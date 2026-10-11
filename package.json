@@ -1,0 +1,18 @@
+{
+  "name": "gather-mod-menu",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "launch": "node launcher/gather-mods-launcher.mjs",
+    "bundle": "node scripts/build-bundle.mjs",
+    "build-launcher-app": "node scripts/build-launcher-app.mjs",
+    "release:dry-run": "gh workflow run release.yml --ref main -f dry_run=true && sleep 5 && gh run watch $(gh run list --workflow release.yml --limit 1 --json databaseId -q \".[0].databaseId\") --exit-status",
+    "deploy-updates": "wrangler deploy --config updates/wrangler.toml"
+  },
+  "devDependencies": {
+    "wrangler": "^4.147.0"
+  },
+  "dependencies": {
+    "sigstore": "^4.1.1"
+  }
+}

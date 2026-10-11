@@ -1,0 +1,63 @@
+name: Release mod
+
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "modules.json", "gather-mod-menu.js"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Sign and validate the upload without publishing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      tag: ${{ steps.publish.outputs.tag }}
+      title: ${{ steps.publish.outputs.title }}
+      notes: ${{ steps.publish.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --omit=dev
+      - id: publish
+        run: node scripts/release.mjs
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+      - if: inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release.json
+
+  # Kept apart so the job holding the signing identity never gets write access.
+  github-release:
+    needs: release
+    if: needs.release.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag }}
+          TITLE: ${{ needs.release.outputs.title }}
+          NOTES: ${{ needs.release.outputs.notes }}
