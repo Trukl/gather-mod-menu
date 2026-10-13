@@ -6,9 +6,17 @@
       "name": "Core",
       "description": "Mods panel, settings, module manager and launcher bridge. Always installed.",
       "file": "src/core.js",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.4.0",
+          "date": "2026-10-13",
+          "notice": "Animations, placed objects and desk objects now survive a new version of the map. Those made on lemlist before its map was republished on Oct 13 were lost: please recreate your animations.",
+          "changes": [
+            "Mod news: important changes (breaking changes, things to redo) open a “Mod news” window once, when you open Gather or when an update brings them; they also stand out in the changelogs."
+          ]
+        },
         {
           "version": "1.3.0",
           "date": "2026-10-13",

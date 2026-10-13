@@ -24,6 +24,7 @@
   const KNOWN_VERSIONS_KEY = STORAGE_PREFIX + "knownVersions";
   const PREVIOUS_VERSIONS_KEY = STORAGE_PREFIX + "previousVersions";
   const HIDDEN_PARTS_KEY = STORAGE_PREFIX + "hiddenParts";
+  const SEEN_NOTICES_KEY = STORAGE_PREFIX + "seenNotices";
   const HUB_URL_KEY = STORAGE_PREFIX + "hubUrl";
   const INSTALL_ID_KEY = STORAGE_PREFIX + "installId";
   const REPORTED_INSTALL_KEY = STORAGE_PREFIX + "reportedInstall";
@@ -384,6 +385,7 @@
     style.textContent = [CORE_CSS, ...state.styles].join("\n");
     document.head.appendChild(style);
     ensurePanel();
+    initSeenNotices();
     trackInstalledVersions();
     window.addEventListener("gathermods:launcher-state", onLauncherState);
     window.addEventListener("gathermods:launcher-diff", renderReviewDiff);
@@ -397,6 +399,7 @@
       sessionStorage.removeItem(REOPEN_SETTINGS_KEY);
       openSettingsModal();
     }
+    showNews();
     console.log(`[GatherMods] installed: ${[...state.apis.keys()].join(", ") || "core only"}`);
   }
 
@@ -546,6 +549,67 @@
     trackInstalledVersions();
     renderUpdateDot();
     if (document.getElementById("gm-settings-modules")) renderSettings();
+    showNews();
+  }
+
+  // ===================
+  // News — a changelog entry can carry a `notice` (breaking change, action
+  // needed). Unseen notices of installed modules, and of their pending
+  // updates, open a modal once.
+  // ===================
+  const noticeKey = ({ module, entry }) => `${module.id}@${entry.version}`;
+  function currentNotices() {
+    const notices = [];
+    for (const module of catalogModules()) {
+      const version = installedVersion(module.id);
+      if (!version) continue;
+      for (const entry of module.changelog ?? [])
+        if (entry.notice)
+          notices.push({ module, entry, pending: isNewerVersion(entry.version, version) });
+    }
+    return notices;
+  }
+  // First run: notices up to the versions this install already had (or all of
+  // them on a fresh install) count as seen. Runs before trackInstalledVersions.
+  function initSeenNotices() {
+    if (readJson(SEEN_NOTICES_KEY, null)) return;
+    const known = readJson(KNOWN_VERSIONS_KEY, {});
+    const old = currentNotices().filter(
+      ({ module, entry }) => !known[module.id] || !isNewerVersion(entry.version, known[module.id]),
+    );
+    writeJson(SEEN_NOTICES_KEY, old.map(noticeKey));
+  }
+  const noticeHtml = (entry) =>
+    entry.notice ? `<div class="gm-notice">${escapeHtml(entry.notice)}</div>` : "";
+  function showNews() {
+    if (document.getElementById("gather-mods-modal")) return;
+    const seen = readJson(SEEN_NOTICES_KEY, []);
+    const notices = currentNotices().filter((n) => !seen.includes(noticeKey(n)));
+    if (!notices.length) return;
+    writeJson(SEEN_NOTICES_KEY, [...seen, ...notices.map(noticeKey)]);
+    const canReview = hasLauncher() && notices.some((n) => n.pending);
+    const modal = openModal(
+      "Mod news",
+      `
+      <div class="gm-news">${notices
+        .map(
+          ({ module, entry, pending }) => `
+        <div class="gm-changelog${pending ? " gm-fresh" : " gm-recent"}">
+          <div class="gm-changelog-head"><b>${escapeHtml(module.name)} v${escapeHtml(entry.version)}</b><span>${escapeHtml(entry.date ?? "")} · ${pending ? "update available" : "installed"}</span></div>
+          ${noticeHtml(entry)}
+          <ul>${(entry.changes ?? []).map((c) => `<li class="${changeClass(c)}">${escapeHtml(c)}</li>`).join("")}</ul>
+        </div>`,
+        )
+        .join("")}</div>
+      <div class="gm-row gm-settings-actions">
+        ${canReview ? '<button class="gm-btn" id="gm-news-review">Review & install</button>' : ""}
+        <button class="gm-btn active" id="gm-news-ok">Got it</button>
+      </div>`,
+      "gm-modal-news",
+    );
+    modal.querySelector("#gm-news-ok").onclick = closeModal;
+    const review = modal.querySelector("#gm-news-review");
+    if (review) review.onclick = openReviewModal;
   }
 
   // ===================
@@ -655,7 +719,7 @@
         ? `<div class="gm-module-changelog">${(m.changelog ?? [])
             .map(
               (e) =>
-                `<div class="gm-changelog"><div class="gm-changelog-head"><b>v${escapeHtml(e.version)}</b><span>${escapeHtml(e.date ?? "")}${e.version === version ? " · installed" : ""}</span></div>${changesHtml(e.changes)}</div>`,
+                `<div class="gm-changelog"><div class="gm-changelog-head"><b>v${escapeHtml(e.version)}</b><span>${escapeHtml(e.date ?? "")}${e.version === version ? " · installed" : ""}</span></div>${noticeHtml(e)}${changesHtml(e.changes)}</div>`,
             )
             .join("")}</div>`
         : "";
@@ -789,6 +853,7 @@
     const entryHtml = ({ module, entry, notInstalled, pending, recent }) => `
         <div class="gm-changelog${notInstalled || pending ? " gm-fresh" : recent ? " gm-recent" : ""}">
           <div class="gm-changelog-head"><b>${escapeHtml(module.name)} v${escapeHtml(entry.version)}</b><span>${escapeHtml(entry.date ?? "")}${notInstalled ? " · not installed" : pending ? " · update available" : recent ? " · installed" : ""}</span></div>
+          ${noticeHtml(entry)}
           <ul>${(entry.changes ?? []).map((c) => `<li class="${changeClass(c)}">${escapeHtml(c)}</li>`).join("")}</ul>
         </div>`;
     box.innerHTML = [
@@ -1005,6 +1070,10 @@
     #gather-mods-modal .gm-settings-actions { margin-top:6px; }
     #gather-mods-modal .gm-settings-actions button.gm-btn { flex:1; text-align:center; margin:0; }
     #gather-mods-modal .gm-modal-review { width:min(960px, 94vw); height:min(760px, 88vh); }
+    #gather-mods-modal .gm-modal-news { width:min(560px, 92vw); height:auto; max-height:80vh; }
+    #gather-mods-modal .gm-news { overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+    #gather-mods-modal .gm-notice { margin:6px 0 2px; padding:6px 9px; border-radius:6px; font-size:13px; font-weight:600; line-height:1.45;
+      color:var(--gm-fg); background:rgba(245,166,35,.16); box-shadow:inset 3px 0 0 #f5a623; }
     #gather-mods-modal .gm-diff { flex:1; overflow:auto; margin:0; padding:8px 0; border-radius:8px; background:var(--gm-input);
       font:11px/1.45 ui-monospace, Menlo, monospace; white-space:pre; }
     #gather-mods-modal .gm-diff div { padding:0 10px; min-width:max-content; }
