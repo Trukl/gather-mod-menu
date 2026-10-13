@@ -1,11 +1,12 @@
 // Community hub: browse, preview, add and publish presets shared by others
 // (Cloudflare Worker, see the gather-mod-hub repo). Tabs follow the installed
-// preset modules (outfits, desks, constructions).
+// preset modules (outfits, desks, constructions). Your presets are those of
+// your Gather account.
 window.__gatherMods.define("hub", (ctx) => {
-  const { me, escapeHtml, readJson, writeJson } = ctx;
+  const { me, escapeHtml, readJson } = ctx;
   const previews = ctx.use("previews");
-  const hubFetch = ctx.use("hub-api").request;
-  const HUB_TOKENS_KEY = "gathermodv2:hubTokens";
+  const api = ctx.use("hub-api");
+  const LEGACY_TOKENS_KEY = "gathermodv2:hubTokens";
   const hub = { type: null, q: "", items: [], searchTimer: null };
 
   const isModalOpen = () => !!document.getElementById("gm-hub-grid");
@@ -17,12 +18,26 @@ window.__gatherMods.define("hub", (ctx) => {
     }
   }
 
+  // Presets published before sign-in are handed to the Gather account once.
+  async function claimLegacyPresets() {
+    const tokens = readJson(LEGACY_TOKENS_KEY, null);
+    if (!tokens) return;
+    await api.claim({
+      presets: Object.entries(tokens).map(([key, token]) => {
+        const [type, id] = key.split(":");
+        return { type, id, token };
+      }),
+    });
+    localStorage.removeItem(LEGACY_TOKENS_KEY);
+  }
+
   async function refresh() {
     if (!isModalOpen() || !presetType()) return;
     if (presetType().needsCatalog) previews.ensureCatalog();
     setStatus("Loading…");
     try {
-      hub.items = (await hubFetch(`/presets/${hub.type}?q=${encodeURIComponent(hub.q)}`)).items;
+      await claimLegacyPresets();
+      hub.items = (await api.request(`/presets/${hub.type}?q=${encodeURIComponent(hub.q)}`)).items;
       setStatus(hub.items.length ? "" : "Nothing here yet");
     } catch (e) {
       hub.items = [];
@@ -44,14 +59,10 @@ window.__gatherMods.define("hub", (ctx) => {
   async function publish(type, preset) {
     setStatus("Publishing…");
     try {
-      const { id, deleteToken } = await hubFetch(`/presets/${type}`, {
+      await api.request(`/presets/${type}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ author: me().name, data: preset }),
-      });
-      writeJson(HUB_TOKENS_KEY, {
-        ...readJson(HUB_TOKENS_KEY, {}),
-        [`${type}:${id}`]: deleteToken,
       });
       if (hub.type === type) await refresh();
       setStatus(`Published "${preset.name}"`);
@@ -60,15 +71,8 @@ window.__gatherMods.define("hub", (ctx) => {
     }
   }
   async function remove(type, id) {
-    const tokens = readJson(HUB_TOKENS_KEY, {});
-    const key = `${type}:${id}`;
     try {
-      await hubFetch(`/presets/${type}/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: "Bearer " + tokens[key] },
-      });
-      delete tokens[key];
-      writeJson(HUB_TOKENS_KEY, tokens);
+      await api.request(`/presets/${type}/${id}`, { method: "DELETE" });
       hub.items = hub.items.filter((i) => i.id !== id);
       setStatus("Deleted from the hub");
       renderGrid();
@@ -81,13 +85,10 @@ window.__gatherMods.define("hub", (ctx) => {
     const grid = document.getElementById("gm-hub-grid");
     const type = presetType();
     if (!grid || !type) return;
-    const tokens = readJson(HUB_TOKENS_KEY, {});
     grid.innerHTML = hub.items
       .map((p) => {
         const id = escapeHtml(p.id);
-        const del = tokens[`${p.type}:${p.id}`]
-          ? `<button class="gm-btn" data-hdel="${id}">Delete</button>`
-          : "";
+        const del = p.mine ? `<button class="gm-btn" data-hdel="${id}">Delete</button>` : "";
         return `<div class="gm-card" title="${escapeHtml(p.summary)}">
           <div class="gm-preview">${type.preview(p.data)}</div>
           <div class="gm-card-name">${escapeHtml(p.name)}</div>

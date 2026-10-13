@@ -18,6 +18,8 @@ A mod for [Gather V2](https://app.v2.gather.town) that adds a **Mods** panel at 
 
 Shared code lives in internal libraries (map helpers, map picking, previews, placements journal, job queue, hub API), installed automatically when a module needs them.
 
+Fun (animations) and Community hub sign in to the hub with your Gather account: the mod reads Gather's ID token from the page and sends it once to the hub, which verifies it with Google's public keys and keeps only your Gather account id (not the token, not your email). What you publish belongs to that account, so you can manage it from the Gather app and the browser alike.
+
 Selecting objects on the map (Place on…, Bulk delete…, Pick desk objects, New construction, New animation): click to add/remove an object, or drag a box to toggle every object fully inside it (unselected ones are added, selected ones removed). Scroll to cycle through stacked objects, Esc to cancel.
 
 Map edits never make you wait: placing constructions, Place on…, bulk delete and deletions from Placed objects are queued and run one after the other, in click order (the status shows how many are queued). Picking another desk while one is being applied stops it and applies the new one.

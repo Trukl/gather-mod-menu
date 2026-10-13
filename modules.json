@@ -128,11 +128,20 @@
       "id": "hub-api",
       "kind": "lib",
       "name": "Hub API",
-      "description": "Shared requests to the community hub.",
+      "description": "Shared requests to the community hub, signed in with your Gather account.",
       "file": "src/lib/hub-api.js",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "requires": {},
-      "changelog": [{ "version": "1.0.0", "date": "2026-10-09", "changes": ["Initial version."] }]
+      "changelog": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-12",
+          "changes": [
+            "Signs in to the hub with your Gather account: what you publish belongs to the account, from the app and the browser alike. Only the Gather account id is kept by the hub."
+          ]
+        },
+        { "version": "1.0.0", "date": "2026-10-09", "changes": ["Initial version."] }
+      ]
     },
     {
       "id": "teleport",
@@ -165,9 +174,16 @@
       "name": "Fun",
       "description": "Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects orbit or move back and forth, seen by everyone with this module.",
       "file": "src/modules/fun.js",
-      "version": "1.2.0",
-      "requires": { "map": "1.1.0", "map-pick": "1.0.1", "hub-api": "1.0.0" },
+      "version": "1.3.0",
+      "requires": { "map": "1.1.0", "map-pick": "1.0.1", "hub-api": "1.1.0" },
       "changelog": [
+        {
+          "version": "1.3.0",
+          "date": "2026-10-12",
+          "changes": [
+            "Your animations belong to your Gather account: start, stop or delete them from the app or the browser. Those you created before are moved to your account when you open their map."
+          ]
+        },
         {
           "version": "1.2.0",
           "date": "2026-10-09",
@@ -355,9 +371,16 @@
       "name": "Community hub",
       "description": "Browse, preview, add and publish presets shared by others.",
       "file": "src/modules/hub.js",
-      "version": "1.0.1",
-      "requires": { "previews": "1.0.0", "hub-api": "1.0.0" },
+      "version": "1.1.0",
+      "requires": { "previews": "1.0.0", "hub-api": "1.1.0" },
       "changelog": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-12",
+          "changes": [
+            "Your published presets belong to your Gather account: delete them from the app or the browser. Those you published before are moved to your account the next time you open the hub."
+          ]
+        },
         {
           "version": "1.0.1",
           "date": "2026-10-09",
