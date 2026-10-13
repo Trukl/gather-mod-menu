@@ -14,7 +14,8 @@
           "date": "2026-10-13",
           "notice": "Animations, placed objects and desk objects now survive a new version of the map. Those made on lemlist before its map was republished on Oct 13 were lost: please recreate your animations.",
           "changes": [
-            "Mod news: important changes (breaking changes, things to redo) open a “Mod news” window once, when you open Gather or when an update brings them; they also stand out in the changelogs."
+            "Mod news: important changes (breaking changes, things to redo) open a “Mod news” window once, when you open Gather or when an update brings them; they also stand out in the changelogs.",
+            "Required updates: when a module no longer works without its new version (breaking change), an “Update required” window asks you to update it or disable it, and the module stays off until then. If the core itself is outdated, the whole mod stays off until you update it or turn it off."
           ]
         },
         {
@@ -161,9 +162,16 @@
       "name": "Hub API",
       "description": "Shared requests to the community hub, signed in with your Gather account.",
       "file": "src/lib/hub-api.js",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.3.0",
+          "date": "2026-10-13",
+          "changes": [
+            "Tells the hub which module versions are running, so it can ask for a required update."
+          ]
+        },
         {
           "version": "1.2.0",
           "date": "2026-10-13",

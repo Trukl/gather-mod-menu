@@ -47,7 +47,7 @@ export function catalogErrors(modules) {
     }
     if (!m.changelog?.some((e) => e.version === m.version))
       errors.push(`${m.id}: no changelog entry for ${m.version}`);
-    for (const e of m.changelog ?? [])
+    for (const e of m.changelog ?? []) {
       if (
         e.notice !== undefined &&
         (typeof e.notice !== "string" || !e.notice.trim() || e.notice.length > MAX_NOTICE)
@@ -55,6 +55,9 @@ export function catalogErrors(modules) {
         errors.push(
           `${m.id} ${e.version}: notice must be a non-empty text of ${MAX_NOTICE} characters at most`,
         );
+      if (e.breaking !== undefined && (e.breaking !== true || e.notice === undefined))
+        errors.push(`${m.id} ${e.version}: breaking must be true and come with a notice`);
+    }
     seen.set(m.id, m);
   }
   return errors;

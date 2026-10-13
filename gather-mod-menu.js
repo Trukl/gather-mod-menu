@@ -28,10 +28,14 @@
   const PREVIOUS_VERSIONS_KEY = STORAGE_PREFIX + "previousVersions";
   const HIDDEN_PARTS_KEY = STORAGE_PREFIX + "hiddenParts";
   const SEEN_NOTICES_KEY = STORAGE_PREFIX + "seenNotices";
+  const UPDATE_REQUIRED_KEY = STORAGE_PREFIX + "updateRequired";
   const HUB_URL_KEY = STORAGE_PREFIX + "hubUrl";
   const INSTALL_ID_KEY = STORAGE_PREFIX + "installId";
   const REPORTED_INSTALL_KEY = STORAGE_PREFIX + "reportedInstall";
   const DEFAULT_HUB_URL = "https://gather-mods-hub.minnecorentin.workers.dev";
+  const VERSIONS_HEADER = "X-Gather-Mods";
+  const BUNDLE_URL =
+    "https://raw.githubusercontent.com/Trukl/gather-mod-menu/main/gather-mod-menu.js";
   const REPORT_RETRY_MS = 10 * 60_000;
   const REOPEN_SETTINGS_KEY = "gathermods:reopenSettings";
   const STYLE_ID = "gather-mods-style";
@@ -152,22 +156,26 @@
   // ===================
   // Modal
   // ===================
+  let modalLocked = false;
   function onModalKey(e) {
     if (e.key !== "Escape") return;
     e.stopPropagation();
-    closeModal();
+    if (!modalLocked) closeModal();
   }
   function closeModal() {
+    modalLocked = false;
     document.removeEventListener("keydown", onModalKey, true);
     document.getElementById("gather-mods-modal")?.remove();
   }
-  function openModal(title, bodyHtml, modalClass = "") {
+  // A locked modal only closes through its own buttons.
+  function openModal(title, bodyHtml, modalClass = "", locked = false) {
     closeModal();
+    modalLocked = locked;
     const modal = document.createElement("div");
     modal.id = "gather-mods-modal";
     modal.innerHTML = `
       <div class="gm-modal ${modalClass}" role="dialog" aria-label="${escapeHtml(title)}">
-        <div class="gm-modal-head"><h3>${escapeHtml(title)}</h3><span class="gm-close" id="gm-modal-close">✕</span></div>
+        <div class="gm-modal-head"><h3>${escapeHtml(title)}</h3>${locked ? "" : '<span class="gm-close" id="gm-modal-close">✕</span>'}</div>
         ${bodyHtml}
       </div>`;
     applyTheme(modal);
@@ -176,9 +184,9 @@
     for (const type of ["keydown", "keyup", "keypress"])
       modal.addEventListener(type, (e) => e.stopPropagation());
     modal.addEventListener("mousedown", (e) => {
-      if (e.target === modal) closeModal();
+      if (e.target === modal && !locked) closeModal();
     });
-    modal.querySelector("#gm-modal-close").onclick = closeModal;
+    if (!locked) modal.querySelector("#gm-modal-close").onclick = closeModal;
     return modal;
   }
 
@@ -253,6 +261,21 @@
   // Community hub access, shared by the core (install reports) and hub-api
   // ===================
   const hubUrl = () => localStorage.getItem(HUB_URL_KEY) || DEFAULT_HUB_URL;
+  // The hub checks the versions of the running modules and answers 426 with
+  // the breaking changes they miss.
+  async function hubFetch(path, init = {}) {
+    const versions = ["core", ...(installed?.apis.keys() ?? [])]
+      .map((id) => [id, installedVersion(id)])
+      .filter(([, version]) => version)
+      .map(([id, version]) => `${id}=${version}`)
+      .join(",");
+    const r = await fetch(hubUrl() + path, {
+      ...init,
+      headers: { ...init.headers, [VERSIONS_HEADER]: versions },
+    });
+    if (r.status === 426) onHubUpdateRequired(await r.clone().json());
+    return r;
+  }
   // Firebase keeps the signed-in user, with an ID token it refreshes, in IndexedDB.
   async function gatherIdToken() {
     const db = await new Promise((resolve, reject) => {
@@ -321,22 +344,25 @@
     ids.forEach(visit);
     return needed;
   }
-  function setModuleSelected(id, on) {
-    const selected = new Set(selectedModules());
-    if (on) selected.add(id);
-    else selected.delete(id);
-    sessionStorage.setItem(REOPEN_SETTINGS_KEY, "1");
+  function setSelectedModules(ids) {
     if (hasLauncher()) {
-      sendToLauncher({ type: "set-modules", modules: [...selected] });
+      sendToLauncher({ type: "set-modules", modules: ids });
       return;
     }
     writeJson(
       DISABLED_MODULES_KEY,
       userModules()
         .map((m) => m.id)
-        .filter((m) => !selected.has(m)),
+        .filter((m) => !ids.includes(m)),
     );
     registry.reload();
+  }
+  function setModuleSelected(id, on) {
+    const selected = new Set(selectedModules());
+    if (on) selected.add(id);
+    else selected.delete(id);
+    sessionStorage.setItem(REOPEN_SETTINGS_KEY, "1");
+    setSelectedModules([...selected]);
   }
 
   // A hidden part of a module is hidden in the panel and turned off by the
@@ -371,12 +397,14 @@
       cleanups: [],
       presetTypes: [],
       tick: null,
+      required: requiredUpdates(),
     };
     installed = state;
+    const blocked = blockedModules(state.required);
     const enabled =
       hasLauncher() || !registry.bundleCatalog ? null : requiredClosure(selectedModules());
     for (const def of defs) {
-      if (def.id === "core" || (enabled && !enabled.has(def.id))) continue;
+      if (def.id === "core" || blocked.has(def.id) || (enabled && !enabled.has(def.id))) continue;
       try {
         state.apis.set(def.id, def.setup(makeContext(def.id, state)) ?? {});
       } catch (e) {
@@ -402,6 +430,7 @@
       sessionStorage.removeItem(REOPEN_SETTINGS_KEY);
       openSettingsModal();
     }
+    showUpdateRequired();
     showNews();
     console.log(`[GatherMods] installed: ${[...state.apis.keys()].join(", ") || "core only"}`);
   }
@@ -447,6 +476,7 @@
       openModal,
       closeModal,
       hubUrl,
+      hubFetch,
       gatherIdToken,
       panel: () => document.getElementById("gather-mods-panel"),
       use: (dep) => state.apis.get(dep),
@@ -500,6 +530,11 @@
       </div>
       <div class="gm-body">
         ${
+          installed.required.length
+            ? `<button class="gm-btn gm-required" id="gm-required">⚠ Update required: ${escapeHtml(installed.required.map((r) => r.module.name).join(", "))}</button>`
+            : ""
+        }
+        ${
           installed.sections
             .map(
               (s) => `
@@ -509,11 +544,15 @@
           </section>`,
             )
             .join("") ||
-          '<div class="gm-empty">No module installed. Open ⚙ to choose modules.</div>'
+          (installed.required.length
+            ? ""
+            : '<div class="gm-empty">No module installed. Open ⚙ to choose modules.</div>')
         }
       </div>`;
     applyTheme(panel);
     sidebar.insertBefore(panel, sidebar.children[sidebar.children.length - 1] || null);
+    const required = panel.querySelector("#gm-required");
+    if (required) required.onclick = showUpdateRequired;
     panel.querySelector("#gm-head").onclick = () => {
       panel.classList.toggle("collapsed");
       localStorage.setItem(PANEL_COLLAPSED_KEY, panel.classList.contains("collapsed"));
@@ -552,6 +591,8 @@
     trackInstalledVersions();
     renderUpdateDot();
     if (document.getElementById("gm-settings-modules")) renderSettings();
+    if (requiredUpdateStep) return continueRequiredUpdate();
+    if (reloadIfRequiredChanged()) return;
     showNews();
   }
 
@@ -583,7 +624,9 @@
     writeJson(SEEN_NOTICES_KEY, old.map(noticeKey));
   }
   const noticeHtml = (entry) =>
-    entry.notice ? `<div class="gm-notice">${escapeHtml(entry.notice)}</div>` : "";
+    entry.notice
+      ? `<div class="gm-notice${entry.breaking ? " gm-breaking" : ""}">${entry.breaking ? "<b>Breaking change.</b> " : ""}${escapeHtml(entry.notice)}</div>`
+      : "";
   function showNews() {
     if (document.getElementById("gather-mods-modal")) return;
     const seen = readJson(SEEN_NOTICES_KEY, []);
@@ -616,9 +659,155 @@
   }
 
   // ===================
+  // Required updates — a changelog entry marked `breaking` is the minimum
+  // version a module needs: below it, the module does not start until it is
+  // updated or disabled, and an outdated core turns the whole mod off. The hub
+  // reports the breaking changes the local catalog does not know yet.
+  // ===================
+  let requiredUpdateStep = null;
+  // Versions this install has, running or blocked.
+  function ownedVersions() {
+    if (hasLauncher())
+      return Object.fromEntries(
+        Object.entries(launcherState().installed ?? {}).map(([id, m]) => [id, m.version]),
+      );
+    const owned = requiredClosure(selectedModules());
+    return Object.fromEntries(
+      catalogModules()
+        .filter((m) => owned.has(m.id))
+        .map((m) => [m.id, m.version]),
+    );
+  }
+  function requiredUpdates() {
+    const owned = ownedVersions();
+    const fromHub = readJson(UPDATE_REQUIRED_KEY, {});
+    return catalogModules().flatMap((module) => {
+      const version = owned[module.id];
+      if (!version) return [];
+      const entries = new Map();
+      for (const entry of [...(module.changelog ?? []), ...(fromHub[module.id] ?? [])])
+        if (entry.breaking && isNewerVersion(entry.version, version))
+          entries.set(entry.version, entry);
+      const sorted = [...entries.values()].sort((a, b) =>
+        isNewerVersion(a.version, b.version) ? -1 : 1,
+      );
+      return sorted.length ? [{ module, version, entries: sorted }] : [];
+    });
+  }
+  function blockedModules(required) {
+    const outdated = new Set(required.map((r) => r.module.id));
+    if (outdated.has("core")) return new Set(defs.map((d) => d.id));
+    return new Set(
+      catalogModules()
+        .map((m) => m.id)
+        .filter((id) => [...requiredClosure([id])].some((dep) => outdated.has(dep))),
+    );
+  }
+  const requiredKey = (required) =>
+    required.map((r) => `${r.module.id}@${r.entries[0].version}`).join();
+  function reloadIfRequiredChanged() {
+    if (!installed || requiredKey(requiredUpdates()) === requiredKey(installed.required))
+      return false;
+    registry.reload();
+    return true;
+  }
+  function onHubUpdateRequired({ modules }) {
+    const fromHub = readJson(UPDATE_REQUIRED_KEY, {});
+    for (const { id, changelog } of modules) fromHub[id] = changelog;
+    writeJson(UPDATE_REQUIRED_KEY, fromHub);
+    reloadIfRequiredChanged();
+  }
+
+  function showUpdateRequired() {
+    const required = installed?.required ?? [];
+    if (!required.length) return;
+    const coreOutdated = required.some((r) => r.module.id === "core");
+    const blocked = blockedModules(required);
+    const toDisable = selectedModules().filter((id) => blocked.has(id));
+    const nameOf = (id) => catalogModules().find((m) => m.id === id)?.name ?? id;
+    const seen = readJson(SEEN_NOTICES_KEY, []);
+    const shown = required.flatMap(({ module, entries }) =>
+      entries.map((entry) => noticeKey({ module, entry })),
+    );
+    writeJson(SEEN_NOTICES_KEY, [...new Set([...seen, ...shown])]);
+    const modal = openModal(
+      "Update required",
+      `
+      <p class="gm-hint">${
+        coreOutdated
+          ? "This version of the mod no longer works: the mod stays off until you update it."
+          : "Some of your modules no longer work in this version: they stay off until you update or disable them."
+      }</p>
+      <div class="gm-news">${required
+        .flatMap(({ module, version, entries }) =>
+          entries.map(
+            (entry) => `
+        <div class="gm-changelog gm-fresh">
+          <div class="gm-changelog-head"><b>${escapeHtml(module.name)} v${escapeHtml(entry.version)}</b><span>${escapeHtml(entry.date ?? "")} · you have v${escapeHtml(version)}</span></div>
+          ${noticeHtml(entry)}
+          <ul>${(entry.changes ?? []).map((c) => `<li class="${changeClass(c)}">${escapeHtml(c)}</li>`).join("")}</ul>
+        </div>`,
+          ),
+        )
+        .join("")}</div>
+      <p class="gm-hint" id="gm-required-message"></p>
+      <div class="gm-row gm-settings-actions">
+        ${
+          coreOutdated || toDisable.length
+            ? `<button class="gm-btn" id="gm-required-off">${coreOutdated ? "Turn off the mod" : `Disable ${escapeHtml(toDisable.map(nameOf).join(", "))}`}</button>`
+            : ""
+        }
+        <button class="gm-btn active" id="gm-required-update">${hasLauncher() ? "Update now" : "Get the new version"}</button>
+      </div>`,
+      "gm-modal-news",
+      true,
+    );
+    const off = modal.querySelector("#gm-required-off");
+    if (off)
+      off.onclick = () =>
+        coreOutdated
+          ? teardown()
+          : setSelectedModules(selectedModules().filter((id) => !blocked.has(id)));
+    modal.querySelector("#gm-required-update").onclick = (e) => {
+      if (!hasLauncher()) return window.open(BUNDLE_URL, "_blank");
+      e.target.disabled = true;
+      e.target.textContent = "Updating…";
+      continueRequiredUpdate();
+    };
+  }
+
+  // The launcher may not know the required versions yet: it checks for them
+  // first. A state push after "apply-update" means nothing was installed.
+  function continueRequiredUpdate() {
+    const step = requiredUpdateStep;
+    requiredUpdateStep = null;
+    const pending = pendingUpdates();
+    const ready = installed.required.every(({ module, entries }) => {
+      const update = pending.find((p) => p.id === module.id);
+      return update && !isNewerVersion(entries[0].version, update.to);
+    });
+    if (step !== "apply" && ready) {
+      requiredUpdateStep = "apply";
+      sendToLauncher({ type: "apply-update" });
+    } else if (step === null) {
+      requiredUpdateStep = "check";
+      sendToLauncher({ type: "check-now" });
+    } else {
+      const button = document.getElementById("gm-required-update");
+      if (!button) return;
+      button.disabled = false;
+      button.textContent = "Update now";
+      document.getElementById("gm-required-message").textContent =
+        launcherState().error ??
+        "The new version is not available yet: try again in a few minutes.";
+    }
+  }
+
+  // ===================
   // Settings
   // ===================
   function openSettingsModal() {
+    if (installed?.required.length) return showUpdateRequired();
     const modal = openModal(
       "Mod settings",
       `
@@ -1000,6 +1189,7 @@
     :is(#gather-mods-panel, #gather-mods-modal) .gm-del { color:var(--gm-muted); font-size:13px; flex-shrink:0; }
     :is(#gather-mods-panel, #gather-mods-modal) .gm-del:hover { color:#ff6b6b; }
     :is(#gather-mods-panel, #gather-mods-modal) .gm-empty { color:var(--gm-muted); font-size:12px; padding:4px 2px; }
+    #gather-mods-panel button.gm-btn.gm-required { color:var(--gm-red); font-weight:600; margin-bottom:6px; }
     :is(#gather-mods-panel, #gather-mods-modal) .gm-row { display:flex; gap:6px; }
     :is(#gather-mods-panel, #gather-mods-modal) .gm-row .gm-input { flex:1; margin:3px 0; }
     :is(#gather-mods-panel, #gather-mods-modal) .gm-row button.gm-btn { width:auto; flex-shrink:0; }
@@ -1077,6 +1267,7 @@
     #gather-mods-modal .gm-news { overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
     #gather-mods-modal .gm-notice { margin:6px 0 2px; padding:6px 9px; border-radius:6px; font-size:13px; font-weight:600; line-height:1.45;
       color:var(--gm-fg); background:rgba(245,166,35,.16); box-shadow:inset 3px 0 0 #f5a623; }
+    #gather-mods-modal .gm-notice.gm-breaking { background:rgba(255,59,48,.14); box-shadow:inset 3px 0 0 var(--gm-red); }
     #gather-mods-modal .gm-diff { flex:1; overflow:auto; margin:0; padding:8px 0; border-radius:8px; background:var(--gm-input);
       font:11px/1.45 ui-monospace, Menlo, monospace; white-space:pre; }
     #gather-mods-modal .gm-diff div { padding:0 10px; min-width:max-content; }
@@ -1088,7 +1279,7 @@
   `;
 })();
 
-window.__gatherMods.bundleCatalog = {"modules":[{"id":"core","kind":"core","name":"Core","description":"Mods panel, settings, module manager and launcher bridge. Always installed.","version":"1.4.0","requires":{},"changelog":[{"version":"1.4.0","date":"2026-10-13","notice":"Animations, placed objects and desk objects now survive a new version of the map. Those made on lemlist before its map was republished on Oct 13 were lost: please recreate your animations.","changes":["Mod news: important changes (breaking changes, things to redo) open a “Mod news” window once, when you open Gather or when an update brings them; they also stand out in the changelogs."]},{"version":"1.3.0","date":"2026-10-13","changes":["On first install and after each update, tells the community hub which module versions this install runs, with your Gather account, so the author knows how many installs run which version."]},{"version":"1.2.0","date":"2026-10-09","changes":["Every module has a “Changelog” link in Settings, installed or not.","Turning on a module you don't have asks first: it shows the version, its latest changes and the libraries it brings, then “Install”.","Modules with several features list them under their row: click one to hide it from the panel and turn it off (e.g. Flee mode)."]},{"version":"1.1.2","date":"2026-10-09","changes":["What's new only shows updates to install and the last update you installed; “Show full history” unfolds the rest."]},{"version":"1.1.1","date":"2026-10-09","changes":["Settings tell you in red when the launcher is no longer running, instead of showing stale information and settings that do nothing.","What's new highlights the changes of the last update you installed, until the module's next update."]},{"version":"1.1.0","date":"2026-10-09","changes":["What's new and Review updates highlight what you haven't installed yet in green.","“New” and “Update” badges are green; a module being uninstalled or no longer published is shown in red.","A module that is no longer published gets an “Uninstall” button instead of a note pointing to the launcher settings file.","Changelog lines starting with “Removed:” are shown in red."]},{"version":"1.0.0","date":"2026-10-08","changes":["The mod is split into modules: pick the features you want in ⚙ Settings, only their code runs and gets updated.","New modules show up in Settings with a “New” badge and are never installed automatically.","“What's new” lists the changelog of your modules; “Review updates” shows it next to the exact code diff."]}]},{"id":"map","kind":"lib","name":"Map helpers","description":"Shared map object helpers.","version":"1.2.0","requires":{},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Stable references to objects (Gather's hashIdentifier, plus type and position), so what the mod tracks survives a new version of the map."]},{"version":"1.1.0","date":"2026-10-08","changes":["Can force Gather to redraw the map, which it otherwise only does when something changes.","Box selection toggles objects, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"map-pick","kind":"lib","name":"Map picking","description":"Shared object selection on the map (click, box, scroll to cycle).","version":"1.0.1","requires":{"map":"1.1.0"},"changelog":[{"version":"1.0.1","date":"2026-10-08","changes":["Selection outlines show up and go away immediately, even when started or stopped from the panel.","The yellow hover outline follows the object named in the tooltip, even between close objects."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"previews","kind":"lib","name":"Previews","description":"Shared outfit and object previews.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"placements","kind":"lib","name":"Placements journal","description":"Shared journal of the objects placed with the mod.","version":"1.1.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.1.0","date":"2026-10-13","changes":["Placements are kept per floor with stable references, so they survive a new version of the map."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"jobs","kind":"lib","name":"Job queue","description":"Shared queue that runs map edits one after the other, in click order.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"hub-api","kind":"lib","name":"Hub API","description":"Shared requests to the community hub, signed in with your Gather account.","version":"1.2.0","requires":{},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Uses the core's hub address and Gather sign-in, shared with install reports."]},{"version":"1.1.0","date":"2026-10-12","changes":["Signs in to the hub with your Gather account: what you publish belongs to the account, from the app and the browser alike. Only the Gather account id is kept by the hub."]},{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"teleport","kind":"module","name":"Teleport","description":"Teleport mode (every “Go to” and double-click teleports), TP to your desk, TP to players and saved locations.","version":"1.2.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Saved locations follow the map when an admin publishes a new version that shifts it (locations saved before this version don't move)."]},{"version":"1.1.0","date":"2026-10-09","changes":["Teleport mode, TP to my desk, Players and Saved locations can each be hidden in Settings (a hidden Teleport mode is off)."]},{"version":"1.0.0","date":"2026-10-08","changes":["Teleport mode, TP to desk, TP to players and saved locations, now in one module."]}]},{"id":"fun","kind":"module","name":"Fun","description":"Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects orbit or move back and forth, seen by everyone with this module.","version":"1.4.0","requires":{"map":"1.2.0","map-pick":"1.0.1","hub-api":"1.1.0"},"changelog":[{"version":"1.4.0","date":"2026-10-13","changes":["Animations survive a new version of the map: they belong to the floor and find their objects again, even if the map moved. Existing animations are converted the first time someone with this version opens their map."]},{"version":"1.3.0","date":"2026-10-12","changes":["Your animations belong to your Gather account: start, stop or delete them from the app or the browser. Those you created before are moved to your account when you open their map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Flee mode and Animations can each be hidden in Settings; a hidden one is turned off (hidden animations are no longer fetched nor played).","The animation list only shows yours; the others' still play on the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Animations: select objects, make them orbit around a point or move back and forth in a straight line or along a wave, with a live preview, then save.","Everyone on the map who has this module sees your animations, in sync; only you can start, stop or delete yours.","Nothing is sent to Gather's server: objects only move on screen, and the map is redrawn at 30 fps at most while an animation runs."]},{"version":"1.0.0","date":"2026-10-08","changes":["Flee mode moves here from the player list."]}]},{"id":"build","kind":"module","name":"Build","description":"Free placement in the build tool, “Place on…” to put objects on any other object, and bulk delete (click or drag a box to select).","version":"1.3.0","requires":{"map":"1.1.0","map-pick":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-09","changes":["Free placement, Place on… and Bulk delete can each be hidden in Settings (a hidden Free placement is off)."]},{"version":"1.2.0","date":"2026-10-09","changes":["Place on… and bulk delete no longer wait for the previous one to finish: start the next one right away, it is queued."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects moved with Place on… are listed in Placed objects.","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Free placement, Place on… and bulk delete, now in one module."]}]},{"id":"outfits","kind":"module","name":"Outfits","description":"Save and apply outfits, including “No outfit” and “Invisible”.","version":"1.0.0","requires":{"previews":"1.0.0"},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Outfit presets as a module."]}]},{"id":"desks","kind":"module","name":"Desks","description":"Save and swap your desk decoration, and pick which objects belong to your desk.","version":"1.3.0","requires":{"map":"1.2.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["The objects picked for your desk survive a new version of the map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Picking another desk while one is being applied stops it and applies the new one; “↩ Previous desk” still brings back the desk you had before the first one."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects added by a desk preset are listed in Placed objects.","Dragging a box over desk objects already picked removes them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Desk presets as a module."]}]},{"id":"constructions","kind":"module","name":"Constructions","description":"Save a group of objects and place it anywhere on the map in one click.","version":"1.2.0","requires":{"map":"1.1.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-09","changes":["Place several constructions and click “↶ Delete last” several times without waiting: each action is queued and runs in order."]},{"version":"1.1.0","date":"2026-10-08","changes":["“↶ Undo” becomes “↶ Delete last”, using the shared journal of placed objects (keeps your history).","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Constructions as a module."]}]},{"id":"placed","kind":"module","name":"Placed objects","description":"Everything you placed with the mod on this map (constructions, desk presets, Place on…): delete the last one, any of them, or all.","version":"1.2.0","requires":{"map":"1.2.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Placed objects are listed per floor and survive a new version of the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Deletions no longer wait for the previous one: click several ✕ or “↶ Delete last” in a row, they are queued and run in order."]},{"version":"1.0.0","date":"2026-10-08","changes":["New module: list what the mod placed on this map, hover to see it, delete the last placement, any of them, or all (everything is outlined in red before you confirm)."]}]},{"id":"share","kind":"module","name":"Share presets","description":"Export and import the presets of your installed modules as JSON.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Export and import only cover the preset modules you have installed."]}]},{"id":"hub","kind":"module","name":"Community hub","description":"Browse, preview, add and publish presets shared by others.","version":"1.1.0","requires":{"previews":"1.0.0","hub-api":"1.1.0"},"changelog":[{"version":"1.1.0","date":"2026-10-12","changes":["Your published presets belong to your Gather account: delete them from the app or the browser. Those you published before are moved to your account the next time you open the hub."]},{"version":"1.0.1","date":"2026-10-09","changes":["Hub requests go through the shared hub library, also used by animations."]},{"version":"1.0.0","date":"2026-10-08","changes":["Hub tabs follow your installed preset modules."]}]}]};
+window.__gatherMods.bundleCatalog = {"modules":[{"id":"core","kind":"core","name":"Core","description":"Mods panel, settings, module manager and launcher bridge. Always installed.","version":"1.4.0","requires":{},"changelog":[{"version":"1.4.0","date":"2026-10-13","notice":"Animations, placed objects and desk objects now survive a new version of the map. Those made on lemlist before its map was republished on Oct 13 were lost: please recreate your animations.","changes":["Mod news: important changes (breaking changes, things to redo) open a “Mod news” window once, when you open Gather or when an update brings them; they also stand out in the changelogs.","Required updates: when a module no longer works without its new version (breaking change), an “Update required” window asks you to update it or disable it, and the module stays off until then. If the core itself is outdated, the whole mod stays off until you update it or turn it off."]},{"version":"1.3.0","date":"2026-10-13","changes":["On first install and after each update, tells the community hub which module versions this install runs, with your Gather account, so the author knows how many installs run which version."]},{"version":"1.2.0","date":"2026-10-09","changes":["Every module has a “Changelog” link in Settings, installed or not.","Turning on a module you don't have asks first: it shows the version, its latest changes and the libraries it brings, then “Install”.","Modules with several features list them under their row: click one to hide it from the panel and turn it off (e.g. Flee mode)."]},{"version":"1.1.2","date":"2026-10-09","changes":["What's new only shows updates to install and the last update you installed; “Show full history” unfolds the rest."]},{"version":"1.1.1","date":"2026-10-09","changes":["Settings tell you in red when the launcher is no longer running, instead of showing stale information and settings that do nothing.","What's new highlights the changes of the last update you installed, until the module's next update."]},{"version":"1.1.0","date":"2026-10-09","changes":["What's new and Review updates highlight what you haven't installed yet in green.","“New” and “Update” badges are green; a module being uninstalled or no longer published is shown in red.","A module that is no longer published gets an “Uninstall” button instead of a note pointing to the launcher settings file.","Changelog lines starting with “Removed:” are shown in red."]},{"version":"1.0.0","date":"2026-10-08","changes":["The mod is split into modules: pick the features you want in ⚙ Settings, only their code runs and gets updated.","New modules show up in Settings with a “New” badge and are never installed automatically.","“What's new” lists the changelog of your modules; “Review updates” shows it next to the exact code diff."]}]},{"id":"map","kind":"lib","name":"Map helpers","description":"Shared map object helpers.","version":"1.2.0","requires":{},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Stable references to objects (Gather's hashIdentifier, plus type and position), so what the mod tracks survives a new version of the map."]},{"version":"1.1.0","date":"2026-10-08","changes":["Can force Gather to redraw the map, which it otherwise only does when something changes.","Box selection toggles objects, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"map-pick","kind":"lib","name":"Map picking","description":"Shared object selection on the map (click, box, scroll to cycle).","version":"1.0.1","requires":{"map":"1.1.0"},"changelog":[{"version":"1.0.1","date":"2026-10-08","changes":["Selection outlines show up and go away immediately, even when started or stopped from the panel.","The yellow hover outline follows the object named in the tooltip, even between close objects."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"previews","kind":"lib","name":"Previews","description":"Shared outfit and object previews.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"placements","kind":"lib","name":"Placements journal","description":"Shared journal of the objects placed with the mod.","version":"1.1.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.1.0","date":"2026-10-13","changes":["Placements are kept per floor with stable references, so they survive a new version of the map."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"jobs","kind":"lib","name":"Job queue","description":"Shared queue that runs map edits one after the other, in click order.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"hub-api","kind":"lib","name":"Hub API","description":"Shared requests to the community hub, signed in with your Gather account.","version":"1.3.0","requires":{},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["Tells the hub which module versions are running, so it can ask for a required update."]},{"version":"1.2.0","date":"2026-10-13","changes":["Uses the core's hub address and Gather sign-in, shared with install reports."]},{"version":"1.1.0","date":"2026-10-12","changes":["Signs in to the hub with your Gather account: what you publish belongs to the account, from the app and the browser alike. Only the Gather account id is kept by the hub."]},{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"teleport","kind":"module","name":"Teleport","description":"Teleport mode (every “Go to” and double-click teleports), TP to your desk, TP to players and saved locations.","version":"1.2.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Saved locations follow the map when an admin publishes a new version that shifts it (locations saved before this version don't move)."]},{"version":"1.1.0","date":"2026-10-09","changes":["Teleport mode, TP to my desk, Players and Saved locations can each be hidden in Settings (a hidden Teleport mode is off)."]},{"version":"1.0.0","date":"2026-10-08","changes":["Teleport mode, TP to desk, TP to players and saved locations, now in one module."]}]},{"id":"fun","kind":"module","name":"Fun","description":"Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects orbit or move back and forth, seen by everyone with this module.","version":"1.4.0","requires":{"map":"1.2.0","map-pick":"1.0.1","hub-api":"1.1.0"},"changelog":[{"version":"1.4.0","date":"2026-10-13","changes":["Animations survive a new version of the map: they belong to the floor and find their objects again, even if the map moved. Existing animations are converted the first time someone with this version opens their map."]},{"version":"1.3.0","date":"2026-10-12","changes":["Your animations belong to your Gather account: start, stop or delete them from the app or the browser. Those you created before are moved to your account when you open their map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Flee mode and Animations can each be hidden in Settings; a hidden one is turned off (hidden animations are no longer fetched nor played).","The animation list only shows yours; the others' still play on the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Animations: select objects, make them orbit around a point or move back and forth in a straight line or along a wave, with a live preview, then save.","Everyone on the map who has this module sees your animations, in sync; only you can start, stop or delete yours.","Nothing is sent to Gather's server: objects only move on screen, and the map is redrawn at 30 fps at most while an animation runs."]},{"version":"1.0.0","date":"2026-10-08","changes":["Flee mode moves here from the player list."]}]},{"id":"build","kind":"module","name":"Build","description":"Free placement in the build tool, “Place on…” to put objects on any other object, and bulk delete (click or drag a box to select).","version":"1.3.0","requires":{"map":"1.1.0","map-pick":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-09","changes":["Free placement, Place on… and Bulk delete can each be hidden in Settings (a hidden Free placement is off)."]},{"version":"1.2.0","date":"2026-10-09","changes":["Place on… and bulk delete no longer wait for the previous one to finish: start the next one right away, it is queued."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects moved with Place on… are listed in Placed objects.","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Free placement, Place on… and bulk delete, now in one module."]}]},{"id":"outfits","kind":"module","name":"Outfits","description":"Save and apply outfits, including “No outfit” and “Invisible”.","version":"1.0.0","requires":{"previews":"1.0.0"},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Outfit presets as a module."]}]},{"id":"desks","kind":"module","name":"Desks","description":"Save and swap your desk decoration, and pick which objects belong to your desk.","version":"1.3.0","requires":{"map":"1.2.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["The objects picked for your desk survive a new version of the map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Picking another desk while one is being applied stops it and applies the new one; “↩ Previous desk” still brings back the desk you had before the first one."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects added by a desk preset are listed in Placed objects.","Dragging a box over desk objects already picked removes them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Desk presets as a module."]}]},{"id":"constructions","kind":"module","name":"Constructions","description":"Save a group of objects and place it anywhere on the map in one click.","version":"1.2.0","requires":{"map":"1.1.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-09","changes":["Place several constructions and click “↶ Delete last” several times without waiting: each action is queued and runs in order."]},{"version":"1.1.0","date":"2026-10-08","changes":["“↶ Undo” becomes “↶ Delete last”, using the shared journal of placed objects (keeps your history).","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Constructions as a module."]}]},{"id":"placed","kind":"module","name":"Placed objects","description":"Everything you placed with the mod on this map (constructions, desk presets, Place on…): delete the last one, any of them, or all.","version":"1.2.0","requires":{"map":"1.2.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Placed objects are listed per floor and survive a new version of the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Deletions no longer wait for the previous one: click several ✕ or “↶ Delete last” in a row, they are queued and run in order."]},{"version":"1.0.0","date":"2026-10-08","changes":["New module: list what the mod placed on this map, hover to see it, delete the last placement, any of them, or all (everything is outlined in red before you confirm)."]}]},{"id":"share","kind":"module","name":"Share presets","description":"Export and import the presets of your installed modules as JSON.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Export and import only cover the preset modules you have installed."]}]},{"id":"hub","kind":"module","name":"Community hub","description":"Browse, preview, add and publish presets shared by others.","version":"1.1.0","requires":{"previews":"1.0.0","hub-api":"1.1.0"},"changelog":[{"version":"1.1.0","date":"2026-10-12","changes":["Your published presets belong to your Gather account: delete them from the app or the browser. Those you published before are moved to your account the next time you open the hub."]},{"version":"1.0.1","date":"2026-10-09","changes":["Hub requests go through the shared hub library, also used by animations."]},{"version":"1.0.0","date":"2026-10-08","changes":["Hub tabs follow your installed preset modules."]}]}]};
 // Map library: object helpers, snapshots, stable object references and
 // screen/world geometry shared by the modules that work on the map.
 window.__gatherMods.define("map", (ctx) => {
@@ -1983,12 +2174,12 @@ window.__gatherMods.define("jobs", () => {
 // is sent once for a hub session. The hub URL and the Gather token come from
 // the core.
 window.__gatherMods.define("hub-api", (ctx) => {
-  const { me, readJson, writeJson, hubUrl, gatherIdToken } = ctx;
+  const { me, readJson, writeJson, hubFetch, gatherIdToken } = ctx;
   const SESSION_KEY = "gathermodv2:hubSession";
   const RENEW_BEFORE_MS = 24 * 3_600_000;
 
   async function call(path, init = {}, session) {
-    const r = await fetch(hubUrl() + path, {
+    const r = await hubFetch(path, {
       ...init,
       headers: { ...init.headers, Authorization: "Bearer " + session },
     });
@@ -2002,7 +2193,7 @@ window.__gatherMods.define("hub-api", (ctx) => {
   async function signIn() {
     const gatherToken = await gatherIdToken();
     if (!gatherToken) throw new Error("hub sign-in: no Gather session found");
-    const r = await fetch(hubUrl() + "/auth", {
+    const r = await hubFetch("/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ gatherToken }),
