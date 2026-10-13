@@ -24,6 +24,7 @@ export function isNewerVersion(candidate, current) {
 const ID_RE = /^[a-z][a-z0-9-]*$/;
 const VERSION_RE = /^\d+\.\d+\.\d+$/;
 const KINDS = ["core", "lib", "module"];
+const MAX_NOTICE = 300;
 
 // Modules are listed in load order: core first, dependencies before dependents.
 export function catalogErrors(modules) {
@@ -46,6 +47,17 @@ export function catalogErrors(modules) {
     }
     if (!m.changelog?.some((e) => e.version === m.version))
       errors.push(`${m.id}: no changelog entry for ${m.version}`);
+    for (const e of m.changelog ?? []) {
+      if (
+        e.notice !== undefined &&
+        (typeof e.notice !== "string" || !e.notice.trim() || e.notice.length > MAX_NOTICE)
+      )
+        errors.push(
+          `${m.id} ${e.version}: notice must be a non-empty text of ${MAX_NOTICE} characters at most`,
+        );
+      if (e.breaking !== undefined && (e.breaking !== true || e.notice === undefined))
+        errors.push(`${m.id} ${e.version}: breaking must be true and come with a notice`);
+    }
     seen.set(m.id, m);
   }
   return errors;

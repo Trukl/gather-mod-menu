@@ -3,12 +3,12 @@
 // is sent once for a hub session. The hub URL and the Gather token come from
 // the core.
 window.__gatherMods.define("hub-api", (ctx) => {
-  const { me, readJson, writeJson, hubUrl, gatherIdToken } = ctx;
+  const { me, readJson, writeJson, hubFetch, gatherIdToken } = ctx;
   const SESSION_KEY = "gathermodv2:hubSession";
   const RENEW_BEFORE_MS = 24 * 3_600_000;
 
   async function call(path, init = {}, session) {
-    const r = await fetch(hubUrl() + path, {
+    const r = await hubFetch(path, {
       ...init,
       headers: { ...init.headers, Authorization: "Bearer " + session },
     });
@@ -22,7 +22,7 @@ window.__gatherMods.define("hub-api", (ctx) => {
   async function signIn() {
     const gatherToken = await gatherIdToken();
     if (!gatherToken) throw new Error("hub sign-in: no Gather session found");
-    const r = await fetch(hubUrl() + "/auth", {
+    const r = await hubFetch("/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ gatherToken }),

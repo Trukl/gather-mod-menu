@@ -38,6 +38,14 @@ Every preset shows a preview on hover; the light/dark theme follows Gather. Clic
 
 A dot in the panel header means updates or new modules are available.
 
+**Mod news**: important changes (a breaking change, something to redo) open a “Mod news” window once, when you open Gather or when an update brings them: for installed modules, and for their pending updates (with “Review & install”). They also stand out in the changelogs. A fresh install starts with every past news item marked as read.
+
+![Mod news](docs/media/mod-news.gif)
+
+**Required updates**: a changelog entry marked `"breaking": true` is the minimum version of its module. Below it, the module stays off and an “Update required” window, which only closes through its buttons, offers to update it now (launcher) or to disable it, with the modules that depend on it. When the core itself is outdated, the whole mod stays off until you update it or turn it off for this session. The hub also knows these minimum versions: mods from Core 1.4.0 send their running versions with every hub request, and the hub answers `426` with the breaking changes they miss, which opens the same window (even without the launcher, whose catalog is the one of the pasted bundle).
+
+![Update required](docs/media/update-required.gif)
+
 ## Demos
 
 ### Modules
@@ -134,7 +142,7 @@ The community hub (shared presets API) lives in a separate repo, `gather-mod-hub
 
 ## Releasing (maintainer)
 
-1. Change the code of one or more modules, bump their `version` in `modules.json` and add a changelog entry (in English) for that version. Start a change with `Removed:` when it takes something away, so it shows in red.
+1. Change the code of one or more modules, bump their `version` in `modules.json` and add a changelog entry (in English) for that version. Start a change with `Removed:` when it takes something away, so it shows in red. For news every user must read (breaking change, action needed), add a short `"notice"` (300 characters max) to that changelog entry: it opens the “Mod news” window once. When older versions of the module no longer work (new data format, changed hub API), also add `"breaking": true` to that entry: every install below that version must update or disable the module. Keep it for real breakages: it stops every outdated install at once.
 2. `npm run bundle`, commit on a branch and open a pull request: `main` only accepts pull requests. Merging it publishes: the `Release mod` GitHub workflow runs on every push to `main` that touches `src/`, `modules.json` or the bundle, then creates a [GitHub release](https://github.com/Trukl/gather-mod-menu/releases) listing the changed modules and their changelog. Follow it with `gh run watch`; retry a failed run with `gh run rerun <id>`.
 
 `npm run release:dry-run` runs the same workflow on `main` without publishing; the signed release is available as a workflow artifact.
