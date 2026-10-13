@@ -26,6 +26,8 @@
   const HIDDEN_PARTS_KEY = STORAGE_PREFIX + "hiddenParts";
   const SEEN_NOTICES_KEY = STORAGE_PREFIX + "seenNotices";
   const UPDATE_REQUIRED_KEY = STORAGE_PREFIX + "updateRequired";
+  const SEEN_ANNOUNCEMENTS_KEY = STORAGE_PREFIX + "seenAnnouncements";
+  const ANNOUNCEMENTS_POLL_MS = 10 * 60_000;
   const HUB_URL_KEY = STORAGE_PREFIX + "hubUrl";
   const INSTALL_ID_KEY = STORAGE_PREFIX + "installId";
   const REPORTED_INSTALL_KEY = STORAGE_PREFIX + "reportedInstall";
@@ -395,6 +397,8 @@
       presetTypes: [],
       tick: null,
       required: requiredUpdates(),
+      announcements: [],
+      announcementsPoll: null,
     };
     installed = state;
     const blocked = blockedModules(state.required);
@@ -422,6 +426,7 @@
       const panel = document.getElementById("gather-mods-panel");
       if (panel) applyTheme(panel);
       for (const fn of state.tickers) runSafely(fn);
+      showAnnouncements(false);
     }, TICK_MS);
     if (sessionStorage.getItem(REOPEN_SETTINGS_KEY)) {
       sessionStorage.removeItem(REOPEN_SETTINGS_KEY);
@@ -429,6 +434,8 @@
     }
     showUpdateRequired();
     showNews();
+    fetchAnnouncements();
+    state.announcementsPoll = setInterval(fetchAnnouncements, ANNOUNCEMENTS_POLL_MS);
     console.log(`[GatherMods] installed: ${[...state.apis.keys()].join(", ") || "core only"}`);
   }
 
@@ -438,6 +445,7 @@
     installed = null;
     if (!state) return;
     clearInterval(state.tick);
+    clearInterval(state.announcementsPoll);
     clearTimeout(launcherPing);
     for (const fn of [...state.cleanups].reverse()) runSafely(fn);
     window.removeEventListener("gathermods:launcher-state", onLauncherState);
@@ -526,6 +534,7 @@
         <span class="gm-head-actions"><span class="gm-cog" id="gm-settings-toggle" title="Settings">⚙</span><span class="gm-chevron">▾</span></span>
       </div>
       <div class="gm-body">
+        <div id="gm-announcements"></div>
         ${
           installed.required.length
             ? `<button class="gm-btn gm-required" id="gm-required">⚠ Update required: ${escapeHtml(installed.required.map((r) => r.module.name).join(", "))}</button>`
@@ -574,6 +583,7 @@
       runSafely(() => s.mount?.(body));
     }
     renderUpdateDot();
+    renderAnnouncements();
   }
 
   function renderUpdateDot() {
@@ -798,6 +808,66 @@
         launcherState().error ??
         "The new version is not available yet: try again in a few minutes.";
     }
+  }
+
+  // ===================
+  // Announcements — messages from the hub admin (maintenance, incident…): a
+  // new one opens a window once no other window is open, active ones stay at
+  // the top of the panel.
+  // ===================
+  async function fetchAnnouncements() {
+    const state = installed;
+    try {
+      const r = await hubFetch("/announcements");
+      if (!r.ok) return;
+      const { announcements } = await r.json();
+      if (installed !== state) return;
+      state.announcements = announcements;
+      renderAnnouncements();
+    } catch (e) {
+      console.warn("[GatherMods] announcements unavailable:", e.message);
+    }
+  }
+  function renderAnnouncements() {
+    const box = document.getElementById("gm-announcements");
+    if (!box) return;
+    box.innerHTML = installed.announcements
+      .map(
+        (a) =>
+          `<button class="gm-btn gm-announce gm-${escapeHtml(a.level)}">📣 ${escapeHtml(a.title)}</button>`,
+      )
+      .join("");
+    box.querySelectorAll("button").forEach((b) => (b.onclick = () => showAnnouncements(true)));
+  }
+  function showAnnouncements(all) {
+    const seen = readJson(SEEN_ANNOUNCEMENTS_KEY, []);
+    const list = all
+      ? installed.announcements
+      : installed.announcements.filter((a) => !seen.includes(a.id));
+    if (!list.length || (!all && document.getElementById("gather-mods-modal"))) return;
+    writeJson(
+      SEEN_ANNOUNCEMENTS_KEY,
+      installed.announcements.map((a) => a.id),
+    );
+    const modal = openModal(
+      list.length === 1 ? list[0].title : "Announcements",
+      `
+      <div class="gm-news">${list
+        .map(
+          (a) => `
+        <div class="gm-announcement gm-${escapeHtml(a.level)}">
+          ${list.length === 1 ? "" : `<b>${escapeHtml(a.title)}</b>`}
+          <p>${escapeHtml(a.message)}</p>
+          <span>${escapeHtml(new Date(a.createdAt).toLocaleString())}</span>
+        </div>`,
+        )
+        .join("")}</div>
+      <div class="gm-row gm-settings-actions">
+        <button class="gm-btn active" id="gm-announcements-ok">Got it</button>
+      </div>`,
+      "gm-modal-news",
+    );
+    modal.querySelector("#gm-announcements-ok").onclick = closeModal;
   }
 
   // ===================
@@ -1187,6 +1257,8 @@
     :is(#gather-mods-panel, #gather-mods-modal) .gm-del:hover { color:#ff6b6b; }
     :is(#gather-mods-panel, #gather-mods-modal) .gm-empty { color:var(--gm-muted); font-size:12px; padding:4px 2px; }
     #gather-mods-panel button.gm-btn.gm-required { color:var(--gm-red); font-weight:600; margin-bottom:6px; }
+    #gather-mods-panel button.gm-btn.gm-announce { font-weight:600; margin-bottom:6px; }
+    #gather-mods-panel button.gm-btn.gm-announce.gm-warning { color:#c77c00; }
     :is(#gather-mods-panel, #gather-mods-modal) .gm-row { display:flex; gap:6px; }
     :is(#gather-mods-panel, #gather-mods-modal) .gm-row .gm-input { flex:1; margin:3px 0; }
     :is(#gather-mods-panel, #gather-mods-modal) .gm-row button.gm-btn { width:auto; flex-shrink:0; }
@@ -1265,6 +1337,11 @@
     #gather-mods-modal .gm-notice { margin:6px 0 2px; padding:6px 9px; border-radius:6px; font-size:13px; font-weight:600; line-height:1.45;
       color:var(--gm-fg); background:rgba(245,166,35,.16); box-shadow:inset 3px 0 0 #f5a623; }
     #gather-mods-modal .gm-notice.gm-breaking { background:rgba(255,59,48,.14); box-shadow:inset 3px 0 0 var(--gm-red); }
+    #gather-mods-modal .gm-announcement { padding:8px 10px; border-radius:6px; font-size:13px; line-height:1.45;
+      background:var(--gm-surface); box-shadow:inset 3px 0 0 var(--theme-color-accent,#6c5ce7); }
+    #gather-mods-modal .gm-announcement.gm-warning { background:rgba(245,166,35,.16); box-shadow:inset 3px 0 0 #f5a623; }
+    #gather-mods-modal .gm-announcement p { margin:4px 0; white-space:pre-line; }
+    #gather-mods-modal .gm-announcement span { color:var(--gm-muted); font-size:12px; }
     #gather-mods-modal .gm-diff { flex:1; overflow:auto; margin:0; padding:8px 0; border-radius:8px; background:var(--gm-input);
       font:11px/1.45 ui-monospace, Menlo, monospace; white-space:pre; }
     #gather-mods-modal .gm-diff div { padding:0 10px; min-width:max-content; }

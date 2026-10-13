@@ -6,9 +6,16 @@
       "name": "Core",
       "description": "Mods panel, settings, module manager and launcher bridge. Always installed.",
       "file": "src/core.js",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.5.0",
+          "date": "2026-10-14",
+          "changes": [
+            "Announcements: messages from the mod author (maintenance, incident…) open a window once, then stay at the top of the Mods panel until they expire. The core checks for them every 10 minutes."
+          ]
+        },
         {
           "version": "1.4.0",
           "date": "2026-10-13",
