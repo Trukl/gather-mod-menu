@@ -24,6 +24,11 @@
   const KNOWN_VERSIONS_KEY = STORAGE_PREFIX + "knownVersions";
   const PREVIOUS_VERSIONS_KEY = STORAGE_PREFIX + "previousVersions";
   const HIDDEN_PARTS_KEY = STORAGE_PREFIX + "hiddenParts";
+  const HUB_URL_KEY = STORAGE_PREFIX + "hubUrl";
+  const INSTALL_ID_KEY = STORAGE_PREFIX + "installId";
+  const REPORTED_INSTALL_KEY = STORAGE_PREFIX + "reportedInstall";
+  const DEFAULT_HUB_URL = "https://gather-mods-hub.minnecorentin.workers.dev";
+  const REPORT_RETRY_MS = 10 * 60_000;
   const REOPEN_SETTINGS_KEY = "gathermods:reopenSettings";
   const STYLE_ID = "gather-mods-style";
   const TICK_MS = 2000;
@@ -237,6 +242,68 @@
     }
     writeJson(KNOWN_VERSIONS_KEY, known);
     writeJson(PREVIOUS_VERSIONS_KEY, previous);
+    reportInstall();
+  }
+
+  // ===================
+  // Community hub access, shared by the core (install reports) and hub-api
+  // ===================
+  const hubUrl = () => localStorage.getItem(HUB_URL_KEY) || DEFAULT_HUB_URL;
+  // Firebase keeps the signed-in user, with an ID token it refreshes, in IndexedDB.
+  async function gatherIdToken() {
+    const db = await new Promise((resolve, reject) => {
+      const open = indexedDB.open("firebaseLocalStorageDb");
+      open.onsuccess = () => resolve(open.result);
+      open.onerror = () => reject(open.error);
+    });
+    try {
+      const rows = await new Promise((resolve, reject) => {
+        const read = db
+          .transaction("firebaseLocalStorage")
+          .objectStore("firebaseLocalStorage")
+          .getAll();
+        read.onsuccess = () => resolve(read.result);
+        read.onerror = () => reject(read.error);
+      });
+      const user = rows.find((r) => String(r.fbase_key).startsWith("firebase:authUser:"))?.value;
+      return user?.stsTokenManager?.accessToken ?? null;
+    } finally {
+      db.close();
+    }
+  }
+
+  // Tells the hub which versions this install runs, on first install and after
+  // each update, so the author knows how many installs run which version.
+  let reportRetryAt = 0;
+  async function reportInstall() {
+    const versions = Object.fromEntries(
+      catalogModules()
+        .map((m) => [m.id, installedVersion(m.id)])
+        .filter(([, version]) => version),
+    );
+    const report = JSON.stringify({ versions, launcher: hasLauncher() });
+    if (!versions.core || localStorage.getItem(REPORTED_INSTALL_KEY) === report) return;
+    if (Date.now() < reportRetryAt) return;
+    reportRetryAt = Date.now() + REPORT_RETRY_MS;
+    try {
+      const gatherToken = await gatherIdToken();
+      if (!gatherToken) return;
+      if (!localStorage.getItem(INSTALL_ID_KEY))
+        localStorage.setItem(INSTALL_ID_KEY, crypto.randomUUID());
+      const r = await fetch(hubUrl() + "/installs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gatherToken,
+          installId: localStorage.getItem(INSTALL_ID_KEY),
+          ...JSON.parse(report),
+        }),
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      localStorage.setItem(REPORTED_INSTALL_KEY, report);
+    } catch (e) {
+      console.warn("[GatherMods] install report failed", e);
+    }
   }
 
   function requiredClosure(ids) {
@@ -373,6 +440,8 @@
       applyTheme,
       openModal,
       closeModal,
+      hubUrl,
+      gatherIdToken,
       panel: () => document.getElementById("gather-mods-panel"),
       use: (dep) => state.apis.get(dep),
       has: (dep) => state.apis.has(dep),

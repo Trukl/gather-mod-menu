@@ -6,9 +6,16 @@
       "name": "Core",
       "description": "Mods panel, settings, module manager and launcher bridge. Always installed.",
       "file": "src/core.js",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.3.0",
+          "date": "2026-10-13",
+          "changes": [
+            "On first install and after each update, tells the community hub which module versions this install runs, with your Gather account, so the author knows how many installs run which version."
+          ]
+        },
         {
           "version": "1.2.0",
           "date": "2026-10-09",
@@ -146,9 +153,16 @@
       "name": "Hub API",
       "description": "Shared requests to the community hub, signed in with your Gather account.",
       "file": "src/lib/hub-api.js",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.2.0",
+          "date": "2026-10-13",
+          "changes": [
+            "Uses the core's hub address and Gather sign-in, shared with install reports."
+          ]
+        },
         {
           "version": "1.1.0",
           "date": "2026-10-12",
