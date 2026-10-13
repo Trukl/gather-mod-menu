@@ -1,11 +1,12 @@
-// Map library: object helpers, snapshots and screen/world geometry shared by
-// the build, desks and constructions modules.
+// Map library: object helpers, snapshots, stable object references and
+// screen/world geometry shared by the modules that work on the map.
 window.__gatherMods.define("map", (ctx) => {
   const TILE_PX = 32;
   const { GD } = ctx;
 
   const scene = () => GD().PhaserManager.scene;
   const currentMapId = () => GD().Repos.gameSpace.currentMap.baseArea.mapId;
+  const currentFloorId = () => GD().Repos.gameSpace.currentMap.floorId;
   const isLiveObject = (e) => e?.mapEntityType === "MapObject" && !e.isSoftDeleted;
   const liveObjects = (ids) => ids.map((id) => GD().Repos.MapObject.get(id)).filter(isLiveObject);
   const objectName = (o) => o.catalogItemVariant?.catalogItem?.type || "?";
@@ -15,6 +16,51 @@ window.__gatherMods.define("map", (ctx) => {
   };
   const toggleId = (ids, id) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
   const toggleIds = (ids, objects) => objects.reduce((acc, o) => toggleId(acc, o.id), ids);
+
+  // Publishing a new version of a map (Gather's map editor) recreates every
+  // object with a new id but keeps its hashIdentifier, as long as it stays on
+  // the same floor. A reference also keeps the type and position, to find an
+  // object Gather recreated otherwise.
+  const REF_POSITION_EPSILON = 0.05;
+  const objectRef = (o) => ({
+    hash: o.hashIdentifier,
+    variant: o.catalogItemVariantId,
+    x: o.absolutePosition.x,
+    y: o.absolutePosition.y,
+  });
+  // Objects of the current map for each reference (null when not found).
+  // Found objects are cached per map: callers resolve on every render.
+  let refCache = { mapId: null, ids: new Map() };
+  function resolveRefs(refs) {
+    const mapId = currentMapId();
+    if (refCache.mapId !== mapId) refCache = { mapId, ids: new Map() };
+    const cached = (r) => {
+      const o = GD().Repos.MapObject.get(refCache.ids.get(r.hash));
+      return isLiveObject(o) ? o : null;
+    };
+    const found = refs.map(cached);
+    if (found.every(Boolean)) return found;
+    const objects = mapObjects();
+    const byHash = new Map(objects.map((o) => [o.hashIdentifier, o]));
+    const used = new Set(found.filter(Boolean).map((o) => o.id));
+    const samePlace = (c, r) =>
+      !used.has(c.id) &&
+      c.catalogItemVariantId === r.variant &&
+      Math.abs(c.absolutePosition.x - r.x) <= REF_POSITION_EPSILON &&
+      Math.abs(c.absolutePosition.y - r.y) <= REF_POSITION_EPSILON;
+    refs.forEach((r, i) => {
+      if (found[i]) return;
+      found[i] = byHash.get(r.hash) ?? null;
+      if (found[i]) used.add(found[i].id);
+    });
+    refs.forEach((r, i) => {
+      found[i] ??= objects.find((c) => samePlace(c, r)) ?? null;
+      if (!found[i]) return;
+      used.add(found[i].id);
+      refCache.ids.set(r.hash, found[i].id);
+    });
+    return found;
+  }
 
   function topLevelObjects(objects) {
     const ids = new Set(objects.map((o) => o.id));
@@ -121,6 +167,9 @@ window.__gatherMods.define("map", (ctx) => {
     TILE_PX,
     scene,
     currentMapId,
+    currentFloorId,
+    objectRef,
+    resolveRefs,
     isLiveObject,
     liveObjects,
     cleanItem,

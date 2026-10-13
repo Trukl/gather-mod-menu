@@ -20,24 +20,34 @@ window.__gatherMods.define("desks", (ctx) => {
   const savePresets = (l) => writeJson(PRESETS_KEY, l);
 
   // Desk objects default to the area's children; once picked by hand, the
-  // tracked ids are the source of truth (objects can sit outside the area).
+  // tracked references are the source of truth (objects can sit outside the area).
+  // Ids tracked before references existed are converted while their map
+  // version is the current one, and dropped once it has been replaced.
+  function trackedRefs() {
+    const tracked = readJson(trackedKey(), null);
+    if (!tracked?.some((t) => typeof t === "string")) return tracked;
+    const live = map.liveObjects(tracked);
+    if (!live.length) {
+      localStorage.removeItem(trackedKey());
+      return null;
+    }
+    const refs = live.map(map.objectRef);
+    writeJson(trackedKey(), refs);
+    return refs;
+  }
   function getDeskObjects() {
     const area = deskArea();
     if (!area) return [];
-    const ids = readJson(trackedKey(), null);
-    return ids ? map.liveObjects(ids) : area.children.filter(map.isLiveObject);
+    const refs = trackedRefs();
+    return refs ? map.resolveRefs(refs).filter(Boolean) : area.children.filter(map.isLiveObject);
   }
-  const setDeskObjects = (objects) =>
-    writeJson(
-      trackedKey(),
-      objects.map((o) => o.id),
-    );
+  const setDeskObjects = (objects) => writeJson(trackedKey(), objects.map(map.objectRef));
   function replaceTrackedObject(oldObject, newObject) {
-    const ids = readJson(trackedKey(), null);
-    if (!ids?.includes(oldObject.id)) return;
+    const refs = trackedRefs();
+    if (!refs?.some((r) => r.hash === oldObject.hashIdentifier)) return;
     writeJson(
       trackedKey(),
-      ids.map((id) => (id === oldObject.id ? newObject.id : id)),
+      refs.map((r) => (r.hash === oldObject.hashIdentifier ? map.objectRef(newObject) : r)),
     );
   }
   const topLevelDeskObjects = () => map.topLevelObjects(getDeskObjects());
