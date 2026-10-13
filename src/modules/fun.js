@@ -92,12 +92,36 @@ window.__gatherMods.define("fun", (ctx) => {
   };
   const DEFAULT_PARAMS = { period: 4, direction: 1, amplitude: 1, waves: 2 };
 
-  // Shared animations of the current map, as last fetched from the hub, with
+  // Shared animations of the current floor, as last fetched from the hub, with
   // this user's recent changes applied on top until the hub reflects them.
-  const shared = { mapId: null, fetched: [], items: [], clockOffset: 0, syncedAt: 0, status: "" };
+  const shared = { floorId: null, fetched: [], items: [], clockOffset: 0, syncedAt: 0, status: "" };
   const localEdits = new Map();
   let draft = null;
-  const animationsPath = (id = "") => `/animations/${shared.mapId}${id ? "/" + id : ""}`;
+  const animationsPath = (id = "") => `/animations/${shared.floorId}${id ? "/" + id : ""}`;
+  // Where each saved animation is on the current map version: its objects,
+  // found through their stable references, and its point moved by as much as
+  // they moved (a new map version can shift everything).
+  const resolved = new Map();
+  function resolveAll() {
+    resolved.clear();
+    for (const a of shared.items) {
+      const found = map.resolveRefs(a.objects);
+      const pairs = a.objects.map((r, i) => [r, found[i]]).filter(([, o]) => o);
+      const shift = pairs.reduce(
+        (s, [r, o]) => ({
+          x: s.x + (o.absolutePosition.x - r.x) / pairs.length,
+          y: s.y + (o.absolutePosition.y - r.y) / pairs.length,
+        }),
+        { x: 0, y: 0 },
+      );
+      resolved.set(a.id, {
+        ids: pairs.map(([, o]) => o.id),
+        point: { x: a.point.x + shift.x * TILE_PX, y: a.point.y + shift.y * TILE_PX },
+      });
+    }
+  }
+  const placementOf = (a) =>
+    a === draft ? { ids: draft.ids, point: draft.point } : resolved.get(a.id);
 
   const anchorOf = (o) => ({
     x: o.absolutePosition.x * TILE_PX,
@@ -122,12 +146,12 @@ window.__gatherMods.define("fun", (ctx) => {
   }
 
   // Line and wave go to the end point and back with an eased speed.
-  function displacement(a, anchor, center, t) {
+  function displacement(a, point, anchor, center, t) {
     const phase = t / a.params.period;
     if (a.type === "orbit") {
       const angle = a.params.direction * phase * 2 * Math.PI;
-      const rx = anchor.x - a.point.x;
-      const ry = anchor.y - a.point.y;
+      const rx = anchor.x - point.x;
+      const ry = anchor.y - point.y;
       return {
         x: rx * Math.cos(angle) - ry * Math.sin(angle) - rx,
         y: rx * Math.sin(angle) + ry * Math.cos(angle) - ry,
@@ -214,13 +238,14 @@ window.__gatherMods.define("fun", (ctx) => {
     const moved = new Set();
     for (const a of animations) {
       const t = elapsedSeconds(a);
-      const objects = withDescendants(a.ids);
+      const { ids, point } = placementOf(a) ?? { ids: [] };
+      const objects = withDescendants(ids);
       if (!objects.length) continue;
-      const center = groupCenter(map.liveObjects(a.ids));
+      const center = groupCenter(map.liveObjects(ids));
       for (const o of objects) {
         if (moved.has(o.id)) continue;
         moved.add(o.id);
-        displace(o, displacement(a, anchorOf(o), center, t));
+        displace(o, displacement(a, point, anchorOf(o), center, t));
       }
     }
     for (const id of [...displaced.keys()]) if (!moved.has(id)) release(id);
@@ -277,6 +302,7 @@ window.__gatherMods.define("fun", (ctx) => {
       else items.delete(id);
     }
     shared.items = [...items.values()];
+    resolveAll();
     renderAnimations();
     refreshAnimations();
   }
@@ -289,12 +315,12 @@ window.__gatherMods.define("fun", (ctx) => {
     renderAnimations();
   }
   // Animations created before sign-in are handed to the Gather account when
-  // their map is visited, since their tokens were stored without the map.
-  async function claimLegacyAnimations(mapId, items) {
+  // their floor is visited, since their tokens were stored without it.
+  async function claimLegacyAnimations(floorId, items) {
     const tokens = readJson(LEGACY_TOKENS_KEY, {});
     const claims = items
       .filter((a) => !a.mine && tokens[a.id])
-      .map((a) => ({ mapId, id: a.id, token: tokens[a.id] }));
+      .map((a) => ({ floorId, id: a.id, token: tokens[a.id] }));
     if (!claims.length) return items;
     const { claimed } = await api.claim({ animations: claims });
     claims.forEach((c) => delete tokens[c.id]);
@@ -302,20 +328,37 @@ window.__gatherMods.define("fun", (ctx) => {
     else localStorage.removeItem(LEGACY_TOKENS_KEY);
     return items.map((a) => (claimed.includes(a.id) ? { ...a, mine: true } : a));
   }
+  // Animations saved per map version with object ids are moved to the floor,
+  // with stable references, while that version is the current one.
+  async function migrateLegacyAnimations(mapId, legacy) {
+    const items = legacy.map((a) => ({
+      id: a.id,
+      objects: map.liveObjects(a.ids).map(map.objectRef),
+    }));
+    return api.request(animationsPath("migrate"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mapId, items: items.filter((i) => i.objects.length) }),
+    });
+  }
   async function sync() {
+    const floorId = map.currentFloorId();
     const mapId = map.currentMapId();
-    if (mapId !== shared.mapId) {
-      Object.assign(shared, { mapId, fetched: [] });
+    if (floorId !== shared.floorId) {
+      Object.assign(shared, { floorId, fetched: [] });
       localEdits.clear();
       merge();
     }
     shared.syncedAt = Date.now();
     try {
       const sentAt = Date.now();
-      const { now, items } = await api.request(animationsPath());
-      if (mapId !== shared.mapId) return;
-      shared.clockOffset = now - (sentAt + Date.now()) / 2;
-      shared.fetched = await claimLegacyAnimations(mapId, items);
+      const listed = await api.request(`${animationsPath()}?map=${mapId}`);
+      if (floorId !== shared.floorId) return;
+      shared.clockOffset = listed.now - (sentAt + Date.now()) / 2;
+      const { items } = listed.legacy
+        ? await migrateLegacyAnimations(mapId, listed.legacy)
+        : listed;
+      shared.fetched = await claimLegacyAnimations(floorId, items);
       if (shared.status.startsWith("Hub")) shared.status = "";
     } catch (e) {
       shared.status = "Hub unreachable: " + e.message;
@@ -328,7 +371,7 @@ window.__gatherMods.define("fun", (ctx) => {
     const data = {
       name: (name || TYPES[draft.type].label).slice(0, MAX_NAME),
       type: draft.type,
-      ids: draft.ids,
+      objects: map.liveObjects(draft.ids).map(map.objectRef),
       point: draft.point,
       params: { ...draft.params },
     };
@@ -528,7 +571,8 @@ window.__gatherMods.define("fun", (ctx) => {
     if (showFlee && root?.isConnected) renderPlayers(root);
     if (!showAnimations) return;
     const due = Date.now() - shared.syncedAt > SYNC_MS;
-    if (map.currentMapId() !== shared.mapId || (due && !document.hidden)) sync();
+    if (map.currentFloorId() !== shared.floorId || (due && !document.hidden)) sync();
+    else resolveAll();
   });
   if (showAnimations) sync();
 });

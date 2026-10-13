@@ -60,9 +60,16 @@
       "name": "Map helpers",
       "description": "Shared map object helpers.",
       "file": "src/lib/map.js",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.2.0",
+          "date": "2026-10-13",
+          "changes": [
+            "Stable references to objects (Gather's hashIdentifier, plus type and position), so what the mod tracks survives a new version of the map."
+          ]
+        },
         {
           "version": "1.1.0",
           "date": "2026-10-08",
@@ -110,9 +117,18 @@
       "name": "Placements journal",
       "description": "Shared journal of the objects placed with the mod.",
       "file": "src/lib/placements.js",
-      "version": "1.0.0",
-      "requires": { "map": "1.0.0" },
-      "changelog": [{ "version": "1.0.0", "date": "2026-10-08", "changes": ["Initial version."] }]
+      "version": "1.1.0",
+      "requires": { "map": "1.2.0" },
+      "changelog": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-13",
+          "changes": [
+            "Placements are kept per floor with stable references, so they survive a new version of the map."
+          ]
+        },
+        { "version": "1.0.0", "date": "2026-10-08", "changes": ["Initial version."] }
+      ]
     },
     {
       "id": "jobs",
@@ -149,9 +165,16 @@
       "name": "Teleport",
       "description": "Teleport mode (every “Go to” and double-click teleports), TP to your desk, TP to players and saved locations.",
       "file": "src/modules/teleport.js",
-      "version": "1.1.0",
-      "requires": {},
+      "version": "1.2.0",
+      "requires": { "map": "1.2.0" },
       "changelog": [
+        {
+          "version": "1.2.0",
+          "date": "2026-10-13",
+          "changes": [
+            "Saved locations follow the map when an admin publishes a new version that shifts it (locations saved before this version don't move)."
+          ]
+        },
         {
           "version": "1.1.0",
           "date": "2026-10-09",
@@ -174,9 +197,16 @@
       "name": "Fun",
       "description": "Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects orbit or move back and forth, seen by everyone with this module.",
       "file": "src/modules/fun.js",
-      "version": "1.3.0",
-      "requires": { "map": "1.1.0", "map-pick": "1.0.1", "hub-api": "1.1.0" },
+      "version": "1.4.0",
+      "requires": { "map": "1.2.0", "map-pick": "1.0.1", "hub-api": "1.1.0" },
       "changelog": [
+        {
+          "version": "1.4.0",
+          "date": "2026-10-13",
+          "changes": [
+            "Animations survive a new version of the map: they belong to the floor and find their objects again, even if the map moved. Existing animations are converted the first time someone with this version opens their map."
+          ]
+        },
         {
           "version": "1.3.0",
           "date": "2026-10-12",
@@ -264,15 +294,20 @@
       "name": "Desks",
       "description": "Save and swap your desk decoration, and pick which objects belong to your desk.",
       "file": "src/modules/desks.js",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "requires": {
-        "map": "1.1.0",
+        "map": "1.2.0",
         "map-pick": "1.0.0",
         "previews": "1.0.0",
-        "placements": "1.0.0",
+        "placements": "1.1.0",
         "jobs": "1.0.0"
       },
       "changelog": [
+        {
+          "version": "1.3.0",
+          "date": "2026-10-13",
+          "changes": ["The objects picked for your desk survive a new version of the map."]
+        },
         {
           "version": "1.2.0",
           "date": "2026-10-09",
@@ -330,9 +365,14 @@
       "name": "Placed objects",
       "description": "Everything you placed with the mod on this map (constructions, desk presets, Place on…): delete the last one, any of them, or all.",
       "file": "src/modules/placed.js",
-      "version": "1.1.0",
-      "requires": { "map": "1.1.0", "placements": "1.0.0", "jobs": "1.0.0" },
+      "version": "1.2.0",
+      "requires": { "map": "1.2.0", "placements": "1.1.0", "jobs": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.2.0",
+          "date": "2026-10-13",
+          "changes": ["Placed objects are listed per floor and survive a new version of the map."]
+        },
         {
           "version": "1.1.0",
           "date": "2026-10-09",

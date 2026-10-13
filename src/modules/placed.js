@@ -24,7 +24,7 @@ window.__gatherMods.define("placed", (ctx) => {
     if (entries.length) {
       const g = map.scene().add.graphics().setDepth(1e9);
       g.lineStyle(1, HIGHLIGHT_COLOR, 1);
-      for (const o of map.liveObjects(entries.flatMap((e) => e.ids))) {
+      for (const o of map.liveObjects(entries.flatMap(placements.liveIds))) {
         const tl = o.topLeftAbsolutePosition;
         const d = o.getDimensionsInTiles();
         g.strokeRect(tl.x * TILE_PX, tl.y * TILE_PX, d.width * TILE_PX, d.height * TILE_PX);
@@ -37,7 +37,7 @@ window.__gatherMods.define("placed", (ctx) => {
   // re-rendering the list never fires mouseleave, so render() refreshes it too.
   // While "Delete all" waits for confirmation, everything stays outlined.
   let hovered = null;
-  const keyOf = (e) => `${e.at}|${e.ids[0]}`;
+  const keyOf = (e) => `${e.at}|${e.refs[0]?.hash}`;
   function refreshHighlight(entries = placements.list()) {
     const shown =
       hovered === "last" ? entries.slice(0, 1) : entries.filter((e) => keyOf(e) === hovered);

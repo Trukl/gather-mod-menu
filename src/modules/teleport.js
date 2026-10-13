@@ -1,6 +1,7 @@
 // Teleport: teleport mode, TP to desk, TP to players and saved locations.
 window.__gatherMods.define("teleport", (ctx) => {
   const { MC, me, allUsers, tpTo, escapeHtml, readJson, writeJson, onEnter, flash } = ctx;
+  const map = ctx.use("map");
   const LOCATIONS_KEY = "gathermodv2:locations";
   let tpMode = !ctx.isPartHidden?.("mode");
 
@@ -73,7 +74,9 @@ window.__gatherMods.define("teleport", (ctx) => {
     list.querySelectorAll(".gm-item").forEach((row) => {
       row.onclick = () => {
         const loc = getLocations()[+row.dataset.idx];
-        if (loc) tpTo(loc.x, loc.y, loc.floorId);
+        if (!loc) return;
+        const { x, y, floorId } = locationTarget(loc);
+        tpTo(x, y, floorId);
       };
     });
     list.querySelectorAll(".gm-del").forEach((d) => {
@@ -85,6 +88,29 @@ window.__gatherMods.define("teleport", (ctx) => {
         renderLocations(root);
       };
     });
+  }
+
+  // Publishing a new version of the map can shift every coordinate (Gather
+  // trims the map to its content): a location keeps the nearest object as an
+  // anchor and follows it. Locations saved before anchors existed don't move.
+  function nearestRef(x, y) {
+    let nearest = null;
+    let best = Infinity;
+    for (const o of map.mapObjects()) {
+      const d = (o.absolutePosition.x - x) ** 2 + (o.absolutePosition.y - y) ** 2;
+      if (d < best) [nearest, best] = [o, d];
+    }
+    return nearest && map.objectRef(nearest);
+  }
+  function locationTarget(loc) {
+    if (!loc.anchor || loc.floorId !== map.currentFloorId()) return loc;
+    const [anchor] = map.resolveRefs([loc.anchor]);
+    if (!anchor) return loc;
+    return {
+      ...loc,
+      x: Math.round(loc.x + anchor.absolutePosition.x - loc.anchor.x),
+      y: Math.round(loc.y + anchor.absolutePosition.y - loc.anchor.y),
+    };
   }
 
   let root = null;
@@ -136,7 +162,10 @@ window.__gatherMods.define("teleport", (ctx) => {
         const name = nameInput.value.trim();
         if (!name) return;
         const u = me();
-        writeJson(LOCATIONS_KEY, [...getLocations(), { name, x: u.x, y: u.y, floorId: u.floorId }]);
+        writeJson(LOCATIONS_KEY, [
+          ...getLocations(),
+          { name, x: u.x, y: u.y, floorId: u.floorId, anchor: nearestRef(u.x, u.y) },
+        ]);
         nameInput.value = "";
         renderLocations(el);
       };

@@ -950,15 +950,16 @@
   `;
 })();
 
-window.__gatherMods.bundleCatalog = {"modules":[{"id":"core","kind":"core","name":"Core","description":"Mods panel, settings, module manager and launcher bridge. Always installed.","version":"1.2.0","requires":{},"changelog":[{"version":"1.2.0","date":"2026-10-09","changes":["Every module has a “Changelog” link in Settings, installed or not.","Turning on a module you don't have asks first: it shows the version, its latest changes and the libraries it brings, then “Install”.","Modules with several features list them under their row: click one to hide it from the panel and turn it off (e.g. Flee mode)."]},{"version":"1.1.2","date":"2026-10-09","changes":["What's new only shows updates to install and the last update you installed; “Show full history” unfolds the rest."]},{"version":"1.1.1","date":"2026-10-09","changes":["Settings tell you in red when the launcher is no longer running, instead of showing stale information and settings that do nothing.","What's new highlights the changes of the last update you installed, until the module's next update."]},{"version":"1.1.0","date":"2026-10-09","changes":["What's new and Review updates highlight what you haven't installed yet in green.","“New” and “Update” badges are green; a module being uninstalled or no longer published is shown in red.","A module that is no longer published gets an “Uninstall” button instead of a note pointing to the launcher settings file.","Changelog lines starting with “Removed:” are shown in red."]},{"version":"1.0.0","date":"2026-10-08","changes":["The mod is split into modules: pick the features you want in ⚙ Settings, only their code runs and gets updated.","New modules show up in Settings with a “New” badge and are never installed automatically.","“What's new” lists the changelog of your modules; “Review updates” shows it next to the exact code diff."]}]},{"id":"map","kind":"lib","name":"Map helpers","description":"Shared map object helpers.","version":"1.1.0","requires":{},"changelog":[{"version":"1.1.0","date":"2026-10-08","changes":["Can force Gather to redraw the map, which it otherwise only does when something changes.","Box selection toggles objects, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"map-pick","kind":"lib","name":"Map picking","description":"Shared object selection on the map (click, box, scroll to cycle).","version":"1.0.1","requires":{"map":"1.1.0"},"changelog":[{"version":"1.0.1","date":"2026-10-08","changes":["Selection outlines show up and go away immediately, even when started or stopped from the panel.","The yellow hover outline follows the object named in the tooltip, even between close objects."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"previews","kind":"lib","name":"Previews","description":"Shared outfit and object previews.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"placements","kind":"lib","name":"Placements journal","description":"Shared journal of the objects placed with the mod.","version":"1.0.0","requires":{"map":"1.0.0"},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"jobs","kind":"lib","name":"Job queue","description":"Shared queue that runs map edits one after the other, in click order.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"hub-api","kind":"lib","name":"Hub API","description":"Shared requests to the community hub, signed in with your Gather account.","version":"1.1.0","requires":{},"changelog":[{"version":"1.1.0","date":"2026-10-12","changes":["Signs in to the hub with your Gather account: what you publish belongs to the account, from the app and the browser alike. Only the Gather account id is kept by the hub."]},{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"teleport","kind":"module","name":"Teleport","description":"Teleport mode (every “Go to” and double-click teleports), TP to your desk, TP to players and saved locations.","version":"1.1.0","requires":{},"changelog":[{"version":"1.1.0","date":"2026-10-09","changes":["Teleport mode, TP to my desk, Players and Saved locations can each be hidden in Settings (a hidden Teleport mode is off)."]},{"version":"1.0.0","date":"2026-10-08","changes":["Teleport mode, TP to desk, TP to players and saved locations, now in one module."]}]},{"id":"fun","kind":"module","name":"Fun","description":"Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects orbit or move back and forth, seen by everyone with this module.","version":"1.3.0","requires":{"map":"1.1.0","map-pick":"1.0.1","hub-api":"1.1.0"},"changelog":[{"version":"1.3.0","date":"2026-10-12","changes":["Your animations belong to your Gather account: start, stop or delete them from the app or the browser. Those you created before are moved to your account when you open their map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Flee mode and Animations can each be hidden in Settings; a hidden one is turned off (hidden animations are no longer fetched nor played).","The animation list only shows yours; the others' still play on the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Animations: select objects, make them orbit around a point or move back and forth in a straight line or along a wave, with a live preview, then save.","Everyone on the map who has this module sees your animations, in sync; only you can start, stop or delete yours.","Nothing is sent to Gather's server: objects only move on screen, and the map is redrawn at 30 fps at most while an animation runs."]},{"version":"1.0.0","date":"2026-10-08","changes":["Flee mode moves here from the player list."]}]},{"id":"build","kind":"module","name":"Build","description":"Free placement in the build tool, “Place on…” to put objects on any other object, and bulk delete (click or drag a box to select).","version":"1.3.0","requires":{"map":"1.1.0","map-pick":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-09","changes":["Free placement, Place on… and Bulk delete can each be hidden in Settings (a hidden Free placement is off)."]},{"version":"1.2.0","date":"2026-10-09","changes":["Place on… and bulk delete no longer wait for the previous one to finish: start the next one right away, it is queued."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects moved with Place on… are listed in Placed objects.","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Free placement, Place on… and bulk delete, now in one module."]}]},{"id":"outfits","kind":"module","name":"Outfits","description":"Save and apply outfits, including “No outfit” and “Invisible”.","version":"1.0.0","requires":{"previews":"1.0.0"},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Outfit presets as a module."]}]},{"id":"desks","kind":"module","name":"Desks","description":"Save and swap your desk decoration, and pick which objects belong to your desk.","version":"1.2.0","requires":{"map":"1.1.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-09","changes":["Picking another desk while one is being applied stops it and applies the new one; “↩ Previous desk” still brings back the desk you had before the first one."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects added by a desk preset are listed in Placed objects.","Dragging a box over desk objects already picked removes them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Desk presets as a module."]}]},{"id":"constructions","kind":"module","name":"Constructions","description":"Save a group of objects and place it anywhere on the map in one click.","version":"1.2.0","requires":{"map":"1.1.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-09","changes":["Place several constructions and click “↶ Delete last” several times without waiting: each action is queued and runs in order."]},{"version":"1.1.0","date":"2026-10-08","changes":["“↶ Undo” becomes “↶ Delete last”, using the shared journal of placed objects (keeps your history).","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Constructions as a module."]}]},{"id":"placed","kind":"module","name":"Placed objects","description":"Everything you placed with the mod on this map (constructions, desk presets, Place on…): delete the last one, any of them, or all.","version":"1.1.0","requires":{"map":"1.1.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.1.0","date":"2026-10-09","changes":["Deletions no longer wait for the previous one: click several ✕ or “↶ Delete last” in a row, they are queued and run in order."]},{"version":"1.0.0","date":"2026-10-08","changes":["New module: list what the mod placed on this map, hover to see it, delete the last placement, any of them, or all (everything is outlined in red before you confirm)."]}]},{"id":"share","kind":"module","name":"Share presets","description":"Export and import the presets of your installed modules as JSON.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Export and import only cover the preset modules you have installed."]}]},{"id":"hub","kind":"module","name":"Community hub","description":"Browse, preview, add and publish presets shared by others.","version":"1.1.0","requires":{"previews":"1.0.0","hub-api":"1.1.0"},"changelog":[{"version":"1.1.0","date":"2026-10-12","changes":["Your published presets belong to your Gather account: delete them from the app or the browser. Those you published before are moved to your account the next time you open the hub."]},{"version":"1.0.1","date":"2026-10-09","changes":["Hub requests go through the shared hub library, also used by animations."]},{"version":"1.0.0","date":"2026-10-08","changes":["Hub tabs follow your installed preset modules."]}]}]};
-// Map library: object helpers, snapshots and screen/world geometry shared by
-// the build, desks and constructions modules.
+window.__gatherMods.bundleCatalog = {"modules":[{"id":"core","kind":"core","name":"Core","description":"Mods panel, settings, module manager and launcher bridge. Always installed.","version":"1.2.0","requires":{},"changelog":[{"version":"1.2.0","date":"2026-10-09","changes":["Every module has a “Changelog” link in Settings, installed or not.","Turning on a module you don't have asks first: it shows the version, its latest changes and the libraries it brings, then “Install”.","Modules with several features list them under their row: click one to hide it from the panel and turn it off (e.g. Flee mode)."]},{"version":"1.1.2","date":"2026-10-09","changes":["What's new only shows updates to install and the last update you installed; “Show full history” unfolds the rest."]},{"version":"1.1.1","date":"2026-10-09","changes":["Settings tell you in red when the launcher is no longer running, instead of showing stale information and settings that do nothing.","What's new highlights the changes of the last update you installed, until the module's next update."]},{"version":"1.1.0","date":"2026-10-09","changes":["What's new and Review updates highlight what you haven't installed yet in green.","“New” and “Update” badges are green; a module being uninstalled or no longer published is shown in red.","A module that is no longer published gets an “Uninstall” button instead of a note pointing to the launcher settings file.","Changelog lines starting with “Removed:” are shown in red."]},{"version":"1.0.0","date":"2026-10-08","changes":["The mod is split into modules: pick the features you want in ⚙ Settings, only their code runs and gets updated.","New modules show up in Settings with a “New” badge and are never installed automatically.","“What's new” lists the changelog of your modules; “Review updates” shows it next to the exact code diff."]}]},{"id":"map","kind":"lib","name":"Map helpers","description":"Shared map object helpers.","version":"1.2.0","requires":{},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Stable references to objects (Gather's hashIdentifier, plus type and position), so what the mod tracks survives a new version of the map."]},{"version":"1.1.0","date":"2026-10-08","changes":["Can force Gather to redraw the map, which it otherwise only does when something changes.","Box selection toggles objects, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"map-pick","kind":"lib","name":"Map picking","description":"Shared object selection on the map (click, box, scroll to cycle).","version":"1.0.1","requires":{"map":"1.1.0"},"changelog":[{"version":"1.0.1","date":"2026-10-08","changes":["Selection outlines show up and go away immediately, even when started or stopped from the panel.","The yellow hover outline follows the object named in the tooltip, even between close objects."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"previews","kind":"lib","name":"Previews","description":"Shared outfit and object previews.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"placements","kind":"lib","name":"Placements journal","description":"Shared journal of the objects placed with the mod.","version":"1.1.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.1.0","date":"2026-10-13","changes":["Placements are kept per floor with stable references, so they survive a new version of the map."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"jobs","kind":"lib","name":"Job queue","description":"Shared queue that runs map edits one after the other, in click order.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"hub-api","kind":"lib","name":"Hub API","description":"Shared requests to the community hub, signed in with your Gather account.","version":"1.1.0","requires":{},"changelog":[{"version":"1.1.0","date":"2026-10-12","changes":["Signs in to the hub with your Gather account: what you publish belongs to the account, from the app and the browser alike. Only the Gather account id is kept by the hub."]},{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"teleport","kind":"module","name":"Teleport","description":"Teleport mode (every “Go to” and double-click teleports), TP to your desk, TP to players and saved locations.","version":"1.2.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Saved locations follow the map when an admin publishes a new version that shifts it (locations saved before this version don't move)."]},{"version":"1.1.0","date":"2026-10-09","changes":["Teleport mode, TP to my desk, Players and Saved locations can each be hidden in Settings (a hidden Teleport mode is off)."]},{"version":"1.0.0","date":"2026-10-08","changes":["Teleport mode, TP to desk, TP to players and saved locations, now in one module."]}]},{"id":"fun","kind":"module","name":"Fun","description":"Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects orbit or move back and forth, seen by everyone with this module.","version":"1.4.0","requires":{"map":"1.2.0","map-pick":"1.0.1","hub-api":"1.1.0"},"changelog":[{"version":"1.4.0","date":"2026-10-13","changes":["Animations survive a new version of the map: they belong to the floor and find their objects again, even if the map moved. Existing animations are converted the first time someone with this version opens their map."]},{"version":"1.3.0","date":"2026-10-12","changes":["Your animations belong to your Gather account: start, stop or delete them from the app or the browser. Those you created before are moved to your account when you open their map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Flee mode and Animations can each be hidden in Settings; a hidden one is turned off (hidden animations are no longer fetched nor played).","The animation list only shows yours; the others' still play on the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Animations: select objects, make them orbit around a point or move back and forth in a straight line or along a wave, with a live preview, then save.","Everyone on the map who has this module sees your animations, in sync; only you can start, stop or delete yours.","Nothing is sent to Gather's server: objects only move on screen, and the map is redrawn at 30 fps at most while an animation runs."]},{"version":"1.0.0","date":"2026-10-08","changes":["Flee mode moves here from the player list."]}]},{"id":"build","kind":"module","name":"Build","description":"Free placement in the build tool, “Place on…” to put objects on any other object, and bulk delete (click or drag a box to select).","version":"1.3.0","requires":{"map":"1.1.0","map-pick":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-09","changes":["Free placement, Place on… and Bulk delete can each be hidden in Settings (a hidden Free placement is off)."]},{"version":"1.2.0","date":"2026-10-09","changes":["Place on… and bulk delete no longer wait for the previous one to finish: start the next one right away, it is queued."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects moved with Place on… are listed in Placed objects.","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Free placement, Place on… and bulk delete, now in one module."]}]},{"id":"outfits","kind":"module","name":"Outfits","description":"Save and apply outfits, including “No outfit” and “Invisible”.","version":"1.0.0","requires":{"previews":"1.0.0"},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Outfit presets as a module."]}]},{"id":"desks","kind":"module","name":"Desks","description":"Save and swap your desk decoration, and pick which objects belong to your desk.","version":"1.3.0","requires":{"map":"1.2.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["The objects picked for your desk survive a new version of the map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Picking another desk while one is being applied stops it and applies the new one; “↩ Previous desk” still brings back the desk you had before the first one."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects added by a desk preset are listed in Placed objects.","Dragging a box over desk objects already picked removes them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Desk presets as a module."]}]},{"id":"constructions","kind":"module","name":"Constructions","description":"Save a group of objects and place it anywhere on the map in one click.","version":"1.2.0","requires":{"map":"1.1.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-09","changes":["Place several constructions and click “↶ Delete last” several times without waiting: each action is queued and runs in order."]},{"version":"1.1.0","date":"2026-10-08","changes":["“↶ Undo” becomes “↶ Delete last”, using the shared journal of placed objects (keeps your history).","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Constructions as a module."]}]},{"id":"placed","kind":"module","name":"Placed objects","description":"Everything you placed with the mod on this map (constructions, desk presets, Place on…): delete the last one, any of them, or all.","version":"1.2.0","requires":{"map":"1.2.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Placed objects are listed per floor and survive a new version of the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Deletions no longer wait for the previous one: click several ✕ or “↶ Delete last” in a row, they are queued and run in order."]},{"version":"1.0.0","date":"2026-10-08","changes":["New module: list what the mod placed on this map, hover to see it, delete the last placement, any of them, or all (everything is outlined in red before you confirm)."]}]},{"id":"share","kind":"module","name":"Share presets","description":"Export and import the presets of your installed modules as JSON.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Export and import only cover the preset modules you have installed."]}]},{"id":"hub","kind":"module","name":"Community hub","description":"Browse, preview, add and publish presets shared by others.","version":"1.1.0","requires":{"previews":"1.0.0","hub-api":"1.1.0"},"changelog":[{"version":"1.1.0","date":"2026-10-12","changes":["Your published presets belong to your Gather account: delete them from the app or the browser. Those you published before are moved to your account the next time you open the hub."]},{"version":"1.0.1","date":"2026-10-09","changes":["Hub requests go through the shared hub library, also used by animations."]},{"version":"1.0.0","date":"2026-10-08","changes":["Hub tabs follow your installed preset modules."]}]}]};
+// Map library: object helpers, snapshots, stable object references and
+// screen/world geometry shared by the modules that work on the map.
 window.__gatherMods.define("map", (ctx) => {
   const TILE_PX = 32;
   const { GD } = ctx;
 
   const scene = () => GD().PhaserManager.scene;
   const currentMapId = () => GD().Repos.gameSpace.currentMap.baseArea.mapId;
+  const currentFloorId = () => GD().Repos.gameSpace.currentMap.floorId;
   const isLiveObject = (e) => e?.mapEntityType === "MapObject" && !e.isSoftDeleted;
   const liveObjects = (ids) => ids.map((id) => GD().Repos.MapObject.get(id)).filter(isLiveObject);
   const objectName = (o) => o.catalogItemVariant?.catalogItem?.type || "?";
@@ -968,6 +969,51 @@ window.__gatherMods.define("map", (ctx) => {
   };
   const toggleId = (ids, id) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
   const toggleIds = (ids, objects) => objects.reduce((acc, o) => toggleId(acc, o.id), ids);
+
+  // Publishing a new version of a map (Gather's map editor) recreates every
+  // object with a new id but keeps its hashIdentifier, as long as it stays on
+  // the same floor. A reference also keeps the type and position, to find an
+  // object Gather recreated otherwise.
+  const REF_POSITION_EPSILON = 0.05;
+  const objectRef = (o) => ({
+    hash: o.hashIdentifier,
+    variant: o.catalogItemVariantId,
+    x: o.absolutePosition.x,
+    y: o.absolutePosition.y,
+  });
+  // Objects of the current map for each reference (null when not found).
+  // Found objects are cached per map: callers resolve on every render.
+  let refCache = { mapId: null, ids: new Map() };
+  function resolveRefs(refs) {
+    const mapId = currentMapId();
+    if (refCache.mapId !== mapId) refCache = { mapId, ids: new Map() };
+    const cached = (r) => {
+      const o = GD().Repos.MapObject.get(refCache.ids.get(r.hash));
+      return isLiveObject(o) ? o : null;
+    };
+    const found = refs.map(cached);
+    if (found.every(Boolean)) return found;
+    const objects = mapObjects();
+    const byHash = new Map(objects.map((o) => [o.hashIdentifier, o]));
+    const used = new Set(found.filter(Boolean).map((o) => o.id));
+    const samePlace = (c, r) =>
+      !used.has(c.id) &&
+      c.catalogItemVariantId === r.variant &&
+      Math.abs(c.absolutePosition.x - r.x) <= REF_POSITION_EPSILON &&
+      Math.abs(c.absolutePosition.y - r.y) <= REF_POSITION_EPSILON;
+    refs.forEach((r, i) => {
+      if (found[i]) return;
+      found[i] = byHash.get(r.hash) ?? null;
+      if (found[i]) used.add(found[i].id);
+    });
+    refs.forEach((r, i) => {
+      found[i] ??= objects.find((c) => samePlace(c, r)) ?? null;
+      if (!found[i]) return;
+      used.add(found[i].id);
+      refCache.ids.set(r.hash, found[i].id);
+    });
+    return found;
+  }
 
   function topLevelObjects(objects) {
     const ids = new Set(objects.map((o) => o.id));
@@ -1074,6 +1120,9 @@ window.__gatherMods.define("map", (ctx) => {
     TILE_PX,
     scene,
     currentMapId,
+    currentFloorId,
+    objectRef,
+    resolveRefs,
     isLiveObject,
     liveObjects,
     cleanItem,
@@ -1645,46 +1694,79 @@ window.__gatherMods.define("previews", (ctx) => {
 });
 
 // Placements library: journal of the objects created by the mod (constructions,
-// desk presets, Place on…), per map, so they can be deleted later.
+// desk presets, Place on…), per floor, so they can be deleted later. Objects
+// are kept as stable references, so a new version of the map keeps them.
 window.__gatherMods.define("placements", (ctx) => {
   const { GD, readJson, writeJson } = ctx;
   const map = ctx.use("map");
   const STORAGE_KEY = "gathermodv2:placementHistory";
   const MAX_ENTRIES = 200;
-  const MAX_IDS = 5000;
+  const MAX_OBJECTS = 5000;
   const listeners = new Set();
 
   // Entries from the constructions-only history have no source.
   const getAll = () => readJson(STORAGE_KEY, []).map((e) => ({ source: "construction", ...e }));
+  const objectCount = (e) => (e.refs ?? e.ids).length;
   function saveAll(entries) {
     let kept = entries.slice(-MAX_ENTRIES);
-    let total = kept.reduce((n, e) => n + e.ids.length, 0);
-    while (kept.length > 1 && total > MAX_IDS) {
-      total -= kept[0].ids.length;
+    let total = kept.reduce((n, e) => n + objectCount(e), 0);
+    while (kept.length > 1 && total > MAX_OBJECTS) {
+      total -= objectCount(kept[0]);
       kept = kept.slice(1);
     }
     writeJson(STORAGE_KEY, kept);
     listeners.forEach((fn) => fn());
   }
 
+  // Entries recorded before references existed hold the object ids of one map
+  // version; they are converted while that version is the current one.
+  function migrateLegacyEntries(all) {
+    const mapId = map.currentMapId();
+    let changed = false;
+    const entries = all.map((e) => {
+      if (e.refs || e.mapId !== mapId) return e;
+      changed = true;
+      const { mapId: _, ids, ...rest } = e;
+      return {
+        ...rest,
+        floorId: map.currentFloorId(),
+        refs: map.liveObjects(ids).map(map.objectRef),
+      };
+    });
+    if (changed) saveAll(entries);
+    return entries;
+  }
+
+  // Ids of the entry's objects still on the map, in creation order.
   const liveIds = (entry) =>
-    entry.ids.filter((id) => map.isLiveObject(GD().Repos.MapObject.get(id)));
+    map
+      .resolveRefs(entry.refs)
+      .filter(Boolean)
+      .map((o) => o.id);
 
   function record({ source, name, ids }) {
     if (!ids.length) return;
     saveAll([
       ...getAll(),
-      { source, name, mapId: map.currentMapId(), at: new Date().toISOString(), ids },
+      {
+        source,
+        name,
+        floorId: map.currentFloorId(),
+        at: new Date().toISOString(),
+        refs: map.liveObjects(ids).map(map.objectRef),
+      },
     ]);
   }
 
-  // Entries of the current map, newest first; entries whose objects are all gone are dropped.
+  // Entries of the current floor, newest first; entries whose objects are all gone are dropped.
   function list(source) {
-    const all = getAll();
-    const gone = all.filter((e) => e.mapId === map.currentMapId() && !liveIds(e).length);
+    const floorId = map.currentFloorId();
+    const all = migrateLegacyEntries(getAll());
+    const here = (e) => e.refs && e.floorId === floorId;
+    const gone = all.filter((e) => here(e) && !liveIds(e).length);
     if (gone.length) saveAll(all.filter((e) => !gone.includes(e)));
-    return getAll()
-      .filter((e) => e.mapId === map.currentMapId() && (!source || e.source === source))
+    return all
+      .filter((e) => here(e) && !gone.includes(e) && (!source || e.source === source))
       .reverse();
   }
 
@@ -1694,7 +1776,7 @@ window.__gatherMods.define("placements", (ctx) => {
     let deleted = 0;
     try {
       for (const entry of entries)
-        for (const id of [...entry.ids].reverse()) {
+        for (const id of liveIds(entry).reverse()) {
           const o = GD().Repos.MapObject.get(id);
           if (!map.isLiveObject(o)) continue;
           await o.delete();
@@ -1851,6 +1933,7 @@ window.__gatherMods.define("hub-api", (ctx) => {
 // Teleport: teleport mode, TP to desk, TP to players and saved locations.
 window.__gatherMods.define("teleport", (ctx) => {
   const { MC, me, allUsers, tpTo, escapeHtml, readJson, writeJson, onEnter, flash } = ctx;
+  const map = ctx.use("map");
   const LOCATIONS_KEY = "gathermodv2:locations";
   let tpMode = !ctx.isPartHidden?.("mode");
 
@@ -1923,7 +2006,9 @@ window.__gatherMods.define("teleport", (ctx) => {
     list.querySelectorAll(".gm-item").forEach((row) => {
       row.onclick = () => {
         const loc = getLocations()[+row.dataset.idx];
-        if (loc) tpTo(loc.x, loc.y, loc.floorId);
+        if (!loc) return;
+        const { x, y, floorId } = locationTarget(loc);
+        tpTo(x, y, floorId);
       };
     });
     list.querySelectorAll(".gm-del").forEach((d) => {
@@ -1935,6 +2020,29 @@ window.__gatherMods.define("teleport", (ctx) => {
         renderLocations(root);
       };
     });
+  }
+
+  // Publishing a new version of the map can shift every coordinate (Gather
+  // trims the map to its content): a location keeps the nearest object as an
+  // anchor and follows it. Locations saved before anchors existed don't move.
+  function nearestRef(x, y) {
+    let nearest = null;
+    let best = Infinity;
+    for (const o of map.mapObjects()) {
+      const d = (o.absolutePosition.x - x) ** 2 + (o.absolutePosition.y - y) ** 2;
+      if (d < best) [nearest, best] = [o, d];
+    }
+    return nearest && map.objectRef(nearest);
+  }
+  function locationTarget(loc) {
+    if (!loc.anchor || loc.floorId !== map.currentFloorId()) return loc;
+    const [anchor] = map.resolveRefs([loc.anchor]);
+    if (!anchor) return loc;
+    return {
+      ...loc,
+      x: Math.round(loc.x + anchor.absolutePosition.x - loc.anchor.x),
+      y: Math.round(loc.y + anchor.absolutePosition.y - loc.anchor.y),
+    };
   }
 
   let root = null;
@@ -1986,7 +2094,10 @@ window.__gatherMods.define("teleport", (ctx) => {
         const name = nameInput.value.trim();
         if (!name) return;
         const u = me();
-        writeJson(LOCATIONS_KEY, [...getLocations(), { name, x: u.x, y: u.y, floorId: u.floorId }]);
+        writeJson(LOCATIONS_KEY, [
+          ...getLocations(),
+          { name, x: u.x, y: u.y, floorId: u.floorId, anchor: nearestRef(u.x, u.y) },
+        ]);
         nameInput.value = "";
         renderLocations(el);
       };
@@ -2093,12 +2204,36 @@ window.__gatherMods.define("fun", (ctx) => {
   };
   const DEFAULT_PARAMS = { period: 4, direction: 1, amplitude: 1, waves: 2 };
 
-  // Shared animations of the current map, as last fetched from the hub, with
+  // Shared animations of the current floor, as last fetched from the hub, with
   // this user's recent changes applied on top until the hub reflects them.
-  const shared = { mapId: null, fetched: [], items: [], clockOffset: 0, syncedAt: 0, status: "" };
+  const shared = { floorId: null, fetched: [], items: [], clockOffset: 0, syncedAt: 0, status: "" };
   const localEdits = new Map();
   let draft = null;
-  const animationsPath = (id = "") => `/animations/${shared.mapId}${id ? "/" + id : ""}`;
+  const animationsPath = (id = "") => `/animations/${shared.floorId}${id ? "/" + id : ""}`;
+  // Where each saved animation is on the current map version: its objects,
+  // found through their stable references, and its point moved by as much as
+  // they moved (a new map version can shift everything).
+  const resolved = new Map();
+  function resolveAll() {
+    resolved.clear();
+    for (const a of shared.items) {
+      const found = map.resolveRefs(a.objects);
+      const pairs = a.objects.map((r, i) => [r, found[i]]).filter(([, o]) => o);
+      const shift = pairs.reduce(
+        (s, [r, o]) => ({
+          x: s.x + (o.absolutePosition.x - r.x) / pairs.length,
+          y: s.y + (o.absolutePosition.y - r.y) / pairs.length,
+        }),
+        { x: 0, y: 0 },
+      );
+      resolved.set(a.id, {
+        ids: pairs.map(([, o]) => o.id),
+        point: { x: a.point.x + shift.x * TILE_PX, y: a.point.y + shift.y * TILE_PX },
+      });
+    }
+  }
+  const placementOf = (a) =>
+    a === draft ? { ids: draft.ids, point: draft.point } : resolved.get(a.id);
 
   const anchorOf = (o) => ({
     x: o.absolutePosition.x * TILE_PX,
@@ -2123,12 +2258,12 @@ window.__gatherMods.define("fun", (ctx) => {
   }
 
   // Line and wave go to the end point and back with an eased speed.
-  function displacement(a, anchor, center, t) {
+  function displacement(a, point, anchor, center, t) {
     const phase = t / a.params.period;
     if (a.type === "orbit") {
       const angle = a.params.direction * phase * 2 * Math.PI;
-      const rx = anchor.x - a.point.x;
-      const ry = anchor.y - a.point.y;
+      const rx = anchor.x - point.x;
+      const ry = anchor.y - point.y;
       return {
         x: rx * Math.cos(angle) - ry * Math.sin(angle) - rx,
         y: rx * Math.sin(angle) + ry * Math.cos(angle) - ry,
@@ -2215,13 +2350,14 @@ window.__gatherMods.define("fun", (ctx) => {
     const moved = new Set();
     for (const a of animations) {
       const t = elapsedSeconds(a);
-      const objects = withDescendants(a.ids);
+      const { ids, point } = placementOf(a) ?? { ids: [] };
+      const objects = withDescendants(ids);
       if (!objects.length) continue;
-      const center = groupCenter(map.liveObjects(a.ids));
+      const center = groupCenter(map.liveObjects(ids));
       for (const o of objects) {
         if (moved.has(o.id)) continue;
         moved.add(o.id);
-        displace(o, displacement(a, anchorOf(o), center, t));
+        displace(o, displacement(a, point, anchorOf(o), center, t));
       }
     }
     for (const id of [...displaced.keys()]) if (!moved.has(id)) release(id);
@@ -2278,6 +2414,7 @@ window.__gatherMods.define("fun", (ctx) => {
       else items.delete(id);
     }
     shared.items = [...items.values()];
+    resolveAll();
     renderAnimations();
     refreshAnimations();
   }
@@ -2290,12 +2427,12 @@ window.__gatherMods.define("fun", (ctx) => {
     renderAnimations();
   }
   // Animations created before sign-in are handed to the Gather account when
-  // their map is visited, since their tokens were stored without the map.
-  async function claimLegacyAnimations(mapId, items) {
+  // their floor is visited, since their tokens were stored without it.
+  async function claimLegacyAnimations(floorId, items) {
     const tokens = readJson(LEGACY_TOKENS_KEY, {});
     const claims = items
       .filter((a) => !a.mine && tokens[a.id])
-      .map((a) => ({ mapId, id: a.id, token: tokens[a.id] }));
+      .map((a) => ({ floorId, id: a.id, token: tokens[a.id] }));
     if (!claims.length) return items;
     const { claimed } = await api.claim({ animations: claims });
     claims.forEach((c) => delete tokens[c.id]);
@@ -2303,20 +2440,37 @@ window.__gatherMods.define("fun", (ctx) => {
     else localStorage.removeItem(LEGACY_TOKENS_KEY);
     return items.map((a) => (claimed.includes(a.id) ? { ...a, mine: true } : a));
   }
+  // Animations saved per map version with object ids are moved to the floor,
+  // with stable references, while that version is the current one.
+  async function migrateLegacyAnimations(mapId, legacy) {
+    const items = legacy.map((a) => ({
+      id: a.id,
+      objects: map.liveObjects(a.ids).map(map.objectRef),
+    }));
+    return api.request(animationsPath("migrate"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mapId, items: items.filter((i) => i.objects.length) }),
+    });
+  }
   async function sync() {
+    const floorId = map.currentFloorId();
     const mapId = map.currentMapId();
-    if (mapId !== shared.mapId) {
-      Object.assign(shared, { mapId, fetched: [] });
+    if (floorId !== shared.floorId) {
+      Object.assign(shared, { floorId, fetched: [] });
       localEdits.clear();
       merge();
     }
     shared.syncedAt = Date.now();
     try {
       const sentAt = Date.now();
-      const { now, items } = await api.request(animationsPath());
-      if (mapId !== shared.mapId) return;
-      shared.clockOffset = now - (sentAt + Date.now()) / 2;
-      shared.fetched = await claimLegacyAnimations(mapId, items);
+      const listed = await api.request(`${animationsPath()}?map=${mapId}`);
+      if (floorId !== shared.floorId) return;
+      shared.clockOffset = listed.now - (sentAt + Date.now()) / 2;
+      const { items } = listed.legacy
+        ? await migrateLegacyAnimations(mapId, listed.legacy)
+        : listed;
+      shared.fetched = await claimLegacyAnimations(floorId, items);
       if (shared.status.startsWith("Hub")) shared.status = "";
     } catch (e) {
       shared.status = "Hub unreachable: " + e.message;
@@ -2329,7 +2483,7 @@ window.__gatherMods.define("fun", (ctx) => {
     const data = {
       name: (name || TYPES[draft.type].label).slice(0, MAX_NAME),
       type: draft.type,
-      ids: draft.ids,
+      objects: map.liveObjects(draft.ids).map(map.objectRef),
       point: draft.point,
       params: { ...draft.params },
     };
@@ -2529,7 +2683,8 @@ window.__gatherMods.define("fun", (ctx) => {
     if (showFlee && root?.isConnected) renderPlayers(root);
     if (!showAnimations) return;
     const due = Date.now() - shared.syncedAt > SYNC_MS;
-    if (map.currentMapId() !== shared.mapId || (due && !document.hidden)) sync();
+    if (map.currentFloorId() !== shared.floorId || (due && !document.hidden)) sync();
+    else resolveAll();
   });
   if (showAnimations) sync();
 });
@@ -2919,24 +3074,34 @@ window.__gatherMods.define("desks", (ctx) => {
   const savePresets = (l) => writeJson(PRESETS_KEY, l);
 
   // Desk objects default to the area's children; once picked by hand, the
-  // tracked ids are the source of truth (objects can sit outside the area).
+  // tracked references are the source of truth (objects can sit outside the area).
+  // Ids tracked before references existed are converted while their map
+  // version is the current one, and dropped once it has been replaced.
+  function trackedRefs() {
+    const tracked = readJson(trackedKey(), null);
+    if (!tracked?.some((t) => typeof t === "string")) return tracked;
+    const live = map.liveObjects(tracked);
+    if (!live.length) {
+      localStorage.removeItem(trackedKey());
+      return null;
+    }
+    const refs = live.map(map.objectRef);
+    writeJson(trackedKey(), refs);
+    return refs;
+  }
   function getDeskObjects() {
     const area = deskArea();
     if (!area) return [];
-    const ids = readJson(trackedKey(), null);
-    return ids ? map.liveObjects(ids) : area.children.filter(map.isLiveObject);
+    const refs = trackedRefs();
+    return refs ? map.resolveRefs(refs).filter(Boolean) : area.children.filter(map.isLiveObject);
   }
-  const setDeskObjects = (objects) =>
-    writeJson(
-      trackedKey(),
-      objects.map((o) => o.id),
-    );
+  const setDeskObjects = (objects) => writeJson(trackedKey(), objects.map(map.objectRef));
   function replaceTrackedObject(oldObject, newObject) {
-    const ids = readJson(trackedKey(), null);
-    if (!ids?.includes(oldObject.id)) return;
+    const refs = trackedRefs();
+    if (!refs?.some((r) => r.hash === oldObject.hashIdentifier)) return;
     writeJson(
       trackedKey(),
-      ids.map((id) => (id === oldObject.id ? newObject.id : id)),
+      refs.map((r) => (r.hash === oldObject.hashIdentifier ? map.objectRef(newObject) : r)),
     );
   }
   const topLevelDeskObjects = () => map.topLevelObjects(getDeskObjects());
@@ -3506,7 +3671,7 @@ window.__gatherMods.define("placed", (ctx) => {
     if (entries.length) {
       const g = map.scene().add.graphics().setDepth(1e9);
       g.lineStyle(1, HIGHLIGHT_COLOR, 1);
-      for (const o of map.liveObjects(entries.flatMap((e) => e.ids))) {
+      for (const o of map.liveObjects(entries.flatMap(placements.liveIds))) {
         const tl = o.topLeftAbsolutePosition;
         const d = o.getDimensionsInTiles();
         g.strokeRect(tl.x * TILE_PX, tl.y * TILE_PX, d.width * TILE_PX, d.height * TILE_PX);
@@ -3519,7 +3684,7 @@ window.__gatherMods.define("placed", (ctx) => {
   // re-rendering the list never fires mouseleave, so render() refreshes it too.
   // While "Delete all" waits for confirmation, everything stays outlined.
   let hovered = null;
-  const keyOf = (e) => `${e.at}|${e.ids[0]}`;
+  const keyOf = (e) => `${e.at}|${e.refs[0]?.hash}`;
   function refreshHighlight(entries = placements.list()) {
     const shown =
       hovered === "last" ? entries.slice(0, 1) : entries.filter((e) => keyOf(e) === hovered);

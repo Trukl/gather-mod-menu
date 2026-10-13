@@ -20,6 +20,8 @@ Shared code lives in internal libraries (map helpers, map picking, previews, pla
 
 Fun (animations) and Community hub sign in to the hub with your Gather account: the mod reads Gather's ID token from the page and sends it once to the hub, which verifies it with Google's public keys and keeps only your Gather account id (not the token, not your email). What you publish belongs to that account, so you can manage it from the Gather app and the browser alike.
 
+What the mod tracks on the map (animations, placed objects, your desk objects, saved locations) survives a new version of the map published by a space admin: Gather then recreates every object with a new id but keeps its `hashIdentifier`, so the mod finds objects by that, or by type and position, and follows the map if it moved. Animations belong to the floor, not to a map version.
+
 Selecting objects on the map (Place on…, Bulk delete…, Pick desk objects, New construction, New animation): click to add/remove an object, or drag a box to toggle every object fully inside it (unselected ones are added, selected ones removed). Scroll to cycle through stacked objects, Esc to cancel.
 
 Map edits never make you wait: placing constructions, Place on…, bulk delete and deletions from Placed objects are queued and run one after the other, in click order (the status shows how many are queued). Picking another desk while one is being applied stops it and applies the new one.
