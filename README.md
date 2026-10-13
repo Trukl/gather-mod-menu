@@ -46,6 +46,10 @@ A dot in the panel header means updates or new modules are available.
 
 ![Update required](docs/media/update-required.gif)
 
+**Announcements**: the author can send a message to every user (maintenance, incident, new feature) from the community hub (`npm run announce` in [gather-mod-hub](https://github.com/Trukl/gather-mod-hub#announcements)). The core checks every 10 minutes: a new announcement opens a window once, and active ones stay at the top of the Mods panel until they expire (click one to read it again).
+
+![Announcements](docs/media/announcements.gif)
+
 ## Demos
 
 ### Modules
