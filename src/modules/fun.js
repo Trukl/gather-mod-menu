@@ -77,7 +77,7 @@ window.__gatherMods.define("fun", (ctx) => {
   // ===================
   // Animations
   // ===================
-  const TOKENS_KEY = "gathermodv2:animationTokens";
+  const LEGACY_TOKENS_KEY = "gathermodv2:animationTokens";
   const SYNC_MS = 60_000;
   // The hub's storage can serve a stale list for about a minute after a change.
   const LOCAL_EDIT_MS = 90_000;
@@ -97,7 +97,6 @@ window.__gatherMods.define("fun", (ctx) => {
   const shared = { mapId: null, fetched: [], items: [], clockOffset: 0, syncedAt: 0, status: "" };
   const localEdits = new Map();
   let draft = null;
-  const tokens = () => readJson(TOKENS_KEY, {});
   const animationsPath = (id = "") => `/animations/${shared.mapId}${id ? "/" + id : ""}`;
 
   const anchorOf = (o) => ({
@@ -289,6 +288,20 @@ window.__gatherMods.define("fun", (ctx) => {
     shared.status = text;
     renderAnimations();
   }
+  // Animations created before sign-in are handed to the Gather account when
+  // their map is visited, since their tokens were stored without the map.
+  async function claimLegacyAnimations(mapId, items) {
+    const tokens = readJson(LEGACY_TOKENS_KEY, {});
+    const claims = items
+      .filter((a) => !a.mine && tokens[a.id])
+      .map((a) => ({ mapId, id: a.id, token: tokens[a.id] }));
+    if (!claims.length) return items;
+    const { claimed } = await api.claim({ animations: claims });
+    claims.forEach((c) => delete tokens[c.id]);
+    if (Object.keys(tokens).length) writeJson(LEGACY_TOKENS_KEY, tokens);
+    else localStorage.removeItem(LEGACY_TOKENS_KEY);
+    return items.map((a) => (claimed.includes(a.id) ? { ...a, mine: true } : a));
+  }
   async function sync() {
     const mapId = map.currentMapId();
     if (mapId !== shared.mapId) {
@@ -302,7 +315,7 @@ window.__gatherMods.define("fun", (ctx) => {
       const { now, items } = await api.request(animationsPath());
       if (mapId !== shared.mapId) return;
       shared.clockOffset = now - (sentAt + Date.now()) / 2;
-      shared.fetched = items;
+      shared.fetched = await claimLegacyAnimations(mapId, items);
       if (shared.status.startsWith("Hub")) shared.status = "";
     } catch (e) {
       shared.status = "Hub unreachable: " + e.message;
@@ -321,12 +334,11 @@ window.__gatherMods.define("fun", (ctx) => {
     };
     setStatus(`Saving "${data.name}"…`);
     try {
-      const { animation, editToken } = await api.request(animationsPath(), {
+      const { animation } = await api.request(animationsPath(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ author: me().name, data }),
       });
-      writeJson(TOKENS_KEY, { ...tokens(), [animation.id]: editToken });
       closeDraft();
       shared.status = "";
       editLocally(animation.id, animation);
@@ -342,10 +354,7 @@ window.__gatherMods.define("fun", (ctx) => {
     try {
       const { animation } = await api.request(animationsPath(a.id), {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + tokens()[a.id],
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ running }),
       });
       editLocally(a.id, animation);
@@ -358,13 +367,7 @@ window.__gatherMods.define("fun", (ctx) => {
   async function deleteAnimation(a) {
     editLocally(a.id, null);
     try {
-      await api.request(animationsPath(a.id), {
-        method: "DELETE",
-        headers: { Authorization: "Bearer " + tokens()[a.id] },
-      });
-      const left = tokens();
-      delete left[a.id];
-      writeJson(TOKENS_KEY, left);
+      await api.request(animationsPath(a.id), { method: "DELETE" });
     } catch (e) {
       localEdits.delete(a.id);
       setStatus(`Could not delete "${a.name}": ${e.message}`);
@@ -408,8 +411,7 @@ window.__gatherMods.define("fun", (ctx) => {
   function renderAnimations() {
     if (!root?.isConnected) return;
     const list = root.querySelector("#gm-anims");
-    const mine = tokens();
-    const own = shared.items.filter((a) => mine[a.id]);
+    const own = shared.items.filter((a) => a.mine);
     list.innerHTML = own.length
       ? own
           .map(
