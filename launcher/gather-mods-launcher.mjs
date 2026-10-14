@@ -364,6 +364,11 @@ async function attach(target) {
       handlePageMessage(message.params.payload, target.id).catch((e) =>
         log("Page message failed:", e.message),
       );
+    // Without the Runtime domain enabled, a reload drops the binding.
+    if (message.method === "Page.frameNavigated" && !message.params.frame.parentId)
+      cdp
+        .send("Runtime.addBinding", { name: PAGE_BINDING })
+        .catch((e) => log("Binding failed:", e.message));
   };
   try {
     await cdp.opened;
