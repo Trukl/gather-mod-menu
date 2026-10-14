@@ -99,6 +99,10 @@ An image placed with its size, layer, base line and collision, then a real objec
 
 ![Custom objects](docs/media/custom-objects.gif)
 
+“Plane” changes the draw order: “▼ Back” and “▲ Front” move the image behind or in front of the objects it overlaps, one at a time (the object it is set against is outlined in green); “Reset” goes back to its layer, or to the restyled object's plane.
+
+![Plane](docs/media/custom-objects-plane.gif)
+
 ## Install (GatherV2 desktop app, macOS)
 
 Requirements: `/Applications/GatherV2.app` and Node.js ≥ 22.9.
