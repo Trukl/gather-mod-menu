@@ -99,7 +99,7 @@ npm ci --omit=dev
 node scripts/build-launcher-app.mjs
 ```
 
-The script creates `~/Applications/Gather Mods.app` (with Gather's icon). Open Gather **through this app** instead of GatherV2:
+The script creates `~/Applications/Gather Mods.app`, with the mod's icon (`launcher/icon.svg`, built into `launcher/icon.icns`). Run it again to update an app built before. Open Gather **through this app** instead of GatherV2:
 
 1. GatherV2 is (re)started with the debug port `31337`; if it was running without it, it is quit and restarted.
 2. The launcher downloads the signed module catalog, **verifies its signature** (see “Update security”), downloads the code of your modules (checked against the catalog hashes), caches it and injects it into Gather on every page load. On the first run every module is installed; change that in ⚙ Settings.
