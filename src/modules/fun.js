@@ -79,7 +79,7 @@ window.__gatherMods.define("fun", (ctx) => {
   // ===================
   const LEGACY_TOKENS_KEY = "gathermodv2:animationTokens";
   const SYNC_MS = 60_000;
-  // The hub's storage can serve a stale list for about a minute after a change.
+  // A sync started before a change can still return the old list.
   const LOCAL_EDIT_MS = 90_000;
   const FRAME_MS = 1000 / 30;
   const DEPTH_PER_PX = 1 / 9999;
@@ -210,8 +210,9 @@ window.__gatherMods.define("fun", (ctx) => {
   }
 
   const isPreviewing = () => draft?.ids.length && draft.point && pick.current() !== "anim-select";
+  // The animation being edited stops while its draft previews the changes.
   const activeAnimations = () => [
-    ...shared.items.filter((a) => a.running),
+    ...shared.items.filter((a) => a.running && a.id !== draft?.editId),
     ...(isPreviewing() ? [draft] : []),
   ];
   const elapsedSeconds = (a) =>
@@ -282,15 +283,51 @@ window.__gatherMods.define("fun", (ctx) => {
     hover() {},
   };
 
+  function fillEditor() {
+    const $ = (sel) => root?.querySelector(sel);
+    if (!$("#gm-anim-editor")) return;
+    $("#gm-anim-type").value = draft.type;
+    $("#gm-anim-period").value = draft.params.period;
+    $("#gm-anim-direction").value = String(draft.params.direction);
+    $("#gm-anim-amplitude").value = draft.params.amplitude;
+    $("#gm-anim-waves").value = draft.params.waves;
+    $("#gm-anim-name").value = draft.name;
+  }
   function startDraft() {
-    draft = { ids: [], type: "orbit", point: null, params: { ...DEFAULT_PARAMS }, startedAt: 0 };
+    draft = {
+      name: "",
+      ids: [],
+      type: "orbit",
+      point: null,
+      params: { ...DEFAULT_PARAMS },
+      startedAt: 0,
+    };
+    fillEditor();
     pick.start(selectSession);
     renderEditor();
+  }
+  // Starts from where the animation is on the current map version.
+  function startEdit(a) {
+    const placed = resolved.get(a.id);
+    draft = {
+      editId: a.id,
+      name: a.name,
+      ids: placed?.ids ?? [],
+      type: a.type,
+      point: placed?.point ?? null,
+      params: { ...DEFAULT_PARAMS, ...a.params },
+      startedAt: Date.now(),
+    };
+    if (pick.current()?.startsWith("anim-")) pick.stop();
+    fillEditor();
+    renderEditor();
+    renderAnimations();
   }
   function closeDraft() {
     draft = null;
     if (pick.current()?.startsWith("anim-")) pick.stop();
     renderEditor();
+    renderAnimations();
   }
 
   function merge() {
@@ -377,10 +414,10 @@ window.__gatherMods.define("fun", (ctx) => {
     };
     setStatus(`Saving "${data.name}"…`);
     try {
-      const { animation } = await api.request(animationsPath(), {
-        method: "POST",
+      const { animation } = await api.request(animationsPath(draft.editId), {
+        method: draft.editId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ author: me().name, data }),
+        body: JSON.stringify(draft.editId ? { data } : { author: me().name, data }),
       });
       closeDraft();
       shared.status = "";
@@ -422,7 +459,11 @@ window.__gatherMods.define("fun", (ctx) => {
   function renderEditor() {
     if (!root?.isConnected) return;
     const $ = (sel) => root.querySelector(sel);
-    $("#gm-anim-new").textContent = draft ? "Cancel new animation" : "New animation…";
+    $("#gm-anim-new").textContent = !draft
+      ? "New animation…"
+      : draft.editId
+        ? "Cancel editing"
+        : "Cancel new animation";
     $("#gm-anim-new").classList.toggle("active", !!draft);
     $("#gm-anim-editor").style.display = draft ? "" : "none";
     if (draft) {
@@ -447,6 +488,7 @@ window.__gatherMods.define("fun", (ctx) => {
         el.style.display = el.dataset.animFor === draft.type ? "" : "none";
       });
       $("#gm-anim-save").disabled = !draft.ids.length || !draft.point;
+      $("#gm-anim-save").textContent = draft.editId ? "Save changes" : "Save";
     }
     refreshAnimations();
   }
@@ -459,7 +501,7 @@ window.__gatherMods.define("fun", (ctx) => {
       ? own
           .map(
             (a) =>
-              `<div class="gm-item${a.running ? " active" : ""}" data-id="${escapeHtml(a.id)}" title="${a.running ? "Click to stop it for everyone" : "Click to start it for everyone"}"><span class="gm-name">${a.running ? "⏸" : "▶"} ${escapeHtml(a.name)}</span><span class="gm-actions"><span class="gm-anim-type">${escapeHtml(TYPES[a.type]?.label ?? a.type)}</span><span class="gm-del" data-del="${escapeHtml(a.id)}" title="Delete this animation for everyone">✕</span></span></div>`,
+              `<div class="gm-item${a.running ? " active" : ""}${a.id === draft?.editId ? " gm-editing" : ""}" data-id="${escapeHtml(a.id)}" title="${a.running ? "Click to stop it for everyone" : "Click to start it for everyone"}"><span class="gm-name">${a.running ? "⏸" : "▶"} ${escapeHtml(a.name)}</span><span class="gm-actions"><span class="gm-anim-type">${escapeHtml(TYPES[a.type]?.label ?? a.type)}</span><span class="gm-edit" data-edit="${escapeHtml(a.id)}" title="Edit this animation: objects, movement, name">✎</span><span class="gm-del" data-del="${escapeHtml(a.id)}" title="Delete this animation for everyone">✕</span></span></div>`,
           )
           .join("")
       : '<div class="gm-empty">You have no animations on this map</div>';
@@ -471,11 +513,20 @@ window.__gatherMods.define("fun", (ctx) => {
         if (a) setRunning(a, !a.running);
       };
     });
+    list.querySelectorAll(".gm-edit").forEach((d) => {
+      d.onclick = (e) => {
+        e.stopPropagation();
+        const a = find(d.dataset.edit);
+        if (a) startEdit(a);
+      };
+    });
     list.querySelectorAll(".gm-del").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const a = find(d.dataset.del);
-        if (a) deleteAnimation(a);
+        if (!a) return;
+        if (draft?.editId === a.id) closeDraft();
+        deleteAnimation(a);
       };
     });
   }
@@ -566,6 +617,10 @@ window.__gatherMods.define("fun", (ctx) => {
     #gather-mods-panel .gm-anim-param .gm-input { width:110px; flex:none; }
     #gather-mods-panel .gm-anim-type { font-size:11px; color:var(--gm-muted); }
     #gather-mods-panel .gm-item.active .gm-anim-type { color:inherit; }
+    #gather-mods-panel .gm-edit { color:var(--gm-muted); font-size:13px; flex-shrink:0; }
+    #gather-mods-panel .gm-edit:hover { color:var(--gm-fg); }
+    #gather-mods-panel .gm-item.active .gm-edit { color:inherit; }
+    #gather-mods-panel .gm-item.gm-editing { box-shadow:inset 0 0 0 1px var(--theme-color-accent,#6c5ce7); }
   `);
   ctx.onTick(() => {
     if (showFlee && root?.isConnected) renderPlayers(root);
