@@ -490,6 +490,24 @@
           "changes": ["Hub tabs follow your installed preset modules."]
         }
       ]
+    },
+    {
+      "id": "custom",
+      "kind": "module",
+      "name": "Custom objects",
+      "description": "Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.",
+      "file": "src/modules/custom.js",
+      "version": "1.0.0",
+      "requires": { "map": "1.2.0", "map-pick": "1.1.0", "hub-api": "1.3.0" },
+      "changelog": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-14",
+          "changes": [
+            "New module: images on the map for everyone who has it, since Gather V2 cannot add your own objects. “New image…” places an image anywhere with its size, layer (floor, sorted like objects, above everything), base line and collision; “Restyle an object…” draws an image over a real object, which keeps its collision and seats. Images come from an https URL or are uploaded to the community hub (512 KB max)."
+          ]
+        }
+      ]
     }
   ]
 }
