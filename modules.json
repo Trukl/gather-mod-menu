@@ -234,9 +234,16 @@
       "name": "Fun",
       "description": "Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects orbit or move back and forth, seen by everyone with this module.",
       "file": "src/modules/fun.js",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "requires": { "map": "1.2.0", "map-pick": "1.0.1", "hub-api": "1.1.0" },
       "changelog": [
+        {
+          "version": "1.5.0",
+          "date": "2026-10-14",
+          "changes": [
+            "Edit your animations (✎): objects, movement, point, speed and name. The preview replaces the animation until you save, then it restarts for everyone."
+          ]
+        },
         {
           "version": "1.4.0",
           "date": "2026-10-13",
