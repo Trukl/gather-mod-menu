@@ -113,6 +113,89 @@ window.__gatherMods.define("build", (ctx) => {
     });
   }
 
+  // Linked objects — what sits on what (Place on…, Gather's tables and
+  // shelves): supports in green, objects on them in cyan, each joined to its
+  // support. Clicking an object shows only its group; clicking it again, all.
+  const links = { focusId: null };
+  const supportOf = (o) => (map.isLiveObject(o.parent) ? o.parent : null);
+  function rootOf(o) {
+    let root = o;
+    while (supportOf(root)) root = supportOf(root);
+    return root;
+  }
+  function objectsOn(support) {
+    const out = [];
+    const walk = (o) =>
+      o.children.filter(map.isLiveObject).forEach((c) => {
+        out.push(c);
+        walk(c);
+      });
+    walk(support);
+    return out;
+  }
+  function linkedObjects() {
+    const focus = links.focusId && GD().Repos.MapObject.get(links.focusId);
+    return map.isLiveObject(focus)
+      ? objectsOn(rootOf(focus))
+      : map.mapObjects().filter((o) => supportOf(o));
+  }
+  const supportsOf = (objects) => [...new Set(objects.map(supportOf))];
+  function centerOf(o) {
+    const tl = o.topLeftAbsolutePosition;
+    const d = o.getDimensionsInTiles();
+    return { x: (tl.x + d.width / 2) * map.TILE_PX, y: (tl.y + d.height / 2) * map.TILE_PX };
+  }
+  const linksSession = {
+    id: "links",
+    marquee: () => false,
+    outlines() {
+      const objects = linkedObjects();
+      return [
+        [supportsOf(objects), COLOR_SUPPORT],
+        [objects, COLOR_SELECTED],
+      ];
+    },
+    draw(g) {
+      g.lineStyle(2, COLOR_SUPPORT, 1);
+      for (const o of linkedObjects()) {
+        const a = centerOf(o);
+        const b = centerOf(supportOf(o));
+        g.lineBetween(a.x, a.y, b.x, b.y);
+      }
+    },
+    label(o) {
+      const support = supportOf(o);
+      const count = o.children.filter(map.isLiveObject).length;
+      return [
+        map.objectName(o),
+        support && `on ${map.objectName(support)}`,
+        count && `${count} on it`,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    },
+    onPick(o) {
+      links.focusId = links.focusId === o.id ? null : o.id;
+      render();
+    },
+    onStop() {
+      links.focusId = null;
+    },
+  };
+  function linksStatus() {
+    const objects = linkedObjects();
+    const focus = links.focusId && GD().Repos.MapObject.get(links.focusId);
+    if (map.isLiveObject(focus)) {
+      const root = rootOf(focus);
+      return objects.length
+        ? `${map.objectName(root)}: ${objects.length} object${objects.length > 1 ? "s" : ""} on it, click it again to see all`
+        : `Nothing sits on ${map.objectName(root)}, click it again to see all`;
+    }
+    if (!objects.length) return "Nothing sits on another object on this map";
+    const supports = supportsOf(objects).length;
+    return `${objects.length} object${objects.length > 1 ? "s" : ""} on ${supports} support${supports > 1 ? "s" : ""}: click one to see only its group`;
+  }
+
   // Bulk delete — deleting an object also deletes what sits on it.
   const bulkSession = {
     id: "bulk-delete",
@@ -180,6 +263,10 @@ window.__gatherMods.define("build", (ctx) => {
         : place.status;
       action.style.display = "none";
     }
+    const showingLinks = pick.current() === "links";
+    $("#gm-links").textContent = showingLinks ? "Hide linked objects" : "Show linked objects…";
+    $("#gm-links").classList.toggle("active", showingLinks);
+    $("#gm-links-status").textContent = showingLinks ? linksStatus() : "";
 
     const deleting = pick.current() === "bulk-delete";
     const count = deleting ? map.liveObjects(bulk.selected).length : 0;
@@ -208,6 +295,8 @@ window.__gatherMods.define("build", (ctx) => {
       <div data-part="place-on">
         <button class="gm-btn" id="gm-place-on" title="Select objects (click, or drag a box), then the object to put them on (works on any object). Esc to cancel.">Place on…</button>
         <div class="gm-status"><span id="gm-place-status"></span><span class="gm-link" id="gm-place-action"></span></div>
+        <button class="gm-btn" id="gm-links" title="Outline what sits on what (Place on…, tables, shelves): supports in green, objects on them in cyan. Click an object to see only its group. Esc to close.">Show linked objects…</button>
+        <div class="gm-status"><span id="gm-links-status"></span></div>
       </div>
       <div data-part="bulk-delete">
         <button class="gm-btn" id="gm-bulk-delete" title="Select objects (click, or drag a box), then delete them all. Esc to cancel.">Bulk delete…</button>
@@ -223,6 +312,8 @@ window.__gatherMods.define("build", (ctx) => {
       el.querySelector("#gm-place-on").onclick = () =>
         pick.current() === "place" ? pick.stop("place") : pick.start(placeSession);
       el.querySelector("#gm-place-action").onclick = advancePlaceOn;
+      el.querySelector("#gm-links").onclick = () =>
+        pick.current() === "links" ? pick.stop("links") : pick.start(linksSession);
       el.querySelector("#gm-bulk-delete").onclick = () =>
         pick.current() === "bulk-delete" ? pick.stop("bulk-delete") : pick.start(bulkSession);
       el.querySelector("#gm-bulk-action").onclick = deleteBulkSelection;

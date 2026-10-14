@@ -110,9 +110,16 @@
       "name": "Map picking",
       "description": "Shared object selection on the map (click, box, scroll to cycle).",
       "file": "src/lib/map-pick.js",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "requires": { "map": "1.1.0" },
       "changelog": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-14",
+          "changes": [
+            "A selection session can name the hovered object its own way and draw more than outlines (lines between objects)."
+          ]
+        },
         {
           "version": "1.0.1",
           "date": "2026-10-08",
@@ -288,9 +295,16 @@
       "name": "Build",
       "description": "Free placement in the build tool, “Place on…” to put objects on any other object, and bulk delete (click or drag a box to select).",
       "file": "src/modules/build.js",
-      "version": "1.3.0",
-      "requires": { "map": "1.1.0", "map-pick": "1.0.0", "placements": "1.0.0", "jobs": "1.0.0" },
+      "version": "1.4.0",
+      "requires": { "map": "1.2.0", "map-pick": "1.1.0", "placements": "1.0.0", "jobs": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.4.0",
+          "date": "2026-10-14",
+          "changes": [
+            "Show linked objects…: outlines what sits on what (Place on…, tables, shelves), supports in green and objects on them in cyan, each joined to its support; hover tells what an object is on, click an object to see only its group."
+          ]
+        },
         {
           "version": "1.3.0",
           "date": "2026-10-09",
