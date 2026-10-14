@@ -246,7 +246,8 @@ window.__gatherMods.define("map-pick", (ctx) => {
     }
     const tip = hoverTip();
     tip.textContent =
-      map.objectName(target) + (total > 1 ? ` (${index + 1}/${total}, scroll to cycle)` : "");
+      (state.session.label?.(target) ?? map.objectName(target)) +
+      (total > 1 ? ` (${index + 1}/${total}, scroll to cycle)` : "");
     tip.style.left = e.clientX + 14 + "px";
     tip.style.top = e.clientY + 14 + "px";
   }
@@ -259,12 +260,15 @@ window.__gatherMods.define("map-pick", (ctx) => {
       g.strokeRect(tl.x * TILE_PX, tl.y * TILE_PX, d.width * TILE_PX, d.height * TILE_PX);
     }
   }
+  // A session outlines objects (outlines) and can draw more on the map (draw).
   function redraw() {
     state.graphics?.destroy();
     state.graphics = null;
-    if (!state.session?.outlines) return;
+    const session = state.session;
+    if (!session?.outlines && !session?.draw) return;
     const g = map.scene().add.graphics().setDepth(1e9);
-    for (const [objects, color] of state.session.outlines()) strokeObjects(g, objects, color);
+    for (const [objects, color] of session.outlines?.() ?? []) strokeObjects(g, objects, color);
+    session.draw?.(g);
     state.graphics = g;
     map.requestRender();
   }
