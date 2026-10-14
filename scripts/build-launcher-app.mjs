@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LAUNCHER = join(ROOT, "launcher/gather-mods-launcher.mjs");
+const ICON = join(ROOT, "launcher/icon.icns");
 const APP = join(homedir(), "Applications/Gather Mods.app");
 const LOG = join(homedir(), "Library/Logs/gather-mods-launcher.log");
-const GATHER_APP = "/Applications/GatherV2.app";
 
 const shellQuote = (s) => `'${s.replaceAll("'", `'\\''`)}'`;
 const command = `nohup ${shellQuote(process.execPath)} ${shellQuote(LAUNCHER)} >> ${shellQuote(LOG)} 2>&1 &`;
@@ -18,17 +18,11 @@ mkdirSync(dirname(APP), { recursive: true });
 rmSync(APP, { recursive: true, force: true });
 execFileSync("osacompile", ["-o", APP, "-e", appleScript]);
 
-const iconName = execFileSync("defaults", [
-  "read",
-  join(GATHER_APP, "Contents/Info.plist"),
-  "CFBundleIconFile",
-])
-  .toString()
-  .trim()
-  .replace(/\.icns$/, "");
-copyFileSync(
-  join(GATHER_APP, "Contents/Resources", `${iconName}.icns`),
-  join(APP, "Contents/Resources/applet.icns"),
-);
+// osacompile adds the AppleScript icon in Assets.car, which macOS shows
+// instead of applet.icns as long as CFBundleIconName names it.
+copyFileSync(ICON, join(APP, "Contents/Resources/applet.icns"));
+rmSync(join(APP, "Contents/Resources/Assets.car"));
+execFileSync("plutil", ["-remove", "CFBundleIconName", join(APP, "Contents/Info.plist")]);
+execFileSync("codesign", ["--force", "--sign", "-", APP]);
 execFileSync("touch", [APP]);
 console.log(`Built ${APP} (logs: ${LOG})`);
