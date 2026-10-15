@@ -43,32 +43,121 @@ window.__gatherMods.define("custom", (ctx) => {
   const imageSrc = (url) => (url.startsWith("/images/") ? hubUrl() + url : url);
 
   // ===================
-  // Textures: one per image URL, loaded once.
+  // Textures: one per image URL, loaded once. Animated GIF, WebP and PNG
+  // are decoded frame by frame (WebCodecs ImageDecoder) into one canvas;
+  // every client shows the frame of the current time, so they play in sync.
   // ===================
   const textures = new Map();
+  const animations = new Map();
+  const MAX_FRAMES = 300;
+  const MAX_ANIMATION_PIXELS = 16_000_000;
+  const MAX_CANVAS_SIDE = 4096;
+  const MIN_FRAME_MS = 20;
   const textureKey = (url) => "gather-mods-custom:" + url;
-  function texture(url) {
-    const scene = map.scene();
-    const key = textureKey(url);
-    if (scene.textures.exists(key)) return key;
-    if (textures.has(url)) return null;
-    textures.set(url, "loading");
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      if (!map.scene().textures.exists(key)) map.scene().textures.addImage(key, img);
-      textures.set(url, "ready");
-      renderAll();
-      renderEditor();
-    };
-    img.onerror = () => {
-      textures.set(url, "error");
-      renderEditor();
-      renderList();
-    };
-    img.src = imageSrc(url);
+  // The type from the first bytes: servers often send a generic one.
+  function imageType(bytes) {
+    const ascii = (from, to) => String.fromCharCode(...bytes.subarray(from, to));
+    if (ascii(0, 4) === "GIF8") return "image/gif";
+    if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "image/webp";
+    if (bytes[0] === 0x89 && ascii(1, 4) === "PNG") return "image/png";
     return null;
   }
+  // A canvas with every frame in a grid and their durations, or null for a
+  // still image (or one too large to keep all its frames).
+  async function decodeAnimation(blob) {
+    const bytes = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+    const type = imageType(bytes);
+    if (!type || !("ImageDecoder" in window) || !(await ImageDecoder.isTypeSupported(type)))
+      return null;
+    const decoder = new ImageDecoder({ data: await blob.arrayBuffer(), type });
+    try {
+      await decoder.tracks.ready;
+      const track = decoder.tracks.selectedTrack;
+      const count = track?.frameCount ?? 1;
+      if (!track?.animated || count < 2 || count > MAX_FRAMES) return null;
+      const first = (await decoder.decode({ frameIndex: 0 })).image;
+      const width = first.displayWidth;
+      const height = first.displayHeight;
+      first.close();
+      if (width * height * count > MAX_ANIMATION_PIXELS) return null;
+      const columns = Math.max(1, Math.floor(MAX_CANVAS_SIDE / width));
+      const canvas = document.createElement("canvas");
+      canvas.width = width * Math.min(columns, count);
+      canvas.height = height * Math.ceil(count / columns);
+      if (canvas.height > MAX_CANVAS_SIDE) return null;
+      const c2d = canvas.getContext("2d");
+      const durations = [];
+      for (let i = 0; i < count; i++) {
+        const { image } = await decoder.decode({ frameIndex: i });
+        c2d.drawImage(image, (i % columns) * width, Math.floor(i / columns) * height);
+        durations.push(Math.max(MIN_FRAME_MS, (image.duration ?? 100_000) / 1000));
+        image.close();
+      }
+      return { canvas, width, height, columns, durations };
+    } finally {
+      decoder.close();
+    }
+  }
+  function addAnimatedTexture(key, { canvas, width, height, columns, durations }) {
+    const tex = map.scene().textures.addCanvas(key, canvas);
+    durations.forEach((_, i) =>
+      tex.add(i, 0, (i % columns) * width, Math.floor(i / columns) * height, width, height),
+    );
+    const ends = [];
+    durations.reduce((t, d) => (ends.push(t + d), t + d), 0);
+    animations.set(key, { ends, total: ends[ends.length - 1] });
+  }
+  function addStillTexture(key, blob) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const src = URL.createObjectURL(blob);
+      img.onload = () => {
+        URL.revokeObjectURL(src);
+        map.scene().textures.addImage(key, img);
+        resolve();
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(src);
+        reject(new Error("not an image"));
+      };
+      img.src = src;
+    });
+  }
+  async function loadTexture(url) {
+    const key = textureKey(url);
+    try {
+      const r = await fetch(imageSrc(url));
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const blob = await r.blob();
+      const animation = await decodeAnimation(blob).catch(() => null);
+      if (!map.scene().textures.exists(key)) {
+        if (animation) addAnimatedTexture(key, animation);
+        else await addStillTexture(key, blob);
+      }
+      textures.set(url, "ready");
+      renderAll();
+    } catch (e) {
+      console.warn("[GatherMods] custom object image unavailable", url, e);
+      textures.set(url, "error");
+      renderList();
+    }
+    renderEditor();
+  }
+  function texture(url) {
+    const key = textureKey(url);
+    if (map.scene().textures.exists(key)) return key;
+    if (!textures.has(url)) {
+      textures.set(url, "loading");
+      loadTexture(url);
+    }
+    return null;
+  }
+  const frameOf = (key) => {
+    const animation = animations.get(key);
+    if (!animation) return null;
+    const t = Date.now() % animation.total;
+    return animation.ends.findIndex((end) => t < end);
+  };
   ctx.onCleanup(() => {
     const scene = map.scene();
     for (const url of textures.keys())
@@ -244,9 +333,15 @@ window.__gatherMods.define("custom", (ctx) => {
       entry = null;
     }
     if (!entry) {
-      entry = { key, zone: place.zone, sprite: map.scene().add.image(0, 0, key).setOrigin(0, 0) };
+      const sprite = map
+        .scene()
+        .add.image(0, 0, key, frameOf(key) ?? undefined)
+        .setOrigin(0, 0);
+      entry = { key, zone: place.zone, sprite };
       drawn.set(o.id, entry);
     }
+    const frame = frameOf(key);
+    if (frame !== null) entry.sprite.setFrame(frame, false, false);
     entry.sprite.setAlpha(o.id === "stamp" ? o.opacity * 0.6 : o.opacity);
     if (place.zone) {
       entry.sprite.setDepth(place.depth);
@@ -273,12 +368,13 @@ window.__gatherMods.define("custom", (ctx) => {
         const key = textureKey(v.o.imageUrl);
         const scene = map.scene();
         if (!scene.textures.exists(key)) return true;
-        const source = scene.textures.get(key).getSourceImage();
+        const frame = frameOf(key) ?? "__BASE";
+        const { width, height } = scene.textures.getFrame(key, frame);
         const f = v.o.free;
-        const x = Math.floor(((tileX - f.x) / f.width) * source.width);
-        const y = Math.floor(((tileY - f.y) / f.height) * source.height);
-        if (x < 0 || y < 0 || x >= source.width || y >= source.height) return false;
-        return (scene.textures.getPixelAlpha(x, y, key) ?? 255) > 16;
+        const x = Math.floor(((tileX - f.x) / f.width) * width);
+        const y = Math.floor(((tileY - f.y) / f.height) * height);
+        if (x < 0 || y < 0 || x >= width || y >= height) return false;
+        return (scene.textures.getPixelAlpha(x, y, key, frame) ?? 255) > 16;
       },
       drawY: () => (placementOf(v.o).depth - 7) / DEPTH_PER_PX,
       displace(dx, dy) {
@@ -320,6 +416,29 @@ window.__gatherMods.define("custom", (ctx) => {
     for (const entry of drawn.values()) if (entry.zone) placeOverZone(entry);
   }
   map.scene().events.on("prerender", followSkins);
+
+  // Gather only draws the map when it changes: redraw when a drawn animated
+  // image reaches its next frame.
+  let playFrame = 0;
+  function play() {
+    playFrame = 0;
+    let changed = false;
+    let playing = false;
+    for (const { key, sprite } of drawn.values()) {
+      const frame = frameOf(key);
+      if (frame === null) continue;
+      playing = true;
+      if (sprite.frame.name !== frame) {
+        sprite.setFrame(frame, false, false);
+        changed = true;
+      }
+    }
+    if (changed) map.requestRender();
+    if (playing) playFrame = requestAnimationFrame(play);
+  }
+  const startPlaying = () => {
+    if (!playFrame) playFrame = requestAnimationFrame(play);
+  };
 
   // Collisions: pathfinding reads Gather's collision map; arrow keys are
   // stopped before the move is sent.
@@ -373,9 +492,11 @@ window.__gatherMods.define("custom", (ctx) => {
     setCollisions(collisionTiles(objects.filter((o) => o.id !== "stamp")));
     outlinePlaneTarget();
     map.requestRender();
+    startPlaying();
   }
   ctx.onCleanup(() => {
     map.scene().events.off("prerender", followSkins);
+    cancelAnimationFrame(playFrame);
     planeOutline?.destroy();
     for (const id of [...drawn.keys()]) undraw(id);
     setCollisions(new Set());

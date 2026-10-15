@@ -1356,7 +1356,7 @@
   `;
 })();
 
-window.__gatherMods.bundleCatalog = {"modules":[{"id":"core","kind":"core","name":"Core","description":"Mods panel, settings, module manager and launcher bridge. Always installed.","version":"1.5.0","requires":{},"changelog":[{"version":"1.5.0","date":"2026-10-14","changes":["Announcements: messages from the mod author (maintenance, incident…) open a window once, then stay at the top of the Mods panel until they expire. The core checks for them every 10 minutes."]},{"version":"1.4.0","date":"2026-10-13","notice":"Animations, placed objects and desk objects now survive a new version of the map. Those made on lemlist before its map was republished on Oct 13 were lost: please recreate your animations.","changes":["Mod news: important changes (breaking changes, things to redo) open a “Mod news” window once, when you open Gather or when an update brings them; they also stand out in the changelogs.","Required updates: when a module no longer works without its new version (breaking change), an “Update required” window asks you to update it or disable it, and the module stays off until then. If the core itself is outdated, the whole mod stays off until you update it or turn it off."]},{"version":"1.3.0","date":"2026-10-13","changes":["On first install and after each update, tells the community hub which module versions this install runs, with your Gather account, so the author knows how many installs run which version."]},{"version":"1.2.0","date":"2026-10-09","changes":["Every module has a “Changelog” link in Settings, installed or not.","Turning on a module you don't have asks first: it shows the version, its latest changes and the libraries it brings, then “Install”.","Modules with several features list them under their row: click one to hide it from the panel and turn it off (e.g. Flee mode)."]},{"version":"1.1.2","date":"2026-10-09","changes":["What's new only shows updates to install and the last update you installed; “Show full history” unfolds the rest."]},{"version":"1.1.1","date":"2026-10-09","changes":["Settings tell you in red when the launcher is no longer running, instead of showing stale information and settings that do nothing.","What's new highlights the changes of the last update you installed, until the module's next update."]},{"version":"1.1.0","date":"2026-10-09","changes":["What's new and Review updates highlight what you haven't installed yet in green.","“New” and “Update” badges are green; a module being uninstalled or no longer published is shown in red.","A module that is no longer published gets an “Uninstall” button instead of a note pointing to the launcher settings file.","Changelog lines starting with “Removed:” are shown in red."]},{"version":"1.0.0","date":"2026-10-08","changes":["The mod is split into modules: pick the features you want in ⚙ Settings, only their code runs and gets updated.","New modules show up in Settings with a “New” badge and are never installed automatically.","“What's new” lists the changelog of your modules; “Review updates” shows it next to the exact code diff."]}]},{"id":"map","kind":"lib","name":"Map helpers","description":"Shared map object helpers.","version":"1.3.0","requires":{},"changelog":[{"version":"1.3.0","date":"2026-10-15","changes":["Virtual objects: images drawn by a module (Custom objects) can be found, referenced and named like map objects."]},{"version":"1.2.0","date":"2026-10-13","changes":["Stable references to objects (Gather's hashIdentifier, plus type and position), so what the mod tracks survives a new version of the map."]},{"version":"1.1.0","date":"2026-10-08","changes":["Can force Gather to redraw the map, which it otherwise only does when something changes.","Box selection toggles objects, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"map-pick","kind":"lib","name":"Map picking","description":"Shared object selection on the map (click, box, scroll to cycle).","version":"1.2.0","requires":{"map":"1.3.0"},"changelog":[{"version":"1.2.0","date":"2026-10-15","changes":["A selection can include custom objects (animations, bulk delete), picked by their visible pixels and stacked by their plane."]},{"version":"1.1.0","date":"2026-10-14","changes":["A selection session can name the hovered object its own way and draw more than outlines (lines between objects)."]},{"version":"1.0.1","date":"2026-10-08","changes":["Selection outlines show up and go away immediately, even when started or stopped from the panel.","The yellow hover outline follows the object named in the tooltip, even between close objects."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"previews","kind":"lib","name":"Previews","description":"Shared outfit and object previews.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"placements","kind":"lib","name":"Placements journal","description":"Shared journal of the objects placed with the mod.","version":"1.1.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.1.0","date":"2026-10-13","changes":["Placements are kept per floor with stable references, so they survive a new version of the map."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"jobs","kind":"lib","name":"Job queue","description":"Shared queue that runs map edits one after the other, in click order.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"hub-api","kind":"lib","name":"Hub API","description":"Shared requests to the community hub, signed in with your Gather account.","version":"1.3.0","requires":{},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["Tells the hub which module versions are running, so it can ask for a required update."]},{"version":"1.2.0","date":"2026-10-13","changes":["Uses the core's hub address and Gather sign-in, shared with install reports."]},{"version":"1.1.0","date":"2026-10-12","changes":["Signs in to the hub with your Gather account: what you publish belongs to the account, from the app and the browser alike. Only the Gather account id is kept by the hub."]},{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"teleport","kind":"module","name":"Teleport","description":"Teleport mode (every “Go to” and double-click teleports), TP to your desk, TP to players and saved locations.","version":"1.2.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Saved locations follow the map when an admin publishes a new version that shifts it (locations saved before this version don't move)."]},{"version":"1.1.0","date":"2026-10-09","changes":["Teleport mode, TP to my desk, Players and Saved locations can each be hidden in Settings (a hidden Teleport mode is off)."]},{"version":"1.0.0","date":"2026-10-08","changes":["Teleport mode, TP to desk, TP to players and saved locations, now in one module."]}]},{"id":"fun","kind":"module","name":"Fun","description":"Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects orbit or move back and forth, seen by everyone with this module.","version":"1.6.0","requires":{"map":"1.3.0","map-pick":"1.2.0","hub-api":"1.1.0"},"changelog":[{"version":"1.6.0","date":"2026-10-15","changes":["Animate custom objects: select them like other objects (alone or with real objects) in New animation or ✎."]},{"version":"1.5.0","date":"2026-10-14","changes":["Edit your animations (✎): objects, movement, point, speed and name. The preview replaces the animation until you save, then it restarts for everyone."]},{"version":"1.4.0","date":"2026-10-13","changes":["Animations survive a new version of the map: they belong to the floor and find their objects again, even if the map moved. Existing animations are converted the first time someone with this version opens their map."]},{"version":"1.3.0","date":"2026-10-12","changes":["Your animations belong to your Gather account: start, stop or delete them from the app or the browser. Those you created before are moved to your account when you open their map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Flee mode and Animations can each be hidden in Settings; a hidden one is turned off (hidden animations are no longer fetched nor played).","The animation list only shows yours; the others' still play on the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Animations: select objects, make them orbit around a point or move back and forth in a straight line or along a wave, with a live preview, then save.","Everyone on the map who has this module sees your animations, in sync; only you can start, stop or delete yours.","Nothing is sent to Gather's server: objects only move on screen, and the map is redrawn at 30 fps at most while an animation runs."]},{"version":"1.0.0","date":"2026-10-08","changes":["Flee mode moves here from the player list."]}]},{"id":"build","kind":"module","name":"Build","description":"Free placement in the build tool, “Place on…” to put objects on any other object, and bulk delete (click or drag a box to select).","version":"1.5.0","requires":{"map":"1.3.0","map-pick":"1.2.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.5.0","date":"2026-10-15","changes":["Bulk delete also selects and deletes custom objects."]},{"version":"1.4.0","date":"2026-10-14","changes":["Show linked objects…: outlines what sits on what (Place on…, tables, shelves), supports in green and objects on them in cyan, each joined to its support; hover tells what an object is on, click an object to see only its group."]},{"version":"1.3.0","date":"2026-10-09","changes":["Free placement, Place on… and Bulk delete can each be hidden in Settings (a hidden Free placement is off)."]},{"version":"1.2.0","date":"2026-10-09","changes":["Place on… and bulk delete no longer wait for the previous one to finish: start the next one right away, it is queued."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects moved with Place on… are listed in Placed objects.","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Free placement, Place on… and bulk delete, now in one module."]}]},{"id":"outfits","kind":"module","name":"Outfits","description":"Save and apply outfits, including “No outfit” and “Invisible”.","version":"1.0.0","requires":{"previews":"1.0.0"},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Outfit presets as a module."]}]},{"id":"desks","kind":"module","name":"Desks","description":"Save and swap your desk decoration, and pick which objects belong to your desk.","version":"1.3.0","requires":{"map":"1.2.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["The objects picked for your desk survive a new version of the map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Picking another desk while one is being applied stops it and applies the new one; “↩ Previous desk” still brings back the desk you had before the first one."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects added by a desk preset are listed in Placed objects.","Dragging a box over desk objects already picked removes them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Desk presets as a module."]}]},{"id":"constructions","kind":"module","name":"Constructions","description":"Save a group of objects and place it anywhere on the map in one click.","version":"1.2.0","requires":{"map":"1.1.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-09","changes":["Place several constructions and click “↶ Delete last” several times without waiting: each action is queued and runs in order."]},{"version":"1.1.0","date":"2026-10-08","changes":["“↶ Undo” becomes “↶ Delete last”, using the shared journal of placed objects (keeps your history).","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Constructions as a module."]}]},{"id":"placed","kind":"module","name":"Placed objects","description":"Everything you placed with the mod on this map (constructions, desk presets, Place on…): delete the last one, any of them, or all.","version":"1.2.0","requires":{"map":"1.2.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Placed objects are listed per floor and survive a new version of the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Deletions no longer wait for the previous one: click several ✕ or “↶ Delete last” in a row, they are queued and run in order."]},{"version":"1.0.0","date":"2026-10-08","changes":["New module: list what the mod placed on this map, hover to see it, delete the last placement, any of them, or all (everything is outlined in red before you confirm)."]}]},{"id":"share","kind":"module","name":"Share presets","description":"Export and import the presets of your installed modules as JSON.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Export and import only cover the preset modules you have installed."]}]},{"id":"hub","kind":"module","name":"Community hub","description":"Browse, preview, add and publish presets shared by others.","version":"1.1.0","requires":{"previews":"1.0.0","hub-api":"1.1.0"},"changelog":[{"version":"1.1.0","date":"2026-10-12","changes":["Your published presets belong to your Gather account: delete them from the app or the browser. Those you published before are moved to your account the next time you open the hub."]},{"version":"1.0.1","date":"2026-10-09","changes":["Hub requests go through the shared hub library, also used by animations."]},{"version":"1.0.0","date":"2026-10-08","changes":["Hub tabs follow your installed preset modules."]}]},{"id":"custom","kind":"module","name":"Custom objects","description":"Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.","version":"1.2.0","requires":{"map":"1.3.0","map-pick":"1.2.0","hub-api":"1.3.0"},"changelog":[{"version":"1.2.0","date":"2026-10-15","changes":["Place copies (＋): images follow the pointer and every click places one more, like a Gather object; for a restyle, every clicked object gets the same image. Esc to stop.","Placed images behave like map objects: Fun animates them and Bulk delete deletes them."]},{"version":"1.1.0","date":"2026-10-15","changes":["Plane: “▼ Back” and “▲ Front” move an image or a restyle behind or in front of the objects it overlaps, one at a time; the object it is set against is outlined in green, “Reset” goes back to the default plane. Seen the same way by everyone."]},{"version":"1.0.0","date":"2026-10-14","changes":["New module: images on the map for everyone who has it, since Gather V2 cannot add your own objects. “New image…” places an image anywhere with its size, layer (floor, sorted like objects, above everything), base line and collision; “Restyle an object…” draws an image over a real object, which keeps its collision and seats. Images come from an https URL or are uploaded to the community hub (512 KB max)."]}]}]};
+window.__gatherMods.bundleCatalog = {"modules":[{"id":"core","kind":"core","name":"Core","description":"Mods panel, settings, module manager and launcher bridge. Always installed.","version":"1.5.0","requires":{},"changelog":[{"version":"1.5.0","date":"2026-10-14","changes":["Announcements: messages from the mod author (maintenance, incident…) open a window once, then stay at the top of the Mods panel until they expire. The core checks for them every 10 minutes."]},{"version":"1.4.0","date":"2026-10-13","notice":"Animations, placed objects and desk objects now survive a new version of the map. Those made on lemlist before its map was republished on Oct 13 were lost: please recreate your animations.","changes":["Mod news: important changes (breaking changes, things to redo) open a “Mod news” window once, when you open Gather or when an update brings them; they also stand out in the changelogs.","Required updates: when a module no longer works without its new version (breaking change), an “Update required” window asks you to update it or disable it, and the module stays off until then. If the core itself is outdated, the whole mod stays off until you update it or turn it off."]},{"version":"1.3.0","date":"2026-10-13","changes":["On first install and after each update, tells the community hub which module versions this install runs, with your Gather account, so the author knows how many installs run which version."]},{"version":"1.2.0","date":"2026-10-09","changes":["Every module has a “Changelog” link in Settings, installed or not.","Turning on a module you don't have asks first: it shows the version, its latest changes and the libraries it brings, then “Install”.","Modules with several features list them under their row: click one to hide it from the panel and turn it off (e.g. Flee mode)."]},{"version":"1.1.2","date":"2026-10-09","changes":["What's new only shows updates to install and the last update you installed; “Show full history” unfolds the rest."]},{"version":"1.1.1","date":"2026-10-09","changes":["Settings tell you in red when the launcher is no longer running, instead of showing stale information and settings that do nothing.","What's new highlights the changes of the last update you installed, until the module's next update."]},{"version":"1.1.0","date":"2026-10-09","changes":["What's new and Review updates highlight what you haven't installed yet in green.","“New” and “Update” badges are green; a module being uninstalled or no longer published is shown in red.","A module that is no longer published gets an “Uninstall” button instead of a note pointing to the launcher settings file.","Changelog lines starting with “Removed:” are shown in red."]},{"version":"1.0.0","date":"2026-10-08","changes":["The mod is split into modules: pick the features you want in ⚙ Settings, only their code runs and gets updated.","New modules show up in Settings with a “New” badge and are never installed automatically.","“What's new” lists the changelog of your modules; “Review updates” shows it next to the exact code diff."]}]},{"id":"map","kind":"lib","name":"Map helpers","description":"Shared map object helpers.","version":"1.3.0","requires":{},"changelog":[{"version":"1.3.0","date":"2026-10-15","changes":["Virtual objects: images drawn by a module (Custom objects) can be found, referenced and named like map objects."]},{"version":"1.2.0","date":"2026-10-13","changes":["Stable references to objects (Gather's hashIdentifier, plus type and position), so what the mod tracks survives a new version of the map."]},{"version":"1.1.0","date":"2026-10-08","changes":["Can force Gather to redraw the map, which it otherwise only does when something changes.","Box selection toggles objects, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"map-pick","kind":"lib","name":"Map picking","description":"Shared object selection on the map (click, box, scroll to cycle).","version":"1.2.0","requires":{"map":"1.3.0"},"changelog":[{"version":"1.2.0","date":"2026-10-15","changes":["A selection can include custom objects (animations, bulk delete), picked by their visible pixels and stacked by their plane."]},{"version":"1.1.0","date":"2026-10-14","changes":["A selection session can name the hovered object its own way and draw more than outlines (lines between objects)."]},{"version":"1.0.1","date":"2026-10-08","changes":["Selection outlines show up and go away immediately, even when started or stopped from the panel.","The yellow hover outline follows the object named in the tooltip, even between close objects."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"previews","kind":"lib","name":"Previews","description":"Shared outfit and object previews.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"placements","kind":"lib","name":"Placements journal","description":"Shared journal of the objects placed with the mod.","version":"1.1.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.1.0","date":"2026-10-13","changes":["Placements are kept per floor with stable references, so they survive a new version of the map."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"jobs","kind":"lib","name":"Job queue","description":"Shared queue that runs map edits one after the other, in click order.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"hub-api","kind":"lib","name":"Hub API","description":"Shared requests to the community hub, signed in with your Gather account.","version":"1.3.0","requires":{},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["Tells the hub which module versions are running, so it can ask for a required update."]},{"version":"1.2.0","date":"2026-10-13","changes":["Uses the core's hub address and Gather sign-in, shared with install reports."]},{"version":"1.1.0","date":"2026-10-12","changes":["Signs in to the hub with your Gather account: what you publish belongs to the account, from the app and the browser alike. Only the Gather account id is kept by the hub."]},{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"teleport","kind":"module","name":"Teleport","description":"Teleport mode (every “Go to” and double-click teleports), TP to your desk, TP to players and saved locations.","version":"1.2.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Saved locations follow the map when an admin publishes a new version that shifts it (locations saved before this version don't move)."]},{"version":"1.1.0","date":"2026-10-09","changes":["Teleport mode, TP to my desk, Players and Saved locations can each be hidden in Settings (a hidden Teleport mode is off)."]},{"version":"1.0.0","date":"2026-10-08","changes":["Teleport mode, TP to desk, TP to players and saved locations, now in one module."]}]},{"id":"fun","kind":"module","name":"Fun","description":"Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects orbit or move back and forth, seen by everyone with this module.","version":"1.6.0","requires":{"map":"1.3.0","map-pick":"1.2.0","hub-api":"1.1.0"},"changelog":[{"version":"1.6.0","date":"2026-10-15","changes":["Animate custom objects: select them like other objects (alone or with real objects) in New animation or ✎."]},{"version":"1.5.0","date":"2026-10-14","changes":["Edit your animations (✎): objects, movement, point, speed and name. The preview replaces the animation until you save, then it restarts for everyone."]},{"version":"1.4.0","date":"2026-10-13","changes":["Animations survive a new version of the map: they belong to the floor and find their objects again, even if the map moved. Existing animations are converted the first time someone with this version opens their map."]},{"version":"1.3.0","date":"2026-10-12","changes":["Your animations belong to your Gather account: start, stop or delete them from the app or the browser. Those you created before are moved to your account when you open their map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Flee mode and Animations can each be hidden in Settings; a hidden one is turned off (hidden animations are no longer fetched nor played).","The animation list only shows yours; the others' still play on the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Animations: select objects, make them orbit around a point or move back and forth in a straight line or along a wave, with a live preview, then save.","Everyone on the map who has this module sees your animations, in sync; only you can start, stop or delete yours.","Nothing is sent to Gather's server: objects only move on screen, and the map is redrawn at 30 fps at most while an animation runs."]},{"version":"1.0.0","date":"2026-10-08","changes":["Flee mode moves here from the player list."]}]},{"id":"build","kind":"module","name":"Build","description":"Free placement in the build tool, “Place on…” to put objects on any other object, and bulk delete (click or drag a box to select).","version":"1.5.0","requires":{"map":"1.3.0","map-pick":"1.2.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.5.0","date":"2026-10-15","changes":["Bulk delete also selects and deletes custom objects."]},{"version":"1.4.0","date":"2026-10-14","changes":["Show linked objects…: outlines what sits on what (Place on…, tables, shelves), supports in green and objects on them in cyan, each joined to its support; hover tells what an object is on, click an object to see only its group."]},{"version":"1.3.0","date":"2026-10-09","changes":["Free placement, Place on… and Bulk delete can each be hidden in Settings (a hidden Free placement is off)."]},{"version":"1.2.0","date":"2026-10-09","changes":["Place on… and bulk delete no longer wait for the previous one to finish: start the next one right away, it is queued."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects moved with Place on… are listed in Placed objects.","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Free placement, Place on… and bulk delete, now in one module."]}]},{"id":"outfits","kind":"module","name":"Outfits","description":"Save and apply outfits, including “No outfit” and “Invisible”.","version":"1.0.0","requires":{"previews":"1.0.0"},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Outfit presets as a module."]}]},{"id":"desks","kind":"module","name":"Desks","description":"Save and swap your desk decoration, and pick which objects belong to your desk.","version":"1.3.0","requires":{"map":"1.2.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["The objects picked for your desk survive a new version of the map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Picking another desk while one is being applied stops it and applies the new one; “↩ Previous desk” still brings back the desk you had before the first one."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects added by a desk preset are listed in Placed objects.","Dragging a box over desk objects already picked removes them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Desk presets as a module."]}]},{"id":"constructions","kind":"module","name":"Constructions","description":"Save a group of objects and place it anywhere on the map in one click.","version":"1.2.0","requires":{"map":"1.1.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-09","changes":["Place several constructions and click “↶ Delete last” several times without waiting: each action is queued and runs in order."]},{"version":"1.1.0","date":"2026-10-08","changes":["“↶ Undo” becomes “↶ Delete last”, using the shared journal of placed objects (keeps your history).","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Constructions as a module."]}]},{"id":"placed","kind":"module","name":"Placed objects","description":"Everything you placed with the mod on this map (constructions, desk presets, Place on…): delete the last one, any of them, or all.","version":"1.2.0","requires":{"map":"1.2.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Placed objects are listed per floor and survive a new version of the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Deletions no longer wait for the previous one: click several ✕ or “↶ Delete last” in a row, they are queued and run in order."]},{"version":"1.0.0","date":"2026-10-08","changes":["New module: list what the mod placed on this map, hover to see it, delete the last placement, any of them, or all (everything is outlined in red before you confirm)."]}]},{"id":"share","kind":"module","name":"Share presets","description":"Export and import the presets of your installed modules as JSON.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Export and import only cover the preset modules you have installed."]}]},{"id":"hub","kind":"module","name":"Community hub","description":"Browse, preview, add and publish presets shared by others.","version":"1.1.0","requires":{"previews":"1.0.0","hub-api":"1.1.0"},"changelog":[{"version":"1.1.0","date":"2026-10-12","changes":["Your published presets belong to your Gather account: delete them from the app or the browser. Those you published before are moved to your account the next time you open the hub."]},{"version":"1.0.1","date":"2026-10-09","changes":["Hub requests go through the shared hub library, also used by animations."]},{"version":"1.0.0","date":"2026-10-08","changes":["Hub tabs follow your installed preset modules."]}]},{"id":"custom","kind":"module","name":"Custom objects","description":"Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.","version":"1.3.0","requires":{"map":"1.3.0","map-pick":"1.2.0","hub-api":"1.3.0"},"changelog":[{"version":"1.3.0","date":"2026-10-15","changes":["Animated GIFs (and animated WebP or PNG) play on the map, for images and restyles, in sync for everyone. Very long or very large animations (over 300 frames or 16 million pixels in all) stay still on their first frame."]},{"version":"1.2.0","date":"2026-10-15","changes":["Place copies (＋): images follow the pointer and every click places one more, like a Gather object; for a restyle, every clicked object gets the same image. Esc to stop.","Placed images behave like map objects: Fun animates them and Bulk delete deletes them."]},{"version":"1.1.0","date":"2026-10-15","changes":["Plane: “▼ Back” and “▲ Front” move an image or a restyle behind or in front of the objects it overlaps, one at a time; the object it is set against is outlined in green, “Reset” goes back to the default plane. Seen the same way by everyone."]},{"version":"1.0.0","date":"2026-10-14","changes":["New module: images on the map for everyone who has it, since Gather V2 cannot add your own objects. “New image…” places an image anywhere with its size, layer (floor, sorted like objects, above everything), base line and collision; “Restyle an object…” draws an image over a real object, which keeps its collision and seats. Images come from an https URL or are uploaded to the community hub (512 KB max)."]}]}]};
 // Map library: object helpers, snapshots, stable object references and
 // screen/world geometry shared by the modules that work on the map.
 window.__gatherMods.define("map", (ctx) => {
@@ -4695,32 +4695,121 @@ window.__gatherMods.define("custom", (ctx) => {
   const imageSrc = (url) => (url.startsWith("/images/") ? hubUrl() + url : url);
 
   // ===================
-  // Textures: one per image URL, loaded once.
+  // Textures: one per image URL, loaded once. Animated GIF, WebP and PNG
+  // are decoded frame by frame (WebCodecs ImageDecoder) into one canvas;
+  // every client shows the frame of the current time, so they play in sync.
   // ===================
   const textures = new Map();
+  const animations = new Map();
+  const MAX_FRAMES = 300;
+  const MAX_ANIMATION_PIXELS = 16_000_000;
+  const MAX_CANVAS_SIDE = 4096;
+  const MIN_FRAME_MS = 20;
   const textureKey = (url) => "gather-mods-custom:" + url;
-  function texture(url) {
-    const scene = map.scene();
-    const key = textureKey(url);
-    if (scene.textures.exists(key)) return key;
-    if (textures.has(url)) return null;
-    textures.set(url, "loading");
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      if (!map.scene().textures.exists(key)) map.scene().textures.addImage(key, img);
-      textures.set(url, "ready");
-      renderAll();
-      renderEditor();
-    };
-    img.onerror = () => {
-      textures.set(url, "error");
-      renderEditor();
-      renderList();
-    };
-    img.src = imageSrc(url);
+  // The type from the first bytes: servers often send a generic one.
+  function imageType(bytes) {
+    const ascii = (from, to) => String.fromCharCode(...bytes.subarray(from, to));
+    if (ascii(0, 4) === "GIF8") return "image/gif";
+    if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "image/webp";
+    if (bytes[0] === 0x89 && ascii(1, 4) === "PNG") return "image/png";
     return null;
   }
+  // A canvas with every frame in a grid and their durations, or null for a
+  // still image (or one too large to keep all its frames).
+  async function decodeAnimation(blob) {
+    const bytes = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+    const type = imageType(bytes);
+    if (!type || !("ImageDecoder" in window) || !(await ImageDecoder.isTypeSupported(type)))
+      return null;
+    const decoder = new ImageDecoder({ data: await blob.arrayBuffer(), type });
+    try {
+      await decoder.tracks.ready;
+      const track = decoder.tracks.selectedTrack;
+      const count = track?.frameCount ?? 1;
+      if (!track?.animated || count < 2 || count > MAX_FRAMES) return null;
+      const first = (await decoder.decode({ frameIndex: 0 })).image;
+      const width = first.displayWidth;
+      const height = first.displayHeight;
+      first.close();
+      if (width * height * count > MAX_ANIMATION_PIXELS) return null;
+      const columns = Math.max(1, Math.floor(MAX_CANVAS_SIDE / width));
+      const canvas = document.createElement("canvas");
+      canvas.width = width * Math.min(columns, count);
+      canvas.height = height * Math.ceil(count / columns);
+      if (canvas.height > MAX_CANVAS_SIDE) return null;
+      const c2d = canvas.getContext("2d");
+      const durations = [];
+      for (let i = 0; i < count; i++) {
+        const { image } = await decoder.decode({ frameIndex: i });
+        c2d.drawImage(image, (i % columns) * width, Math.floor(i / columns) * height);
+        durations.push(Math.max(MIN_FRAME_MS, (image.duration ?? 100_000) / 1000));
+        image.close();
+      }
+      return { canvas, width, height, columns, durations };
+    } finally {
+      decoder.close();
+    }
+  }
+  function addAnimatedTexture(key, { canvas, width, height, columns, durations }) {
+    const tex = map.scene().textures.addCanvas(key, canvas);
+    durations.forEach((_, i) =>
+      tex.add(i, 0, (i % columns) * width, Math.floor(i / columns) * height, width, height),
+    );
+    const ends = [];
+    durations.reduce((t, d) => (ends.push(t + d), t + d), 0);
+    animations.set(key, { ends, total: ends[ends.length - 1] });
+  }
+  function addStillTexture(key, blob) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const src = URL.createObjectURL(blob);
+      img.onload = () => {
+        URL.revokeObjectURL(src);
+        map.scene().textures.addImage(key, img);
+        resolve();
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(src);
+        reject(new Error("not an image"));
+      };
+      img.src = src;
+    });
+  }
+  async function loadTexture(url) {
+    const key = textureKey(url);
+    try {
+      const r = await fetch(imageSrc(url));
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const blob = await r.blob();
+      const animation = await decodeAnimation(blob).catch(() => null);
+      if (!map.scene().textures.exists(key)) {
+        if (animation) addAnimatedTexture(key, animation);
+        else await addStillTexture(key, blob);
+      }
+      textures.set(url, "ready");
+      renderAll();
+    } catch (e) {
+      console.warn("[GatherMods] custom object image unavailable", url, e);
+      textures.set(url, "error");
+      renderList();
+    }
+    renderEditor();
+  }
+  function texture(url) {
+    const key = textureKey(url);
+    if (map.scene().textures.exists(key)) return key;
+    if (!textures.has(url)) {
+      textures.set(url, "loading");
+      loadTexture(url);
+    }
+    return null;
+  }
+  const frameOf = (key) => {
+    const animation = animations.get(key);
+    if (!animation) return null;
+    const t = Date.now() % animation.total;
+    return animation.ends.findIndex((end) => t < end);
+  };
   ctx.onCleanup(() => {
     const scene = map.scene();
     for (const url of textures.keys())
@@ -4896,9 +4985,15 @@ window.__gatherMods.define("custom", (ctx) => {
       entry = null;
     }
     if (!entry) {
-      entry = { key, zone: place.zone, sprite: map.scene().add.image(0, 0, key).setOrigin(0, 0) };
+      const sprite = map
+        .scene()
+        .add.image(0, 0, key, frameOf(key) ?? undefined)
+        .setOrigin(0, 0);
+      entry = { key, zone: place.zone, sprite };
       drawn.set(o.id, entry);
     }
+    const frame = frameOf(key);
+    if (frame !== null) entry.sprite.setFrame(frame, false, false);
     entry.sprite.setAlpha(o.id === "stamp" ? o.opacity * 0.6 : o.opacity);
     if (place.zone) {
       entry.sprite.setDepth(place.depth);
@@ -4925,12 +5020,13 @@ window.__gatherMods.define("custom", (ctx) => {
         const key = textureKey(v.o.imageUrl);
         const scene = map.scene();
         if (!scene.textures.exists(key)) return true;
-        const source = scene.textures.get(key).getSourceImage();
+        const frame = frameOf(key) ?? "__BASE";
+        const { width, height } = scene.textures.getFrame(key, frame);
         const f = v.o.free;
-        const x = Math.floor(((tileX - f.x) / f.width) * source.width);
-        const y = Math.floor(((tileY - f.y) / f.height) * source.height);
-        if (x < 0 || y < 0 || x >= source.width || y >= source.height) return false;
-        return (scene.textures.getPixelAlpha(x, y, key) ?? 255) > 16;
+        const x = Math.floor(((tileX - f.x) / f.width) * width);
+        const y = Math.floor(((tileY - f.y) / f.height) * height);
+        if (x < 0 || y < 0 || x >= width || y >= height) return false;
+        return (scene.textures.getPixelAlpha(x, y, key, frame) ?? 255) > 16;
       },
       drawY: () => (placementOf(v.o).depth - 7) / DEPTH_PER_PX,
       displace(dx, dy) {
@@ -4972,6 +5068,29 @@ window.__gatherMods.define("custom", (ctx) => {
     for (const entry of drawn.values()) if (entry.zone) placeOverZone(entry);
   }
   map.scene().events.on("prerender", followSkins);
+
+  // Gather only draws the map when it changes: redraw when a drawn animated
+  // image reaches its next frame.
+  let playFrame = 0;
+  function play() {
+    playFrame = 0;
+    let changed = false;
+    let playing = false;
+    for (const { key, sprite } of drawn.values()) {
+      const frame = frameOf(key);
+      if (frame === null) continue;
+      playing = true;
+      if (sprite.frame.name !== frame) {
+        sprite.setFrame(frame, false, false);
+        changed = true;
+      }
+    }
+    if (changed) map.requestRender();
+    if (playing) playFrame = requestAnimationFrame(play);
+  }
+  const startPlaying = () => {
+    if (!playFrame) playFrame = requestAnimationFrame(play);
+  };
 
   // Collisions: pathfinding reads Gather's collision map; arrow keys are
   // stopped before the move is sent.
@@ -5025,9 +5144,11 @@ window.__gatherMods.define("custom", (ctx) => {
     setCollisions(collisionTiles(objects.filter((o) => o.id !== "stamp")));
     outlinePlaneTarget();
     map.requestRender();
+    startPlaying();
   }
   ctx.onCleanup(() => {
     map.scene().events.off("prerender", followSkins);
+    cancelAnimationFrame(playFrame);
     planeOutline?.destroy();
     for (const id of [...drawn.keys()]) undraw(id);
     setCollisions(new Set());

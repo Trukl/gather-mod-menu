@@ -523,9 +523,16 @@
       "name": "Custom objects",
       "description": "Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.",
       "file": "src/modules/custom.js",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "requires": { "map": "1.3.0", "map-pick": "1.2.0", "hub-api": "1.3.0" },
       "changelog": [
+        {
+          "version": "1.3.0",
+          "date": "2026-10-15",
+          "changes": [
+            "Animated GIFs (and animated WebP or PNG) play on the map, for images and restyles, in sync for everyone. Very long or very large animations (over 300 frames or 16 million pixels in all) stay still on their first frame."
+          ]
+        },
         {
           "version": "1.2.0",
           "date": "2026-10-15",

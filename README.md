@@ -143,6 +143,10 @@ An image placed with its size, layer, base line and collision, then a real objec
 
 ![Copies and animation](docs/media/custom-objects-copies-animation.gif)
 
+Animated GIFs (and animated WebP or PNG) play on the map, in sync for everyone, for images and restyles alike.
+
+![Animated GIFs](docs/media/custom-objects-animated-gif.gif)
+
 ## Development
 
 ```
