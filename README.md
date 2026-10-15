@@ -2,6 +2,42 @@
 
 A mod for [Gather V2](https://app.v2.gather.town) that adds a **Mods** panel at the top of the sidebar. It is split into modules: install only the features you want, and only their code runs in Gather and gets updated.
 
+## Install (GatherV2 desktop app, macOS)
+
+Requirements: `/Applications/GatherV2.app` and Node.js ≥ 22.9.
+
+```bash
+git clone https://github.com/Trukl/gather-mod-menu.git
+cd gather-mod-menu
+npm ci --omit=dev
+node scripts/build-launcher-app.mjs
+```
+
+The script creates `~/Applications/Gather Mods.app`, with the mod's icon (`launcher/icon.svg`, built into `launcher/icon.icns`). Run it again to update an app built before. Open Gather **through this app** instead of GatherV2:
+
+1. GatherV2 is (re)started with the debug port `31337`; if it was running without it, it is quit and restarted.
+2. The launcher downloads the signed module catalog, **verifies its signature** (see “Update security”), downloads the code of your modules (checked against the catalog hashes), caches it and injects it into Gather on every page load. On the first run every module is installed; change that in ⚙ Settings.
+3. Every 15 minutes it checks for new module versions. Automatic updates are **off by default**: updates are announced (dot in the panel header) and “Review & install” shows the diff before installing them live. When on, updates of your installed modules are installed as soon as they are detected. Settings live in `~/Library/Application Support/gather-mods/settings.json` (`autoUpdate`, `modules`).
+4. It exits when Gather closes (or when Gather's debug port stays unreachable for 30 seconds). If it is no longer running, ⚙ Settings says so in red and disables the module and update settings until you reopen “Gather Mods.app”.
+
+Opening the app again just brings Gather to the front. Logs: `~/Library/Logs/gather-mods-launcher.log`.
+
+> While Gather runs with the debug port, any local program can drive the Gather session (the port only listens on `127.0.0.1`).
+
+If Gather is opened normally (Dock, login item), the mod is not loaded.
+
+### Without the launcher (browser)
+
+Paste the content of `gather-mod-menu.js` (all modules in one file) into the DevTools console of an `app.v2.gather.town` tab. Pick your modules in ⚙ Settings. No automatic updates in this mode.
+
+### Launcher environment variables
+
+| Variable                      | Default                          | Purpose               |
+| ----------------------------- | -------------------------------- | --------------------- |
+| `GATHER_MODS_PORT`            | `31337`                          | GatherV2 debug port   |
+| `GATHER_MODS_UPDATE_CHECK_MS` | `900000`                         | Update check interval |
+| `GATHER_MODS_UPDATES_URL`     | `gather-mod-menu-updates` worker | Release source        |
+
 ## Modules
 
 | Module             | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -103,42 +139,6 @@ An image placed with its size, layer, base line and collision, then a real objec
 
 ![Plane](docs/media/custom-objects-plane.gif)
 
-## Install (GatherV2 desktop app, macOS)
-
-Requirements: `/Applications/GatherV2.app` and Node.js ≥ 22.9.
-
-```bash
-git clone https://github.com/Trukl/gather-mod-menu.git
-cd gather-mod-menu
-npm ci --omit=dev
-node scripts/build-launcher-app.mjs
-```
-
-The script creates `~/Applications/Gather Mods.app`, with the mod's icon (`launcher/icon.svg`, built into `launcher/icon.icns`). Run it again to update an app built before. Open Gather **through this app** instead of GatherV2:
-
-1. GatherV2 is (re)started with the debug port `31337`; if it was running without it, it is quit and restarted.
-2. The launcher downloads the signed module catalog, **verifies its signature** (see “Update security”), downloads the code of your modules (checked against the catalog hashes), caches it and injects it into Gather on every page load. On the first run every module is installed; change that in ⚙ Settings.
-3. Every 15 minutes it checks for new module versions. Automatic updates are **off by default**: updates are announced (dot in the panel header) and “Review & install” shows the diff before installing them live. When on, updates of your installed modules are installed as soon as they are detected. Settings live in `~/Library/Application Support/gather-mods/settings.json` (`autoUpdate`, `modules`).
-4. It exits when Gather closes (or when Gather's debug port stays unreachable for 30 seconds). If it is no longer running, ⚙ Settings says so in red and disables the module and update settings until you reopen “Gather Mods.app”.
-
-Opening the app again just brings Gather to the front. Logs: `~/Library/Logs/gather-mods-launcher.log`.
-
-> While Gather runs with the debug port, any local program can drive the Gather session (the port only listens on `127.0.0.1`).
-
-If Gather is opened normally (Dock, login item), the mod is not loaded.
-
-### Without the launcher (browser)
-
-Paste the content of `gather-mod-menu.js` (all modules in one file) into the DevTools console of an `app.v2.gather.town` tab. Pick your modules in ⚙ Settings. No automatic updates in this mode.
-
-### Launcher environment variables
-
-| Variable                      | Default                          | Purpose               |
-| ----------------------------- | -------------------------------- | --------------------- |
-| `GATHER_MODS_PORT`            | `31337`                          | GatherV2 debug port   |
-| `GATHER_MODS_UPDATE_CHECK_MS` | `900000`                         | Update check interval |
-| `GATHER_MODS_UPDATES_URL`     | `gather-mod-menu-updates` worker | Release source        |
-
 ## Development
 
 ```
@@ -158,6 +158,19 @@ docs/media/               README recordings
 A module is a file that calls `window.__gatherMods.define(id, (ctx) => { … })`. `ctx` gives engine helpers, `ctx.section({ title, html, mount })` for its panel section, `ctx.use(id)` for libraries and other modules, `ctx.onCleanup` for uninstall, and `ctx.registerPresetType` to plug presets into Share and the hub. Modules are listed in `modules.json` in load order (core first, dependencies before dependents); `requires` maps each dependency to its minimum version.
 
 The community hub (shared presets API) lives in a separate repo, `gather-mod-hub`.
+
+## How to contribute
+
+The repo is public but only maintainers can push to it: contribute through a fork.
+
+1. Fork the repo on GitHub (“Fork”, or `gh repo fork Trukl/gather-mod-menu --clone`), then create a branch.
+2. Make your change. For module code, also bump the module's `version` in `modules.json`, add a changelog entry (see “Releasing”) and run `npm run bundle`: a pull request with an out-of-date bundle cannot be released.
+3. Test it: paste `gather-mod-menu.js` into the DevTools console of an `app.v2.gather.town` tab (see “Without the launcher”).
+4. Push the branch to your fork and open a pull request against `main`, with a GIF or video of the change when it shows on screen.
+
+A maintainer reviews and merges it; merging publishes the release.
+
+Changes to the community hub (shared presets, animations, custom objects API) go to [gather-mod-hub](https://github.com/Trukl/gather-mod-hub), the same way.
 
 ## Releasing (maintainer)
 
