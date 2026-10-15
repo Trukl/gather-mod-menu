@@ -19,6 +19,8 @@ window.__gatherMods.define("custom", (ctx) => {
   const ABOVE_DEPTH = 9;
   const sortedDepth = (basePx) => 7 + basePx / 9999;
   const SKIN_DEPTH_STEP = 1e-7;
+  const PLANE_STEP = 2e-7;
+  const COLOR_PLANE = 0x2ecc71;
   const COLLISION_ID = "gather-mods-custom-object";
   const DIRECTIONS = { Left: [-1, 0], Right: [1, 0], Up: [0, -1], Down: [0, 1] };
   const LAYERS = {
@@ -86,8 +88,30 @@ window.__gatherMods.define("custom", (ctx) => {
     z = zoneIndex.get(id);
     return z?.scene ? z : null;
   }
+  // The depths Gather draws a real object at: its main sprite and, for some
+  // objects (armchairs…), a foreground part drawn in front of avatars.
+  function depthSpan(zone) {
+    const depths = (zone.children ?? []).map((c) => c.depth);
+    return depths.length
+      ? { min: Math.min(...depths), max: Math.max(...depths) }
+      : { min: zone.depth, max: zone.depth };
+  }
+  // The real object a plane is set against, found by id while editing.
+  function planeTarget(o) {
+    if (!o.plane) return null;
+    const known = o.planeObjectId && GD().Repos.MapObject.get(o.planeObjectId);
+    const target = known ?? map.resolveRefs([o.plane.object])[0];
+    return map.isLiveObject(target) ? target : null;
+  }
+  function planeDepth(o) {
+    const target = planeTarget(o);
+    const zone = target && zoneOf(target.id);
+    if (!zone) return null;
+    const span = depthSpan(zone);
+    return o.plane.relation === "front" ? span.max + PLANE_STEP : span.min - PLANE_STEP;
+  }
   // Where an object is drawn: the rectangle and depth, and for a skin the
-  // zone of the real object it covers.
+  // zone of the real object it covers. A plane, when set, decides the depth.
   function placementOf(o) {
     if (o.mode === "skin") {
       if (!o.skin) return null;
@@ -97,11 +121,11 @@ window.__gatherMods.define("custom", (ctx) => {
           : map.resolveRefs([o.skin.object])[0];
       const zone = target && map.isLiveObject(target) && zoneOf(target.id);
       if (!zone) return null;
-      return { zone, depth: zone.depth + SKIN_DEPTH_STEP };
+      return { zone, depth: planeDepth(o) ?? zone.depth + SKIN_DEPTH_STEP };
     }
     const f = o.free;
     if (!f || f.x === undefined) return null;
-    const depth =
+    const layerDepth =
       f.layer === "floor"
         ? FLOOR_DEPTH
         : f.layer === "above"
@@ -112,8 +136,61 @@ window.__gatherMods.define("custom", (ctx) => {
       y: f.y * TILE_PX,
       width: f.width * TILE_PX,
       height: f.height * TILE_PX,
-      depth,
+      depth: planeDepth(o) ?? layerDepth,
     };
+  }
+  const rectOf = (place) =>
+    place.zone
+      ? { x: place.zone.x, y: place.zone.y, width: place.zone.width, height: place.zone.height }
+      : place;
+
+  // The real objects under an image, back to front: the steps of its plane.
+  function objectsUnder(place) {
+    const r = rectOf(place);
+    return map
+      .scene()
+      .children.list.filter(
+        (c) =>
+          c.type === "Zone" &&
+          c.name &&
+          c !== place.zone &&
+          c.x < r.x + r.width &&
+          c.x + c.width > r.x &&
+          c.y < r.y + r.height &&
+          c.y + c.height > r.y,
+      )
+      .map((zone) => ({ zone, object: GD().Repos.MapObject.get(zone.name), span: depthSpan(zone) }))
+      .filter((e) => map.isLiveObject(e.object))
+      .sort((a, b) => a.span.min - b.span.min);
+  }
+  // Forward: just in front of the first object drawn in front of the image;
+  // backward: just behind the last object drawn behind it.
+  function stepPlane(direction) {
+    const place = draft && placementOf(draft);
+    if (!place) return;
+    const under = objectsUnder(place);
+    const behind = under.filter((e) => e.span.max < place.depth);
+    const next = direction > 0 ? under[behind.length] : behind[behind.length - 1];
+    if (!next) {
+      draft.planeMessage =
+        direction > 0 ? "Nothing else in front of it here" : "Nothing else behind it here";
+      return renderEditor();
+    }
+    draft.plane = {
+      relation: direction > 0 ? "front" : "behind",
+      object: map.objectRef(next.object),
+    };
+    draft.planeObjectId = next.object.id;
+    draft.planeMessage = "";
+    renderAll();
+    renderEditor();
+  }
+  function resetPlane() {
+    draft.plane = null;
+    draft.planeObjectId = null;
+    draft.planeMessage = "";
+    renderAll();
+    renderEditor();
   }
 
   // The tiles under the base line of free objects with collision.
@@ -204,16 +281,35 @@ window.__gatherMods.define("custom", (ctx) => {
     return gameMove.call(this, direction);
   };
 
+  // The object a draft's plane is set against, outlined while editing.
+  let planeOutline = null;
+  function outlinePlaneTarget() {
+    planeOutline?.destroy();
+    planeOutline = null;
+    const target = draft && planeTarget(draft);
+    if (!target) return;
+    const tl = target.topLeftAbsolutePosition;
+    const d = target.getDimensionsInTiles();
+    planeOutline = map
+      .scene()
+      .add.graphics()
+      .setDepth(1e9)
+      .lineStyle(1, COLOR_PLANE, 1)
+      .strokeRect(tl.x * TILE_PX, tl.y * TILE_PX, d.width * TILE_PX, d.height * TILE_PX);
+  }
+
   function renderAll() {
     const objects = shownObjects();
     const ids = new Set(objects.map((o) => o.id));
     for (const id of [...drawn.keys()]) if (!ids.has(id)) undraw(id);
     for (const o of objects) draw(o);
     setCollisions(collisionTiles(objects));
+    outlinePlaneTarget();
     map.requestRender();
   }
   ctx.onCleanup(() => {
     map.scene().events.off("prerender", followSkins);
+    planeOutline?.destroy();
     for (const id of [...drawn.keys()]) undraw(id);
     setCollisions(new Set());
     delete moveController.gameMove;
@@ -253,6 +349,7 @@ window.__gatherMods.define("custom", (ctx) => {
       opacity: draft.opacity,
       mode: draft.mode,
       ...(draft.mode === "skin" ? { skin: draft.skin } : { free: draft.free }),
+      ...(draft.plane && { plane: draft.plane }),
     };
     showStatus(`Saving "${name}"…`);
     try {
@@ -339,6 +436,9 @@ window.__gatherMods.define("custom", (ctx) => {
       free: { ...free },
       skin: from?.skin,
       objectId: null,
+      plane: from?.plane ?? null,
+      planeObjectId: null,
+      planeMessage: "",
     };
     fillEditor();
     renderEditor();
@@ -418,6 +518,26 @@ window.__gatherMods.define("custom", (ctx) => {
     $("#gm-co-pick").classList.toggle("active", mode === "custom-skin");
     $("#gm-co-save").disabled = !isReady() || broken;
     $("#gm-co-save").textContent = editing ? "Save changes" : "Save";
+    renderPlane();
+  }
+  function renderPlane() {
+    const $ = (sel) => root.querySelector(sel);
+    const target = planeTarget(draft);
+    const ready = !!placementOf(draft);
+    $("#gm-co-back").disabled = !ready;
+    $("#gm-co-front").disabled = !ready;
+    $("#gm-co-plane-reset").style.display = draft.plane ? "" : "none";
+    $("#gm-co-plane-status").textContent =
+      draft.planeMessage ||
+      (draft.plane
+        ? target
+          ? `${draft.plane.relation === "front" ? "In front of" : "Behind"} ${map.objectName(target)} (outlined in green)`
+          : "Its object is no longer on the map: default plane"
+        : draft.mode === "skin"
+          ? "Same plane as the object"
+          : draft.free.layer === "sorted"
+            ? "Sorted by its base line"
+            : LAYERS[draft.free.layer]);
   }
   // Everyone's objects are drawn, but only yours are listed: you can't act on the others.
   function renderList() {
@@ -495,6 +615,9 @@ window.__gatherMods.define("custom", (ctx) => {
     );
     onEnter($("#gm-co-name"), saveDraft);
     $("#gm-co-save").onclick = saveDraft;
+    $("#gm-co-back").onclick = () => stepPlane(-1);
+    $("#gm-co-front").onclick = () => stepPlane(1);
+    $("#gm-co-plane-reset").onclick = resetPlane;
     renderEditor();
     renderList();
   }
@@ -530,6 +653,8 @@ window.__gatherMods.define("custom", (ctx) => {
           <button class="gm-btn" id="gm-co-pick"></button>
         </div>
         <label class="gm-co-param">Opacity<input id="gm-co-opacity" type="range" min="0.1" max="1" step="0.05" /></label>
+        <div class="gm-co-param" title="Draw order: move the image behind or in front of the objects it overlaps, one at a time.">Plane<span class="gm-co-plane"><button class="gm-btn" id="gm-co-back" title="Behind the next object it overlaps">▼ Back</button><button class="gm-btn" id="gm-co-front" title="In front of the next object it overlaps">▲ Front</button></span></div>
+        <div class="gm-status"><span id="gm-co-plane-status"></span><span class="gm-link" id="gm-co-plane-reset">Reset</span></div>
         <div class="gm-row">
           <input class="gm-input" id="gm-co-name" placeholder="Name this object..." />
           <button class="gm-btn" id="gm-co-save">Save</button>
@@ -544,6 +669,8 @@ window.__gatherMods.define("custom", (ctx) => {
     #gather-mods-panel .gm-co-param .gm-input { width:110px; flex:none; }
     #gather-mods-panel .gm-co-param input[type=range] { width:110px; }
     #gather-mods-panel .gm-co-mode { font-size:11px; color:var(--gm-muted); }
+    #gather-mods-panel .gm-co-plane { display:flex; gap:4px; }
+    #gather-mods-panel .gm-co-plane button.gm-btn { width:auto; margin:0; padding:3px 8px; }
     #gather-mods-panel .gm-edit { color:var(--gm-muted); font-size:13px; flex-shrink:0; }
     #gather-mods-panel .gm-edit:hover { color:var(--gm-fg); }
     #gather-mods-panel .gm-item.gm-editing { box-shadow:inset 0 0 0 1px var(--theme-color-accent,#6c5ce7); }
