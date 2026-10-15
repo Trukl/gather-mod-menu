@@ -7,9 +7,29 @@ window.__gatherMods.define("map", (ctx) => {
   const scene = () => GD().PhaserManager.scene;
   const currentMapId = () => GD().Repos.gameSpace.currentMap.baseArea.mapId;
   const currentFloorId = () => GD().Repos.gameSpace.currentMap.floorId;
-  const isLiveObject = (e) => e?.mapEntityType === "MapObject" && !e.isSoftDeleted;
-  const liveObjects = (ids) => ids.map((id) => GD().Repos.MapObject.get(id)).filter(isLiveObject);
-  const objectName = (o) => o.catalogItemVariant?.catalogItem?.type || "?";
+  // Virtual objects: drawn by a module (Custom objects), not by Gather. They
+  // have ids "custom:<id>", the geometry of a map object (absolutePosition,
+  // topLeftAbsolutePosition, getDimensionsInTiles, children) and their own
+  // `ref`, `isOpaqueAt`, `drawY`, `displace`, `release` and `delete`.
+  let virtualSource = null;
+  function registerVirtualObjects(source) {
+    virtualSource = source;
+    return () => {
+      if (virtualSource === source) virtualSource = null;
+    };
+  }
+  const virtualObjects = () => virtualSource?.list() ?? [];
+  const virtualObject = (id) => virtualSource?.get(id) ?? null;
+  const isVirtualId = (id) => typeof id === "string" && id.startsWith("custom:");
+  const isLiveObject = (e) =>
+    e?.isVirtual
+      ? virtualObject(e.id) !== null
+      : e?.mapEntityType === "MapObject" && !e.isSoftDeleted;
+  const liveObjects = (ids) =>
+    ids
+      .map((id) => (isVirtualId(id) ? virtualObject(id) : GD().Repos.MapObject.get(id)))
+      .filter(isLiveObject);
+  const objectName = (o) => (o.isVirtual ? o.name : o.catalogItemVariant?.catalogItem?.type || "?");
   const mapObjects = () => {
     const mapId = currentMapId();
     return GD().Repos.MapObject.filter((m) => m.mapId === mapId && isLiveObject(m));
@@ -22,24 +42,29 @@ window.__gatherMods.define("map", (ctx) => {
   // the same floor. A reference also keeps the type and position, to find an
   // object Gather recreated otherwise.
   const REF_POSITION_EPSILON = 0.05;
-  const objectRef = (o) => ({
-    hash: o.hashIdentifier,
-    variant: o.catalogItemVariantId,
-    x: o.absolutePosition.x,
-    y: o.absolutePosition.y,
-  });
+  const objectRef = (o) =>
+    o.isVirtual
+      ? o.ref
+      : {
+          hash: o.hashIdentifier,
+          variant: o.catalogItemVariantId,
+          x: o.absolutePosition.x,
+          y: o.absolutePosition.y,
+        };
   // Objects of the current map for each reference (null when not found).
   // Found objects are cached per map: callers resolve on every render.
+  // A virtual object's reference ({ custom, x, y }) is found by its id.
   let refCache = { mapId: null, ids: new Map() };
   function resolveRefs(refs) {
     const mapId = currentMapId();
     if (refCache.mapId !== mapId) refCache = { mapId, ids: new Map() };
     const cached = (r) => {
+      if (r.custom) return virtualObject("custom:" + r.custom);
       const o = GD().Repos.MapObject.get(refCache.ids.get(r.hash));
       return isLiveObject(o) ? o : null;
     };
     const found = refs.map(cached);
-    if (found.every(Boolean)) return found;
+    if (found.every((o, i) => o || refs[i].custom)) return found;
     const objects = mapObjects();
     const byHash = new Map(objects.map((o) => [o.hashIdentifier, o]));
     const used = new Set(found.filter(Boolean).map((o) => o.id));
@@ -49,11 +74,12 @@ window.__gatherMods.define("map", (ctx) => {
       Math.abs(c.absolutePosition.x - r.x) <= REF_POSITION_EPSILON &&
       Math.abs(c.absolutePosition.y - r.y) <= REF_POSITION_EPSILON;
     refs.forEach((r, i) => {
-      if (found[i]) return;
+      if (found[i] || r.custom) return;
       found[i] = byHash.get(r.hash) ?? null;
       if (found[i]) used.add(found[i].id);
     });
     refs.forEach((r, i) => {
+      if (r.custom) return;
       found[i] ??= objects.find((c) => samePlace(c, r)) ?? null;
       if (!found[i]) return;
       used.add(found[i].id);
@@ -175,6 +201,8 @@ window.__gatherMods.define("map", (ctx) => {
     cleanItem,
     objectName,
     mapObjects,
+    registerVirtualObjects,
+    virtualObjects,
     toggleId,
     toggleIds,
     topLevelObjects,

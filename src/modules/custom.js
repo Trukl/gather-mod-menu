@@ -36,6 +36,9 @@ window.__gatherMods.define("custom", (ctx) => {
 
   const shared = { floorId: null, items: [], syncedAt: 0, status: "" };
   let draft = null;
+  // Copies being placed: a ghost of the source follows the pointer (images)
+  // or each clicked object is restyled (restyles), until Esc.
+  let stamp = null;
   const objectsPath = (id = "") => `/objects/${shared.floorId}${id ? "/" + id : ""}`;
   const imageSrc = (url) => (url.startsWith("/images/") ? hubUrl() + url : url);
 
@@ -211,9 +214,13 @@ window.__gatherMods.define("custom", (ctx) => {
   // Drawing
   // ===================
   const drawn = new Map();
+  // Offsets (pixels) applied by animations to free images, by object id.
+  const offsets = new Map();
+  const DEPTH_PER_PX = 1 / 9999;
   const shownObjects = () => [
     ...shared.items.filter((o) => o.id !== draft?.editId),
     ...(draft && draft.imageUrl && placementOf(draft) ? [{ ...draft, id: "draft" }] : []),
+    ...(stamp?.mode === "free" && placementOf(stamp) ? [{ ...stamp, id: "stamp" }] : []),
   ];
   function setChildrenVisible(zone, visible) {
     for (const child of zone.children ?? [])
@@ -240,10 +247,69 @@ window.__gatherMods.define("custom", (ctx) => {
       entry = { key, zone: place.zone, sprite: map.scene().add.image(0, 0, key).setOrigin(0, 0) };
       drawn.set(o.id, entry);
     }
-    entry.sprite.setAlpha(o.opacity).setDepth(place.depth);
-    if (place.zone) placeOverZone(entry);
-    else entry.sprite.setPosition(place.x, place.y).setDisplaySize(place.width, place.height);
+    entry.sprite.setAlpha(o.id === "stamp" ? o.opacity * 0.6 : o.opacity);
+    if (place.zone) {
+      entry.sprite.setDepth(place.depth);
+      return placeOverZone(entry);
+    }
+    const off = offsets.get(o.id) ?? { dx: 0, dy: 0 };
+    entry.sprite
+      .setDepth(place.depth + off.dy * DEPTH_PER_PX)
+      .setPosition(place.x + off.dx, place.y + off.dy)
+      .setDisplaySize(place.width, place.height);
   }
+
+  // Placed free images are virtual objects for the other modules: picked by
+  // the animation editor and bulk delete, moved by animations.
+  const virtuals = new Map();
+  function virtualOf(o) {
+    const v = virtuals.get(o.id) ?? {
+      isVirtual: true,
+      id: "custom:" + o.id,
+      children: [],
+      parent: null,
+      getDimensionsInTiles: () => ({ width: v.o.free.width, height: v.o.free.height }),
+      isOpaqueAt(tileX, tileY) {
+        const key = textureKey(v.o.imageUrl);
+        const scene = map.scene();
+        if (!scene.textures.exists(key)) return true;
+        const source = scene.textures.get(key).getSourceImage();
+        const f = v.o.free;
+        const x = Math.floor(((tileX - f.x) / f.width) * source.width);
+        const y = Math.floor(((tileY - f.y) / f.height) * source.height);
+        if (x < 0 || y < 0 || x >= source.width || y >= source.height) return false;
+        return (scene.textures.getPixelAlpha(x, y, key) ?? 255) > 16;
+      },
+      drawY: () => (placementOf(v.o).depth - 7) / DEPTH_PER_PX,
+      displace(dx, dy) {
+        offsets.set(v.o.id, { dx, dy });
+        if (drawn.has(v.o.id)) draw(v.o);
+      },
+      release() {
+        offsets.delete(v.o.id);
+        if (drawn.has(v.o.id)) draw(v.o);
+      },
+      delete: () => deleteObject(v.o),
+    };
+    v.o = o;
+    v.name = o.name;
+    v.topLeftAbsolutePosition = { x: o.free.x, y: o.free.y };
+    v.absolutePosition = { x: o.free.x + o.free.width / 2, y: o.free.y + o.free.base };
+    v.ref = { custom: o.id, ...v.absolutePosition };
+    virtuals.set(o.id, v);
+    return v;
+  }
+  const placedFree = () => shared.items.filter((o) => o.mode === "free" && o.id !== draft?.editId);
+  function updateVirtuals() {
+    const ids = new Set(placedFree().map((o) => virtualOf(o).id));
+    for (const [id, v] of virtuals) if (!ids.has(v.id)) virtuals.delete(id);
+  }
+  ctx.onCleanup(
+    map.registerVirtualObjects({
+      list: () => [...virtuals.values()],
+      get: (id) => virtuals.get(id.slice("custom:".length)) ?? null,
+    }),
+  );
   // Skins follow their object (an animation can move it) and keep it hidden.
   function placeOverZone({ sprite, zone }) {
     if (!zone.scene) return;
@@ -299,11 +365,12 @@ window.__gatherMods.define("custom", (ctx) => {
   }
 
   function renderAll() {
+    updateVirtuals();
     const objects = shownObjects();
     const ids = new Set(objects.map((o) => o.id));
     for (const id of [...drawn.keys()]) if (!ids.has(id)) undraw(id);
     for (const o of objects) draw(o);
-    setCollisions(collisionTiles(objects));
+    setCollisions(collisionTiles(objects.filter((o) => o.id !== "stamp")));
     outlinePlaneTarget();
     map.requestRender();
   }
@@ -424,8 +491,75 @@ window.__gatherMods.define("custom", (ctx) => {
     },
   };
 
+  const stampStatus = () =>
+    `Placing copies of "${stamp.name}": ${stamp.placed} placed. ${stamp.mode === "skin" ? "Click objects" : "Click on the map"}, Esc to stop`;
+  async function placeCopy(data) {
+    const current = stamp;
+    try {
+      const { object } = await api.request(objectsPath(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ author: me().name, data }),
+      });
+      shared.items = [...shared.items, object];
+      if (current === stamp) {
+        stamp.placed++;
+        shared.status = stampStatus();
+      }
+      renderAll();
+      renderList();
+    } catch (e) {
+      showStatus("Copy failed: " + e.message);
+    }
+  }
+  const copyData = (o) => ({
+    name: o.name,
+    imageUrl: o.imageUrl,
+    opacity: o.opacity,
+    mode: o.mode,
+  });
+  const stampSession = {
+    id: "custom-stamp",
+    hover(e) {
+      if (!e || stamp?.mode !== "free") return;
+      const p = map.pointerWorldPoint(e);
+      const snap = (v) => Math.round(v * 8) / 8;
+      stamp.free.x = snap(p.x / TILE_PX - stamp.free.width / 2);
+      stamp.free.y = snap(p.y / TILE_PX - stamp.free.height / 2);
+      renderAll();
+    },
+    pointerDown(e) {
+      stampSession.hover(e);
+      placeCopy({ ...copyData(stamp), free: { ...stamp.free } });
+    },
+    onStop: () => stopStamp(),
+  };
+  const stampSkinSession = {
+    id: "custom-stamp",
+    onPick(o) {
+      placeCopy({ ...copyData(stamp), skin: { object: map.objectRef(o) } });
+    },
+    onStop: () => stopStamp(),
+  };
+  function startStamp(o) {
+    if (draft) closeDraft();
+    if (pick.current()) pick.stop();
+    stamp = { ...o, free: o.free && { ...o.free }, placed: 0 };
+    shared.status = stampStatus();
+    pick.start(o.mode === "skin" ? stampSkinSession : stampSession);
+    renderList();
+  }
+  function stopStamp() {
+    if (!stamp) return;
+    stamp = null;
+    shared.status = "";
+    renderAll();
+    renderList();
+  }
+
   function startDraft(mode, from = null) {
     if (pick.current()?.startsWith("custom-")) pick.stop();
+    stopStamp();
     const free = from?.free ?? { ...DEFAULT_FREE };
     draft = {
       editId: from?.id,
@@ -548,16 +682,24 @@ window.__gatherMods.define("custom", (ctx) => {
       ? own
           .map(
             (o) =>
-              `<div class="gm-item${o.id === draft?.editId ? " gm-editing" : ""}" data-id="${escapeHtml(o.id)}"><span class="gm-name">${escapeHtml(o.name)}</span><span class="gm-actions"><span class="gm-co-mode">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><span class="gm-edit" data-edit="${escapeHtml(o.id)}" title="Edit this object">✎</span><span class="gm-del" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone">✕</span></span></div>`,
+              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id ? " gm-editing" : ""}" data-id="${escapeHtml(o.id)}"><span class="gm-name">${escapeHtml(o.name)}</span><span class="gm-actions"><span class="gm-co-mode">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><span class="gm-edit gm-copy" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}">＋</span><span class="gm-edit" data-edit="${escapeHtml(o.id)}" title="Edit this object">✎</span><span class="gm-del" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone">✕</span></span></div>`,
           )
           .join("")
       : '<div class="gm-empty">You have no custom objects on this map</div>';
     root.querySelector("#gm-co-list-status").textContent = shared.status;
     const find = (id) => shared.items.find((o) => o.id === id);
-    list.querySelectorAll(".gm-edit").forEach((el) => {
+    list.querySelectorAll("[data-edit]").forEach((el) => {
       el.onclick = () => {
         const o = find(el.dataset.edit);
         if (o) startDraft(o.mode, o);
+      };
+    });
+    list.querySelectorAll("[data-copy]").forEach((el) => {
+      el.onclick = () => {
+        const o = find(el.dataset.copy);
+        if (!o) return;
+        if (stamp?.id === o.id) pick.stop("custom-stamp");
+        else startStamp(o);
       };
     });
     list.querySelectorAll(".gm-del").forEach((el) => {

@@ -46,6 +46,7 @@ window.__gatherMods.define("map-pick", (ctx) => {
     return null;
   }
   function isOpaqueAt(o, tileX, tileY) {
+    if (o.isVirtual) return o.isOpaqueAt(tileX, tileY);
     const variant = o.catalogItemVariant;
     const pixels = spritePixels(variant.mainRenderableUrl);
     if (!pixels) return true;
@@ -57,6 +58,7 @@ window.__gatherMods.define("map-pick", (ctx) => {
     return pixels.data[(y * pixels.width + x) * 4 + 3] > 16;
   }
   function drawOrderPath(o) {
+    if (o.isVirtual) return [o.drawY()];
     const path = [];
     for (let cur = o; cur?.mapEntityType === "MapObject"; cur = cur.parent) {
       const variant = cur.catalogItemVariant;
@@ -69,9 +71,14 @@ window.__gatherMods.define("map-pick", (ctx) => {
     for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i] - b[i];
     return a.length - b.length;
   }
+  // Sessions with `virtual: true` also pick the mod's virtual objects.
+  const pickable = () => [
+    ...map.mapObjects(),
+    ...(state.session?.virtual ? map.virtualObjects() : []),
+  ];
   function objectsAtTile(tileX, tileY) {
     const hits = [];
-    for (const o of map.mapObjects()) {
+    for (const o of pickable()) {
       const tl = o.topLeftAbsolutePosition;
       const d = o.getDimensionsInTiles();
       if (
@@ -92,7 +99,7 @@ window.__gatherMods.define("map-pick", (ctx) => {
     const x1 = Math.max(p.x, q.x) / TILE_PX;
     const y0 = Math.min(p.y, q.y) / TILE_PX;
     const y1 = Math.max(p.y, q.y) / TILE_PX;
-    return map.mapObjects().filter((o) => {
+    return pickable().filter((o) => {
       const tl = o.topLeftAbsolutePosition;
       const d = o.getDimensionsInTiles();
       return tl.x >= x0 && tl.y >= y0 && tl.x + d.width <= x1 && tl.y + d.height <= y1;
