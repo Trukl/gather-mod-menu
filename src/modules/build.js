@@ -196,10 +196,12 @@ window.__gatherMods.define("build", (ctx) => {
     return `${objects.length} object${objects.length > 1 ? "s" : ""} on ${supports} support${supports > 1 ? "s" : ""}: click one to see only its group`;
   }
 
-  // Bulk delete — deleting an object also deletes what sits on it.
+  // Bulk delete — deleting an object also deletes what sits on it. Custom
+  // objects are picked and deleted too.
   const bulkSession = {
     id: "bulk-delete",
     danger: true,
+    virtual: true,
     outlines: () => [[map.liveObjects(bulk.selected), COLOR_DELETE]],
     onPick(target) {
       bulk.selected = map.toggleId(bulk.selected, target.id);

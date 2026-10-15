@@ -186,7 +186,13 @@ window.__gatherMods.define("fun", (ctx) => {
     x: o.absolutePosition.x * TILE_PX - o.catalogItemVariant.originX,
     y: o.absolutePosition.y * TILE_PX - o.catalogItemVariant.originY,
   });
+  // Virtual objects (Custom objects) move themselves.
   function displace(o, d) {
+    if (o.isVirtual) {
+      o.displace(d.x, d.y);
+      displaced.set(o.id, { virtual: o });
+      return;
+    }
     let entry = displaced.get(o.id);
     if (!entry) {
       const zone = zoneOf(o.id);
@@ -202,6 +208,7 @@ window.__gatherMods.define("fun", (ctx) => {
   function release(id) {
     const entry = displaced.get(id);
     displaced.delete(id);
+    if (entry?.virtual) return entry.virtual.release();
     const o = ctx.GD().Repos.MapObject.get(id);
     if (!entry?.zone.scene || !map.isLiveObject(o)) return;
     const rest = restingPosition(o);
@@ -262,6 +269,7 @@ window.__gatherMods.define("fun", (ctx) => {
 
   const selectSession = {
     id: "anim-select",
+    virtual: true,
     outlines: () => [[map.liveObjects(draft?.ids ?? []), COLOR_SELECTED]],
     onPick(o) {
       draft.ids = map.toggleId(draft.ids, o.id);
