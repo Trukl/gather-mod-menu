@@ -159,6 +159,19 @@ A module is a file that calls `window.__gatherMods.define(id, (ctx) => { … })`
 
 The community hub (shared presets API) lives in a separate repo, `gather-mod-hub`.
 
+## How to contribute
+
+The repo is public but only maintainers can push to it: contribute through a fork.
+
+1. Fork the repo on GitHub (“Fork”, or `gh repo fork Trukl/gather-mod-menu --clone`), then create a branch.
+2. Make your change. For module code, also bump the module's `version` in `modules.json`, add a changelog entry (see “Releasing”) and run `npm run bundle`: a pull request with an out-of-date bundle cannot be released.
+3. Test it: paste `gather-mod-menu.js` into the DevTools console of an `app.v2.gather.town` tab (see “Without the launcher”).
+4. Push the branch to your fork and open a pull request against `main`, with a GIF or video of the change when it shows on screen.
+
+A maintainer reviews and merges it; merging publishes the release.
+
+Changes to the community hub (shared presets, animations, custom objects API) go to [gather-mod-hub](https://github.com/Trukl/gather-mod-hub), the same way.
+
 ## Releasing (maintainer)
 
 1. Change the code of one or more modules, bump their `version` in `modules.json` and add a changelog entry (in English) for that version. Start a change with `Removed:` when it takes something away, so it shows in red. For news every user must read (breaking change, action needed), add a short `"notice"` (300 characters max) to that changelog entry: it opens the “Mod news” window once. When older versions of the module no longer work (new data format, changed hub API), also add `"breaking": true` to that entry: every install below that version must update or disable the module. Keep it for real breakages: it stops every outdated install at once.
