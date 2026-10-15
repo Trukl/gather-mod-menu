@@ -347,11 +347,15 @@ window.__gatherMods.define("custom", (ctx) => {
       entry.sprite.setDepth(place.depth);
       return placeOverZone(entry);
     }
-    const off = offsets.get(o.id) ?? { dx: 0, dy: 0 };
+    // Animations move and turn an image around its anchor, the middle of its base line.
+    const off = offsets.get(o.id) ?? { dx: 0, dy: 0, angle: 0 };
+    const baseLine = o.free.base / o.free.height;
     entry.sprite
+      .setOrigin(0.5, baseLine)
       .setDepth(place.depth + off.dy * DEPTH_PER_PX)
-      .setPosition(place.x + off.dx, place.y + off.dy)
-      .setDisplaySize(place.width, place.height);
+      .setPosition(place.x + place.width / 2 + off.dx, place.y + place.height * baseLine + off.dy)
+      .setDisplaySize(place.width, place.height)
+      .setAngle(off.angle);
   }
 
   // Placed free images are virtual objects for the other modules: picked by
@@ -377,8 +381,8 @@ window.__gatherMods.define("custom", (ctx) => {
         return (scene.textures.getPixelAlpha(x, y, key, frame) ?? 255) > 16;
       },
       drawY: () => (placementOf(v.o).depth - 7) / DEPTH_PER_PX,
-      displace(dx, dy) {
-        offsets.set(v.o.id, { dx, dy });
+      displace(dx, dy, angle = 0) {
+        offsets.set(v.o.id, { dx, dy, angle });
         if (drawn.has(v.o.id)) draw(v.o);
       },
       release() {
@@ -406,10 +410,16 @@ window.__gatherMods.define("custom", (ctx) => {
       get: (id) => virtuals.get(id.slice("custom:".length)) ?? null,
     }),
   );
-  // Skins follow their object (an animation can move it) and keep it hidden.
+  // Skins follow their object (an animation can move and turn it) and keep it
+  // hidden. Gather anchors the object's sprites on its position.
   function placeOverZone({ sprite, zone }) {
     if (!zone.scene) return;
-    sprite.setPosition(zone.x, zone.y).setDisplaySize(zone.width, zone.height);
+    const anchor = zone.children?.[0] ?? { x: 0, y: 0, angle: 0 };
+    sprite
+      .setOrigin(anchor.x / zone.width, anchor.y / zone.height)
+      .setPosition(zone.x + anchor.x, zone.y + anchor.y)
+      .setDisplaySize(zone.width, zone.height)
+      .setAngle(anchor.angle);
     setChildrenVisible(zone, false);
   }
   function followSkins() {

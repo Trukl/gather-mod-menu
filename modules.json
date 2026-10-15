@@ -185,6 +185,16 @@
       "changelog": [{ "version": "1.0.0", "date": "2026-10-09", "changes": ["Initial version."] }]
     },
     {
+      "id": "motion",
+      "kind": "lib",
+      "name": "Motion",
+      "description": "Shared math of path animations: steps, shapes, easings, formulas, block or per-object movement.",
+      "file": "src/lib/motion.js",
+      "version": "1.0.0",
+      "requires": {},
+      "changelog": [{ "version": "1.0.0", "date": "2026-10-15", "changes": ["Initial version."] }]
+    },
+    {
       "id": "hub-api",
       "kind": "lib",
       "name": "Hub API",
@@ -253,11 +263,21 @@
       "id": "fun",
       "kind": "module",
       "name": "Fun",
-      "description": "Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects orbit or move back and forth, seen by everyone with this module.",
+      "description": "Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects follow a path of steps (lines, waves, arcs, orbits, formulas) with easings, pauses and turns, seen by everyone with this module.",
       "file": "src/modules/fun.js",
-      "version": "1.6.0",
-      "requires": { "map": "1.3.0", "map-pick": "1.2.0", "hub-api": "1.1.0" },
+      "version": "1.7.0",
+      "requires": { "map": "1.3.0", "map-pick": "1.2.0", "hub-api": "1.1.0", "motion": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.7.0",
+          "date": "2026-10-15",
+          "changes": [
+            "Animation studio: a floating window where an animation is a path of steps, drawn on the map with numbered points to drag. Each step has its shape (line, wave, arc, orbit, or your own x(t) and y(t) formulas), easing (smooth, overshoot, bounce, elastic, or your own f(t)), duration, pause and turn.",
+            "The selection moves as one block (it turns as one piece, around its center) or each object on its own, one after the other with a stagger (selection order, left to right, top to bottom or random). At the end, the path loops, plays back (ping-pong) or stops.",
+            "Preview with play, pause and a timeline. What sits on an object moves and turns with it.",
+            "Earlier animations keep playing; ✎ opens them in the studio and saves them as paths. Mods before Fun 1.7.0 don't show path animations."
+          ]
+        },
         {
           "version": "1.6.0",
           "date": "2026-10-15",
@@ -523,9 +543,16 @@
       "name": "Custom objects",
       "description": "Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.",
       "file": "src/modules/custom.js",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "requires": { "map": "1.3.0", "map-pick": "1.2.0", "hub-api": "1.3.0" },
       "changelog": [
+        {
+          "version": "1.4.0",
+          "date": "2026-10-15",
+          "changes": [
+            "Images and restyles turn with Fun 1.7.0 animations, around the middle of their base line (images) or with the object they restyle."
+          ]
+        },
         {
           "version": "1.3.0",
           "date": "2026-10-15",
