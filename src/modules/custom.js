@@ -21,6 +21,7 @@ window.__gatherMods.define("custom", (ctx) => {
   const SKIN_DEPTH_STEP = 1e-7;
   const PLANE_STEP = 2e-7;
   const COLOR_PLANE = 0x2ecc71;
+  const COLOR_HOVER = 0xff3b30;
   const COLLISION_ID = "gather-mods-custom-object";
   const DIRECTIONS = { Left: [-1, 0], Right: [1, 0], Up: [0, -1], Down: [0, 1] };
   const LAYERS = {
@@ -422,10 +423,35 @@ window.__gatherMods.define("custom", (ctx) => {
       .setAngle(anchor.angle);
     setChildrenVisible(zone, false);
   }
-  function followSkins() {
-    for (const entry of drawn.values()) if (entry.zone) placeOverZone(entry);
+  // The image hovered in the list, outlined in red on the map: redrawn on
+  // every frame since animations move and turn it.
+  let hoveredId = null;
+  let hoverOutline = null;
+  function outlineHovered() {
+    const entry = drawn.get(hoveredId) ?? (hoveredId === draft?.editId && drawn.get("draft"));
+    if (hoverOutline && !hoverOutline.scene) hoverOutline = null;
+    if (!entry) {
+      hoverOutline?.destroy();
+      hoverOutline = null;
+      return;
+    }
+    hoverOutline ??= map.scene().add.graphics().setDepth(1e9);
+    const b = entry.sprite.getBounds();
+    hoverOutline
+      .clear()
+      .lineStyle(2 / map.scene().cameras.main.zoom, COLOR_HOVER, 1)
+      .strokeRect(b.x, b.y, b.width, b.height);
   }
-  map.scene().events.on("prerender", followSkins);
+  function hoverItem(id) {
+    hoveredId = id;
+    outlineHovered();
+    map.requestRender();
+  }
+  function beforeRender() {
+    for (const entry of drawn.values()) if (entry.zone) placeOverZone(entry);
+    outlineHovered();
+  }
+  map.scene().events.on("prerender", beforeRender);
 
   // Gather only draws the map when it changes: redraw when a drawn animated
   // image reaches its next frame.
@@ -505,9 +531,10 @@ window.__gatherMods.define("custom", (ctx) => {
     startPlaying();
   }
   ctx.onCleanup(() => {
-    map.scene().events.off("prerender", followSkins);
+    map.scene().events.off("prerender", beforeRender);
     cancelAnimationFrame(playFrame);
     planeOutline?.destroy();
+    hoverOutline?.destroy();
     for (const id of [...drawn.keys()]) undraw(id);
     setCollisions(new Set());
     delete moveController.gameMove;
@@ -813,12 +840,16 @@ window.__gatherMods.define("custom", (ctx) => {
       ? own
           .map(
             (o) =>
-              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id ? " gm-editing" : ""}" data-id="${escapeHtml(o.id)}"><span class="gm-name">${escapeHtml(o.name)}</span><span class="gm-actions"><span class="gm-co-mode">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><span class="gm-edit gm-copy" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}">＋</span><span class="gm-edit" data-edit="${escapeHtml(o.id)}" title="Edit this object">✎</span><span class="gm-del" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone">✕</span></span></div>`,
+              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id ? " gm-editing" : ""}" data-id="${escapeHtml(o.id)}" title="Hover to see it on the map, outlined in red"><span class="gm-name">${escapeHtml(o.name)}</span><span class="gm-actions"><span class="gm-co-mode">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><span class="gm-edit gm-copy" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}">＋</span><span class="gm-edit" data-edit="${escapeHtml(o.id)}" title="Edit this object">✎</span><span class="gm-del" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone">✕</span></span></div>`,
           )
           .join("")
       : '<div class="gm-empty">You have no custom objects on this map</div>';
     root.querySelector("#gm-co-list-status").textContent = shared.status;
     const find = (id) => shared.items.find((o) => o.id === id);
+    list.querySelectorAll(".gm-item").forEach((row) => {
+      row.addEventListener("mouseenter", () => hoverItem(row.dataset.id));
+      row.addEventListener("mouseleave", () => hoverItem(null));
+    });
     list.querySelectorAll("[data-edit]").forEach((el) => {
       el.onclick = () => {
         const o = find(el.dataset.edit);
