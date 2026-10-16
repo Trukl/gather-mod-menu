@@ -80,6 +80,8 @@ window.__gatherMods.define("fun", (ctx) => {
   // ===================
   const LEGACY_TOKENS_KEY = "gathermodv2:animationTokens";
   const STUDIO_POSITION_KEY = "gathermodv2:animationStudio";
+  // Others' animations hidden on this screen, by id.
+  const HIDDEN_ANIMATIONS_KEY = "gathermodv2:hiddenAnimations";
   const SYNC_MS = 60_000;
   // A sync started before a change can still return the old list.
   const LOCAL_EDIT_MS = 90_000;
@@ -115,6 +117,7 @@ window.__gatherMods.define("fun", (ctx) => {
   // this user's recent changes applied on top until the hub reflects them.
   const shared = { floorId: null, fetched: [], items: [], clockOffset: 0, syncedAt: 0, status: "" };
   const localEdits = new Map();
+  const hiddenIds = new Set(readJson(HIDDEN_ANIMATIONS_KEY, []));
   // The animation open in the studio, always as a path: its objects (ids),
   // movement, selected step and preview clock (paused at `time`, or running
   // since `startedAt`).
@@ -280,7 +283,7 @@ window.__gatherMods.define("fun", (ctx) => {
     draft?.ids.length && draft.steps.length && pick.current() !== "anim-select";
   // The animation being edited stops while its draft previews the changes.
   const activeAnimations = () => [
-    ...shared.items.filter((a) => a.running && a.id !== draft?.editId),
+    ...shared.items.filter((a) => a.running && a.id !== draft?.editId && !hiddenIds.has(a.id)),
     ...(isPreviewing() ? [draft] : []),
   ];
   const elapsedSeconds = (a) =>
@@ -715,11 +718,11 @@ window.__gatherMods.define("fun", (ctx) => {
       const row = e.target.closest("[data-i]");
       if (!row) return;
       const i = Number(row.dataset.i);
-      if (e.target.closest(".gm-st-del")) {
-        draft.steps.splice(i, 1);
-        const kept = draft.selected > i ? draft.selected - 1 : draft.selected;
-        selectStep(Math.max(0, Math.min(kept, draft.steps.length - 1)));
-      } else selectStep(i);
+      const action = e.target.closest("[data-act]")?.dataset.act;
+      if (action === "del") deleteStep(i);
+      else if (action === "up" || action === "down") moveStep(i, action === "up" ? -1 : 1);
+      else if (action === "copy") duplicateStep(i);
+      else selectStep(i);
       changed();
     };
     $("play").onclick = togglePlay;
@@ -793,9 +796,35 @@ window.__gatherMods.define("fun", (ctx) => {
       if ("expr" in el.dataset) el.classList.toggle("gm-st-bad", !motion.compile(value));
     }
   }
+  function deleteStep(i) {
+    draft.steps.splice(i, 1);
+    const kept = draft.selected > i ? draft.selected - 1 : draft.selected;
+    selectStep(Math.max(0, Math.min(kept, draft.steps.length - 1)));
+  }
+  // Steps are points on the map: moving one changes the order they are reached in.
+  function moveStep(i, by) {
+    const j = i + by;
+    if (j < 0 || j >= draft.steps.length) return;
+    [draft.steps[i], draft.steps[j]] = [draft.steps[j], draft.steps[i]];
+    selectStep(j);
+  }
+  // The copy makes the same move again from where the step ends.
+  function duplicateStep(i) {
+    if (draft.steps.length >= MAX_STEPS) return;
+    const b = builtOf(draft).steps[i];
+    const shift = (p) => p && { x: p.x + b.to.x - b.from.x, y: p.y + b.to.y - b.from.y };
+    draft.steps.splice(i + 1, 0, {
+      ...draft.steps[i],
+      to: shift(b.to),
+      center: shift(draft.steps[i].center),
+    });
+    selectStep(i + 1);
+  }
   const seconds = (n) => `${+n.toFixed(2)} s`;
-  const stepRow = (s, i) =>
-    `<div class="gm-st-step${i === draft.selected ? " gm-st-sel" : ""}" data-i="${i}"><span class="gm-st-num">${i + 1}</span><span class="gm-st-grow">${SHAPE_LABELS[s.shape]} · ${seconds(s.duration)}${s.pause ? ` + ${seconds(s.pause)} pause` : ""}${s.rotate ? ` · ${+s.rotate.toFixed(1)}°` : ""}</span><span class="gm-st-del" title="Delete this step">✕</span></div>`;
+  const stepAction = (action, label, title, shown) =>
+    `<span class="gm-st-act${shown ? "" : " gm-st-off"}" data-act="${action}" title="${title}">${label}</span>`;
+  const stepRow = (s, i, steps) =>
+    `<div class="gm-st-step${i === draft.selected ? " gm-st-sel" : ""}" data-i="${i}"><span class="gm-st-num">${i + 1}</span><span class="gm-st-grow">${SHAPE_LABELS[s.shape]} · ${seconds(s.duration)}${s.pause ? ` + ${seconds(s.pause)} pause` : ""}${s.rotate ? ` · ${+s.rotate.toFixed(1)}°` : ""}</span>${stepAction("up", "↑", "Move up: reached earlier", i > 0)}${stepAction("down", "↓", "Move down: reached later", i < steps.length - 1)}${stepAction("copy", "⧉", "Duplicate: the same move again from where this step ends", steps.length < MAX_STEPS)}<span class="gm-st-del" data-act="del" title="Delete this step">✕</span></div>`;
   function studioStatus(session) {
     if (draft.status) return draft.status;
     if (session === "anim-select")
@@ -1072,7 +1101,14 @@ window.__gatherMods.define("fun", (ctx) => {
     a.type === "path"
       ? `${a.steps.length} step${a.steps.length === 1 ? "" : "s"}`
       : (LEGACY_LABELS[a.type] ?? a.type);
-  // Everyone's animations play, but only yours are listed: you can't act on the others.
+  function toggleHidden(id) {
+    if (!hiddenIds.delete(id)) hiddenIds.add(id);
+    writeJson(HIDDEN_ANIMATIONS_KEY, [...hiddenIds]);
+    renderAnimations();
+    refreshAnimations();
+  }
+  // Everyone's animations play; yours can be started, stopped and edited, the
+  // others' only hidden on your screen.
   function renderAnimations() {
     if (!root?.isConnected) return;
     const button = root.querySelector("#gm-anim-new");
@@ -1116,6 +1152,19 @@ window.__gatherMods.define("fun", (ctx) => {
         deleteAnimation(a);
       };
     });
+    const others = shared.items.filter((a) => !a.mine);
+    const othersList = root.querySelector("#gm-anims-others");
+    othersList.innerHTML = others.length
+      ? others
+          .map((a) => {
+            const hidden = hiddenIds.has(a.id);
+            return `<div class="gm-item${hidden ? " gm-anim-hidden" : ""}"><span class="gm-name">${escapeHtml(a.name)}</span><span class="gm-actions"><span class="gm-anim-type">${escapeHtml(a.author || "?")} · ${escapeHtml(typeLabel(a))}${a.running ? "" : " · stopped"}</span><span class="gm-edit" data-hide="${escapeHtml(a.id)}" title="${hidden ? "Play it again on your screen" : "Hide it on your screen only"}">${hidden ? "Show" : "Hide"}</span></span></div>`;
+          })
+          .join("")
+      : '<div class="gm-empty">No one else has animations on this map</div>';
+    othersList.querySelectorAll("[data-hide]").forEach((d) => {
+      d.onclick = () => toggleHidden(d.dataset.hide);
+    });
   }
   pick.onChange(() => {
     renderStudio();
@@ -1140,6 +1189,8 @@ window.__gatherMods.define("fun", (ctx) => {
       <button class="gm-btn" id="gm-anim-new" title="Opens the animation studio: select objects, add points on the map, adjust each step, save.">New animation…</button>
       <div class="gm-list" id="gm-anims"></div>
       <div class="gm-status"><span id="gm-anims-status"></span></div>
+      <div class="gm-sublabel">Others' animations: hide one on your screen only</div>
+      <div class="gm-list" id="gm-anims-others"></div>
       </div>`,
     mount(el) {
       root = el;
@@ -1158,6 +1209,7 @@ window.__gatherMods.define("fun", (ctx) => {
     #gather-mods-panel .gm-edit:hover { color:var(--gm-fg); }
     #gather-mods-panel .gm-item.active .gm-edit { color:inherit; }
     #gather-mods-panel .gm-item.gm-editing { box-shadow:inset 0 0 0 1px var(--theme-color-accent,#6c5ce7); }
+    #gather-mods-panel .gm-item.gm-anim-hidden .gm-name { opacity:.45; text-decoration:line-through; }
     #gm-anim-studio { position:fixed; z-index:2147482400; width:300px; max-height:calc(100vh - 24px); display:flex; flex-direction:column;
       background:var(--gm-bg); color:var(--gm-fg); border:1px solid var(--gm-border); border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.35); font-size:13px; }
     #gm-anim-studio .gm-st-head { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; cursor:move; font-weight:600;
@@ -1195,6 +1247,9 @@ window.__gatherMods.define("fun", (ctx) => {
     #gm-anim-studio .gm-st-sel .gm-st-num { background:#ffd400; color:#1f1f23; }
     #gm-anim-studio .gm-st-del { color:var(--gm-muted); }
     #gm-anim-studio .gm-st-del:hover { color:var(--gm-red); }
+    #gm-anim-studio .gm-st-act { color:var(--gm-muted); padding:0 1px; }
+    #gm-anim-studio .gm-st-act:hover { color:var(--gm-fg); }
+    #gm-anim-studio .gm-st-off { visibility:hidden; }
     #gm-anim-studio .gm-st-card { display:flex; flex-direction:column; gap:6px; padding:8px; border:1px solid var(--gm-border); border-radius:8px; }
     #gm-anim-studio .gm-st-card .gm-st-label { width:auto; }
     #gm-anim-studio .gm-st-cols { display:flex; gap:6px; }
