@@ -558,9 +558,16 @@
       "name": "Custom objects",
       "description": "Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.",
       "file": "src/modules/custom.js",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "requires": { "map": "1.3.0", "map-pick": "1.2.0", "hub-api": "1.3.0" },
       "changelog": [
+        {
+          "version": "1.6.0",
+          "date": "2026-10-16",
+          "changes": [
+            "Images and restyles are hidden in Gather's simplified view (zoomed out), like the map's own objects, and come back with the full view."
+          ]
+        },
         {
           "version": "1.5.0",
           "date": "2026-10-16",
