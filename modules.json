@@ -598,6 +598,24 @@
           ]
         }
       ]
+    },
+    {
+      "id": "auto-away",
+      "kind": "module",
+      "name": "Auto away",
+      "description": "Sets you Away (or Busy, your choice) after a few minutes without keyboard or mouse on your computer, and back to your status on your next input. The same status set by hand stays. Gather desktop app only.",
+      "file": "src/modules/auto-away.js",
+      "version": "1.0.0",
+      "requires": {},
+      "changelog": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-16",
+          "changes": [
+            "New module: after 5 minutes (1 to 120) without keyboard or mouse anywhere on your computer, your status goes to Away (or Busy, your choice), and back to what it was as soon as you use the computer again. Away or Busy set by hand is never changed. Needs the Gather desktop app, which knows the computer's idle time; in a browser tab it stays off."
+          ]
+        }
+      ]
     }
   ]
 }
