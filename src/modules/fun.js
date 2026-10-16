@@ -448,9 +448,10 @@ window.__gatherMods.define("fun", (ctx) => {
       steps: path.steps.map((s) => ({ ...newStep(s.to ?? null), ...s })),
     });
   }
+  // Stopping a session redraws the studio, which needs the draft.
   function closeDraft() {
-    draft = null;
     if (pick.current()?.startsWith("anim-")) pick.stop();
+    draft = null;
     closeStudio();
     renderAnimations();
     refreshAnimations();
