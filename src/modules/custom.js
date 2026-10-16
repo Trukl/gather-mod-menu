@@ -312,6 +312,8 @@ window.__gatherMods.define("custom", (ctx) => {
     ...(draft && draft.imageUrl && placementOf(draft) ? [{ ...draft, id: "draft" }] : []),
     ...(stamp?.mode === "free" && placementOf(stamp) ? [{ ...stamp, id: "stamp" }] : []),
   ];
+  // Gather's simplified view (zoomed out) draws no objects: no images either.
+  const isSimplifiedView = () => GD().Repos.officeViewRenderState.isInAnySimplifiedView;
   function setChildrenVisible(zone, visible) {
     for (const child of zone.children ?? [])
       if (child.visible !== visible) child.setVisible(visible);
@@ -322,7 +324,7 @@ window.__gatherMods.define("custom", (ctx) => {
     if (!entry) return;
     entry.sprite.destroy();
     if (entry.zone?.scene && ![...drawn.values()].some((e) => e.zone === entry.zone))
-      setChildrenVisible(entry.zone, true);
+      setChildrenVisible(entry.zone, !isSimplifiedView());
   }
   function draw(o) {
     const key = texture(o.imageUrl);
@@ -448,7 +450,11 @@ window.__gatherMods.define("custom", (ctx) => {
     map.requestRender();
   }
   function beforeRender() {
-    for (const entry of drawn.values()) if (entry.zone) placeOverZone(entry);
+    const visible = !isSimplifiedView();
+    for (const entry of drawn.values()) {
+      if (entry.sprite.visible !== visible) entry.sprite.setVisible(visible);
+      if (entry.zone) placeOverZone(entry);
+    }
     outlineHovered();
   }
   map.scene().events.on("prerender", beforeRender);
