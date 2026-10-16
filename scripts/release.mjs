@@ -35,7 +35,9 @@ const manifest = JSON.stringify({
   commit: GITHUB_SHA,
   modules: modules.map((m) => ({ ...moduleMeta(m), hash: m.hash })),
 });
-const bundle = await sign(signedPayload(manifest));
+// Rekor can take longer than sigstore's 5 s default: the timed-out request
+// still logs the entry, and the retry then fails on it (409 conflict).
+const bundle = await sign(signedPayload(manifest), { timeout: 30_000 });
 await verify(bundle, signedPayload(manifest), SIGNER_POLICY);
 
 async function idToken(audience) {
