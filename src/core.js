@@ -1392,8 +1392,12 @@
     .gm-field { position:relative; display:flex; align-items:center; min-width:0; }
     .gm-field > .gm-i { position:absolute; left:10px; color:var(--gm-text-3); pointer-events:none; }
     .gm-field > .gm-i + .gm-input { padding-left:32px; }
-    .gm-field > .gm-unit { position:absolute; right:10px; font-size:12px; color:var(--gm-text-3); pointer-events:none; }
-    .gm-field > .gm-input:has(+ .gm-unit) { padding-right:44px; }
+    .gm-field:has(> .gm-unit) { height:32px; padding-right:9px; border:1px solid transparent; border-radius:8px; background-color:var(--gm-fill); cursor:text;
+      transition:background-color .12s, border-color .12s, box-shadow .12s; }
+    .gm-field:has(> .gm-unit):hover { background-color:var(--gm-fill-2); }
+    .gm-field:has(> .gm-unit):focus-within { background-color:var(--gm-surface); border-color:color-mix(in srgb, var(--gm-accent) 55%, transparent); box-shadow:var(--gm-ring); }
+    .gm-field:has(> .gm-unit) > .gm-input { flex:1; min-width:0; height:100%; padding-right:6px; border:0; background:none; box-shadow:none; }
+    .gm-field > .gm-unit { flex:none; font-size:12px; color:var(--gm-text-3); pointer-events:none; }
     .gm-field > .gm-btn { position:absolute; right:3px; }
     .gm-field > .gm-input:has(~ .gm-btn) { padding-right:64px; }
     .gm-prop { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:32px; padding:0 2px 0 8px; }

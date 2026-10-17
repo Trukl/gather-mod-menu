@@ -101,7 +101,7 @@ window.__gatherMods.define("auto-away", (ctx) => {
         <input type="checkbox" class="gm-switch" id="gm-away-toggle" />
       </label>
       <div class="gm-prop"><span>Status when idle</span><div class="gm-seg" id="gm-away-idle-status">${IDLE_STATUSES.map((s) => `<button data-status="${s}">${s}</button>`).join("")}</div></div>
-      <div class="gm-prop"><span>After</span><div class="gm-field"><input class="gm-input" id="gm-away-minutes" type="number" min="${MINUTES.min}" max="${MINUTES.max}" step="1" /><span class="gm-unit">min</span></div></div>
+      <div class="gm-prop"><span>After</span><label class="gm-field"><input class="gm-input" id="gm-away-minutes" type="number" min="${MINUTES.min}" max="${MINUTES.max}" step="1" /><span class="gm-unit">min</span></label></div>
       <div class="gm-note"><i class="gm-i sm" data-i="moon"></i><span id="gm-away-status"></span></div>`,
     mount(el) {
       root = el;

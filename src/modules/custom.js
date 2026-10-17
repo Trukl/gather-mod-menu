@@ -965,9 +965,9 @@ window.__gatherMods.define("custom", (ctx) => {
         <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-co-status"></span></div>
         <div class="gm-co-group" data-co-for="free">
           <button class="gm-btn gm-block" id="gm-co-place"></button>
-          <div class="gm-prop"><span>Size</span><div class="gm-co-size"><div class="gm-field"><input class="gm-input" id="gm-co-width" type="number" min="0.25" max="30" step="0.25" title="Width (tiles)" /><span class="gm-unit">w</span></div><div class="gm-field"><input class="gm-input" id="gm-co-height" type="number" min="0.25" max="30" step="0.25" title="Height (tiles)" /><span class="gm-unit">h</span></div></div></div>
+          <div class="gm-prop"><span>Size</span><div class="gm-co-size"><label class="gm-field"><input class="gm-input" id="gm-co-width" type="number" min="0.25" max="30" step="0.25" title="Width (tiles)" /><span class="gm-unit">w</span></label><label class="gm-field"><input class="gm-input" id="gm-co-height" type="number" min="0.25" max="30" step="0.25" title="Height (tiles)" /><span class="gm-unit">h</span></label></div></div>
           <div class="gm-prop"><span>Layer</span><select class="gm-select" id="gm-co-layer">${layerOptions}</select></div>
-          <div class="gm-prop" id="gm-co-base-row" title="Avatars standing above this line are drawn behind the image, below it in front."><span>Base line</span><div class="gm-field"><input class="gm-input" id="gm-co-base" type="number" min="0" max="30" step="0.25" title="Tiles from the top" /><span class="gm-unit">tiles</span></div></div>
+          <div class="gm-prop" id="gm-co-base-row" title="Avatars standing above this line are drawn behind the image, below it in front."><span>Base line</span><label class="gm-field"><input class="gm-input" id="gm-co-base" type="number" min="0" max="30" step="0.25" title="Tiles from the top" /><span class="gm-unit">tiles</span></label></div>
           <label class="gm-prop" title="The tiles from the base line down block avatars (for people who have this module)."><span>Collision</span><input type="checkbox" class="gm-switch" id="gm-co-collision" /></label>
         </div>
         <div class="gm-co-group" data-co-for="skin">
@@ -989,6 +989,7 @@ window.__gatherMods.define("custom", (ctx) => {
     #gather-mods-panel .gm-co-group { display:flex; flex-direction:column; gap:8px; }
     #gather-mods-panel .gm-co-size { display:flex; gap:4px; width:132px; flex:none; }
     #gather-mods-panel .gm-co-size > .gm-field { flex:1; min-width:0; }
+    #gather-mods-panel .gm-co-size .gm-input { padding-left:8px; padding-right:3px; }
     #gather-mods-panel .gm-co-range { width:132px; flex:none; margin:0; accent-color:var(--gm-accent); }
     #gather-mods-panel .gm-co-reset { margin-left:auto; flex:none; }
   `);

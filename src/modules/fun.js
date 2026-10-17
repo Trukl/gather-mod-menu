@@ -619,7 +619,7 @@ window.__gatherMods.define("fun", (ctx) => {
   const prop = (label, control, attrs = "") =>
     `<div class="gm-prop"${attrs}><span>${label}</span>${control}</div>`;
   const unitField = (input, unit, title) =>
-    `<div class="gm-field"${title ? ` title="${title}"` : ""}>${input}${unit ? `<span class="gm-unit">${unit}</span>` : ""}</div>`;
+    `<label class="gm-field"${title ? ` title="${title}"` : ""}>${input}${unit ? `<span class="gm-unit">${unit}</span>` : ""}</label>`;
   const number = (key, min, max, step) =>
     `<input class="gm-input" type="number" data-f="${key}" min="${min}" max="${max}" step="${step}" />`;
   const formula = (key, placeholder) =>
@@ -1256,7 +1256,9 @@ window.__gatherMods.define("fun", (ctx) => {
     #gm-anim-studio .gm-st-card { gap:6px; padding:8px; }
     #gm-anim-studio .gm-st-cols { display:flex; gap:6px; }
     #gm-anim-studio .gm-st-cols > * { flex:1; min-width:0; }
-    #gm-anim-studio .gm-input.gm-st-bad { border-color:var(--gm-danger); }
+    #gm-anim-studio .gm-st-cols > .gm-field:has(> .gm-unit) { flex:1 1 auto; padding-right:8px; }
+    #gm-anim-studio .gm-st-cols > .gm-field:has(> .gm-unit) > .gm-input { width:0; padding-left:8px; padding-right:3px; }
+    #gm-anim-studio :is(.gm-input.gm-st-bad, .gm-field:has(> .gm-st-bad)) { border-color:var(--gm-danger); }
     #gm-anim-studio .gm-st-player { display:flex; align-items:center; gap:8px; margin-top:2px; }
     #gm-anim-studio .gm-st-play { width:30px; height:30px; border-radius:50%; background:var(--gm-accent); color:var(--gm-on-accent); }
     #gm-anim-studio .gm-st-play:hover { background:var(--gm-accent); color:var(--gm-on-accent); filter:brightness(1.08); }
