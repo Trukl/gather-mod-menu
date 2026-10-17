@@ -10,25 +10,20 @@ import {
 } from "../launcher/mod-release.mjs";
 import { BUNDLE_PATH, buildBundle, loadLocalCatalog, moduleMeta, ROOT } from "./catalog.mjs";
 
-const { GITHUB_ACTIONS, GITHUB_REF, GITHUB_SHA, GITHUB_EVENT_NAME, GITHUB_OUTPUT, DRY_RUN } =
-  process.env;
+const { GITHUB_ACTIONS, GITHUB_REF, GITHUB_SHA, GITHUB_OUTPUT, DRY_RUN } = process.env;
 if (GITHUB_ACTIONS !== "true" || GITHUB_REF !== "refs/heads/main")
   throw new Error("Releases are published by the GitHub release workflow on main");
 const dryRun = DRY_RUN === "true";
 
 const modules = loadLocalCatalog();
 if (readFileSync(BUNDLE_PATH, "utf8") !== buildBundle(modules))
-  throw new Error("gather-mod-menu.js is out of date: run `npm run bundle` and commit it");
+  throw new Error("gather-mod-menu.js is out of date: wait for the Bundle workflow on main");
 
 const published = await fetch(`${UPDATES_URL}/catalog`).then((r) => (r.ok ? r.json() : null));
 const publishedModules = published ? JSON.parse(published.manifest).modules : null;
 const { errors, changed } = releaseChanges(modules, publishedModules);
 if (errors.length) throw new Error("Release refused:\n- " + errors.join("\n- "));
-if (!changed.length) {
-  if (GITHUB_EVENT_NAME !== "push") throw new Error("Nothing to release: no module changed");
-  console.log("Nothing to release: no module changed");
-  process.exit(0);
-}
+if (!changed.length) throw new Error("Nothing to release: no module changed");
 console.log("Changes:\n- " + changed.join("\n- "));
 
 const manifest = JSON.stringify({

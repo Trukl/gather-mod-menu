@@ -5,6 +5,8 @@
   "scripts": {
     "launch": "node launcher/gather-mods-launcher.mjs",
     "bundle": "node scripts/build-bundle.mjs",
+    "check": "node scripts/check.mjs",
+    "release": "gh workflow run release.yml --ref main && sleep 5 && gh run watch $(gh run list --workflow release.yml --limit 1 --json databaseId -q \".[0].databaseId\") --exit-status",
     "build-launcher-app": "node scripts/build-launcher-app.mjs",
     "release:dry-run": "gh workflow run release.yml --ref main -f dry_run=true && sleep 5 && gh run watch $(gh run list --workflow release.yml --limit 1 --json databaseId -q \".[0].databaseId\") --exit-status",
     "deploy-updates": "wrangler deploy --config updates/wrangler.toml"

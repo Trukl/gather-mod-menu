@@ -1,0 +1,39 @@
+name: Bundle
+
+# gather-mod-menu.js is generated here, on main, so pull requests don't conflict
+# on it. Pushes made with the workflow token start no other workflow.
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "modules.json", "scripts/catalog.mjs", "scripts/build-bundle.mjs"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bundle
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build and commit the bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # main may move between the build and the push: start again from it.
+          for attempt in 1 2 3; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            npm run bundle
+            git diff --quiet -- gather-mod-menu.js && exit 0
+            git commit -q -m "chore: bundle" -- gather-mod-menu.js
+            git push origin HEAD:main && exit 0
+          done
+          exit 1
