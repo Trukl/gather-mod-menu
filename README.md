@@ -303,6 +303,6 @@ flowchart LR
 - **Upload**: `POST /release` only accepts the OIDC token of that same workflow (repo and owner checked by id, `main` branch), a catalog whose commit matches the token, code matching the hashes, and versions that follow the rules above. No Cloudflare secret is stored in GitHub.
 - **Review**: with automatic updates off, the changelog (written by the author) and the exact code diff (the proof) are shown before installing.
 
-Limit: whoever can merge into `main` can publish. Each release is a public commit and a GitHub release, so the diff shown in “Review & install” can be compared with the code on GitHub. The `Bundle` workflow is the only one allowed to push to `main` without a pull request: it only commits the regenerated `gather-mod-menu.js`, which the launcher never runs (it runs the signed modules).
+Limit: whoever can merge into `main` can publish. Each release is a public commit and a GitHub release, so the diff shown in “Review & install” can be compared with the code on GitHub. The `Bundle` workflow is the only one allowed to push to `main` without a pull request, with a deploy key: it only commits the regenerated `gather-mod-menu.js`, which the launcher never runs (it runs the signed modules).
 
 Deploy the updates worker (after changing `updates/`): `npm run deploy-updates`.
