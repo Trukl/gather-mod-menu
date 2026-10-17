@@ -140,7 +140,7 @@ Save and apply outfits, with built-in “No outfit” and “Invisible” (bowti
 
 - **New**: select objects (what sits on them comes along), name it, save.
 - **Place it**: click it, a ghost follows the pointer, click on the map (snapped to tiles unless free placement is on; Esc to cancel).
-- **Remove last** removes the objects of the last construction placed on this map (the recording shows an older name, “↶ Undo”).
+- **Remove last** removes the objects of the last construction placed on this map.
 
 ![Constructions](docs/media/constructions.gif)
 
