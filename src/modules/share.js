@@ -34,20 +34,26 @@ window.__gatherMods.define("share", (ctx) => {
   ctx.section({
     title: "Share presets",
     html: `
-      <div class="gm-row gm-share">
-        <button class="gm-btn" id="gm-export" title="Copy the presets of your installed modules to the clipboard and download them as a file">Export</button>
-        <button class="gm-btn" id="gm-import-file" title="Import presets from an exported file">Import file</button>
-        <button class="gm-btn" id="gm-import-paste" title="Import presets from pasted text">Paste</button>
+      <div class="gm-btn-row">
+        <button class="gm-btn" id="gm-export" title="Copy the presets of your installed modules to the clipboard and download them as a file"><i class="gm-i" data-i="download"></i>Export</button>
+        <button class="gm-btn" id="gm-import-file" title="Import presets from an exported file"><i class="gm-i" data-i="file-up"></i>Import</button>
+        <button class="gm-btn" id="gm-import-paste" title="Import presets from pasted text"><i class="gm-i" data-i="clipboard-paste"></i>Paste</button>
       </div>
       <input type="file" id="gm-import-input" accept=".json,application/json" hidden />
-      <div class="gm-status"><span id="gm-share-status"></span></div>`,
+      <div class="gm-note" id="gm-share-note"><i class="gm-i sm" data-i="circle-check"></i><span id="gm-share-status"></span></div>`,
     mount(el) {
-      const setStatus = (text) => (el.querySelector("#gm-share-status").textContent = text);
+      const note = el.querySelector("#gm-share-note");
+      const setStatus = (text, ok = true) => {
+        note.classList.toggle("gm-ok", ok);
+        note.classList.toggle("gm-err", !ok);
+        note.querySelector(".gm-i").dataset.i = ok ? "circle-check" : "circle-alert";
+        el.querySelector("#gm-share-status").textContent = text;
+      };
       const runImport = (text) => {
         try {
           setStatus("Imported " + describe(importPresets(JSON.parse(text))));
         } catch (e) {
-          setStatus("Import failed: " + (e?.message || e));
+          setStatus("Import failed: " + (e?.message || e), false);
         }
       };
       el.querySelector("#gm-export").onclick = async () => {
@@ -73,7 +79,4 @@ window.__gatherMods.define("share", (ctx) => {
       };
     },
   });
-  ctx.style(
-    `#gather-mods-panel .gm-share button.gm-btn { flex:1; text-align:center; padding:7px 4px; }`,
-  );
 });

@@ -8,7 +8,16 @@ export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const BUNDLE_PATH = join(ROOT, "gather-mod-menu.js");
 export const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
 
-const META_FIELDS = ["id", "kind", "name", "description", "version", "requires", "changelog"];
+const META_FIELDS = [
+  "id",
+  "kind",
+  "name",
+  "description",
+  "icon",
+  "version",
+  "requires",
+  "changelog",
+];
 export const moduleMeta = (m) => Object.fromEntries(META_FIELDS.map((k) => [k, m[k]]));
 
 export function loadLocalCatalog() {

@@ -1,5 +1,5 @@
 // Desks: save and swap your desk decoration (only differing objects change),
-// pick which objects belong to your desk, automatic "↩ Previous desk" backup.
+// pick which objects belong to your desk, automatic "Previous desk" backup.
 window.__gatherMods.define("desks", (ctx) => {
   const { GD, me, escapeHtml, readJson, writeJson, onEnter, flash } = ctx;
   const map = ctx.use("map");
@@ -85,7 +85,7 @@ window.__gatherMods.define("desks", (ctx) => {
   }
 
   // Picking another desk stops the one being applied. The backup is only
-  // taken before the first one, so "↩ Previous desk" never holds a half-applied desk.
+  // taken before the first one, so "Previous desk" never holds a half-applied desk.
   function applyPreset(preset) {
     desk.status = `Applying "${preset.name}"…`;
     renderStatus();
@@ -100,7 +100,7 @@ window.__gatherMods.define("desks", (ctx) => {
     const extra = [];
     const created = [];
     try {
-      if (!desk.keepBackup) writeJson(BACKUP_KEY, snapshotDesk("↩ Previous desk"));
+      if (!desk.keepBackup) writeJson(BACKUP_KEY, snapshotDesk("Previous desk"));
       desk.keepBackup = false;
       const missing = [...preset.items];
       for (const o of topLevelDeskObjects()) {
@@ -181,21 +181,20 @@ window.__gatherMods.define("desks", (ctx) => {
   let root = null;
   function renderStatus() {
     if (!root?.isConnected) return;
-    const el = root.querySelector("#gm-desk-status");
-    if (desk.status) el.textContent = desk.status;
-    else if (!deskArea()) el.textContent = "No desk";
+    const note = root.querySelector("#gm-desk-status");
+    note.textContent = desk.status;
+    note.parentElement.classList.toggle("gm-err", desk.status.startsWith("Failed"));
+    const count = root.querySelector("#gm-desk-count");
+    if (!deskArea()) count.textContent = "No desk";
     else {
       const objects = getDeskObjects();
-      el.textContent = objects.length + " desk objects";
-      el.title = objects.map(map.objectName).join(", ");
+      count.textContent = objects.length + " objects on your desk";
+      count.title = objects.map(map.objectName).join(", ");
     }
   }
   function renderPickButton() {
     if (!root?.isConnected) return;
-    const btn = root.querySelector("#gm-desk-pick");
-    const on = pick.current() === "desk";
-    btn.textContent = "Pick desk objects: " + (on ? "ON" : "OFF");
-    btn.classList.toggle("active", on);
+    root.querySelector("#gm-desk-pick").checked = pick.current() === "desk";
   }
   function renderList() {
     if (!root?.isConnected) return;
@@ -204,11 +203,11 @@ window.__gatherMods.define("desks", (ctx) => {
     const backup = readJson(BACKUP_KEY, null);
     const summary = (p) => escapeHtml(p.items.map((i) => i.name).join(", "));
     const backupRow = backup
-      ? `<div class="gm-item" data-backup="1" title="${summary(backup)}"><span class="gm-name">${escapeHtml(backup.name)}</span></div>`
+      ? `<div class="gm-item" data-backup="1" title="${summary(backup)}"><i class="gm-i" data-i="undo-2"></i><div class="gm-item-text"><span class="gm-item-title">Previous desk</span></div><span class="gm-tail">Backup</span></div>`
       : "";
     const savedRows = getPresets().map(
       (p, i) =>
-        `<div class="gm-item" data-idx="${i}" title="${summary(p)}"><span class="gm-name">${escapeHtml(p.name)}</span><span class="gm-actions">${hub ? `<span class="gm-pub" data-pub="${i}" title="Publish to the community hub">⇪</span>` : ""}<span class="gm-del" data-del="${i}">✕</span></span></div>`,
+        `<div class="gm-item" data-idx="${i}" title="${summary(p)}"><i class="gm-i" data-i="lamp-desk"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(p.name)}</span></div><div class="gm-actions">${hub ? `<button class="gm-iconbtn gm-pub" data-pub="${i}" title="Publish to the community hub"><i class="gm-i" data-i="upload"></i></button>` : ""}<button class="gm-iconbtn gm-danger gm-desk-del" data-del="${i}" title="Delete"><i class="gm-i" data-i="trash-2"></i></button></div></div>`,
     );
     previews.hidePopover();
     list.innerHTML = backupRow + savedRows.join("") || '<div class="gm-empty">No saved desks</div>';
@@ -228,7 +227,7 @@ window.__gatherMods.define("desks", (ctx) => {
         if (preset) applyPreset(preset);
       };
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll(".gm-desk-del").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const l = getPresets();
@@ -261,19 +260,24 @@ window.__gatherMods.define("desks", (ctx) => {
   ctx.onTick(renderStatus);
   ctx.section({
     title: "Desks",
+    status: () => (pick.current() === "desk" ? "Picking" : null),
     html: `
-      <button class="gm-btn" id="gm-desk-pick" title="Click objects, or drag a box around them, to add or remove them from your desk. Esc to stop.">Pick desk objects: OFF</button>
-      <div class="gm-status"><span id="gm-desk-status"></span><span class="gm-link" id="gm-desk-reset" title="Track the objects inside the desk area again">Reset</span></div>
-      <div class="gm-row">
-        <input class="gm-input" id="gm-desk-name" placeholder="Name this desk..." />
-        <button class="gm-btn" id="gm-desk-save">Save</button>
+      <label class="gm-toggle" title="Click objects, or drag a box around them, to add or remove them from your desk. Esc to stop.">
+        <span class="gm-toggle-text"><span class="gm-toggle-title">Pick desk objects</span><span class="gm-hint"><span id="gm-desk-count"></span> · <span class="gm-link" id="gm-desk-reset" title="Track the objects inside the desk area again">Reset</span></span></span>
+        <input type="checkbox" class="gm-switch" id="gm-desk-pick" />
+      </label>
+      <div class="gm-field">
+        <input class="gm-input" id="gm-desk-name" placeholder="Name this desk" />
+        <button class="gm-btn gm-primary gm-sm" id="gm-desk-save">Save</button>
       </div>
+      <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-desk-status"></span></div>
       <div class="gm-list" id="gm-desks"></div>`,
     mount(el) {
       root = el;
-      el.querySelector("#gm-desk-pick").onclick = () =>
-        pick.current() === "desk" ? pick.stop("desk") : pick.start(deskSession);
-      el.querySelector("#gm-desk-reset").onclick = () => {
+      el.querySelector("#gm-desk-pick").onchange = (e) =>
+        e.target.checked ? pick.start(deskSession) : pick.stop("desk");
+      el.querySelector("#gm-desk-reset").onclick = (e) => {
+        e.preventDefault();
         localStorage.removeItem(trackedKey());
         pick.redraw();
         renderStatus();

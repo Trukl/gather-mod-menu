@@ -156,10 +156,11 @@ window.__gatherMods.define("map-pick", (ctx) => {
     if (!box) {
       box = document.createElement("div");
       box.id = "gather-mods-marquee";
+      ctx.applyTheme(box);
       document.body.appendChild(box);
       clearHoverHighlight();
     }
-    box.classList.toggle("gm-danger", !!state.session?.danger);
+    box.classList.toggle("is-danger", !!state.session?.danger);
     Object.assign(box.style, {
       left: Math.min(drag.x, e.clientX) + "px",
       top: Math.min(drag.y, e.clientY) + "px",
@@ -209,6 +210,7 @@ window.__gatherMods.define("map-pick", (ctx) => {
     }
   }
 
+  // Re-themed on every update: the theme can change while it is shown.
   function hoverTip() {
     let tip = document.getElementById("gather-mods-hover-tip");
     if (!tip) {
@@ -216,6 +218,7 @@ window.__gatherMods.define("map-pick", (ctx) => {
       tip.id = "gather-mods-hover-tip";
       document.body.appendChild(tip);
     }
+    ctx.applyTheme(tip);
     return tip;
   }
   function clearHoverHighlight() {
@@ -252,9 +255,8 @@ window.__gatherMods.define("map-pick", (ctx) => {
       map.requestRender();
     }
     const tip = hoverTip();
-    tip.textContent =
-      (state.session.label?.(target) ?? map.objectName(target)) +
-      (total > 1 ? ` (${index + 1}/${total}, scroll to cycle)` : "");
+    const name = ctx.escapeHtml(state.session.label?.(target) ?? map.objectName(target));
+    tip.innerHTML = `<span class="gm-tip">${name}${total > 1 ? ` <span class="gm-kbd">${index + 1}/${total}</span> scroll to cycle` : ""}</span>`;
     tip.style.left = e.clientX + 14 + "px";
     tip.style.top = e.clientY + 14 + "px";
   }
@@ -316,10 +318,9 @@ window.__gatherMods.define("map-pick", (ctx) => {
   ctx.onCleanup(() => stop());
   ctx.style(`
     #gather-mods-marquee { position:fixed; z-index:2147482500; pointer-events:none; box-sizing:border-box;
-      border:1px dashed var(--theme-color-accent,#6c5ce7); background:rgba(108,92,231,.12); }
-    #gather-mods-marquee.gm-danger { border-color:#ff3b30; background:rgba(255,59,48,.12); }
-    #gather-mods-hover-tip { position:fixed; z-index:2147483001; pointer-events:none; padding:3px 7px; border-radius:6px;
-      background:rgba(0,0,0,.82); color:#fff; font-size:12px; font-family:inherit; white-space:nowrap; }
+      border:1px dashed var(--gm-accent); background:var(--gm-accent-soft); }
+    #gather-mods-marquee.is-danger { border-color:var(--gm-danger); background:var(--gm-danger-soft); }
+    #gather-mods-hover-tip { position:fixed; z-index:2147483001; pointer-events:none; white-space:nowrap; }
   `);
 
   return {
