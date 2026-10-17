@@ -1,9 +1,8 @@
 name: Release mod
 
+# Manual only (`npm run release` or “Run workflow”), so several merged pull
+# requests go out as one release.
 on:
-  push:
-    branches: [main]
-    paths: ["src/**", "modules.json", "gather-mod-menu.js"]
   workflow_dispatch:
     inputs:
       dry_run:
