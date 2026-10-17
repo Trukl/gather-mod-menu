@@ -1,14 +1,17 @@
 name: Bundle
 
 # gather-mod-menu.js is generated here, on main, so pull requests don't conflict
-# on it. Pushes made with the workflow token start no other workflow.
+# on it. It is pushed with a deploy key, the only bypass of the main ruleset
+# besides pull requests (Actions can't be one on a personal repository). The
+# commit only touches the bundle, which starts no workflow.
 on:
   push:
     branches: [main]
     paths: ["src/**", "modules.json", "scripts/catalog.mjs", "scripts/build-bundle.mjs"]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: bundle
@@ -21,6 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+          ssh-key: ${{ secrets.BUNDLE_DEPLOY_KEY }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
