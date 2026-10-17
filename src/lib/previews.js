@@ -197,20 +197,23 @@ window.__gatherMods.define("previews", (ctx) => {
     row.addEventListener("mouseleave", hidePopover);
   }
   ctx.onCleanup(hidePopover);
+  ctx.onTick(() => {
+    const pop = document.getElementById("gather-mods-popover");
+    if (pop) ctx.applyTheme(pop);
+  });
 
   ctx.style(`
     :is(#gather-mods-modal, #gather-mods-popover) .gm-preview { height:${PREVIEW_BOX_H}px; display:flex; align-items:center; justify-content:center; overflow:hidden;
-      border-radius:8px; background:var(--gm-input); }
+      border-radius:10px; background:var(--gm-fill); }
     :is(#gather-mods-modal, #gather-mods-popover) .gm-preview img { image-rendering:pixelated; }
     :is(#gather-mods-modal, #gather-mods-popover) .gm-outfit-crop { position:relative; overflow:hidden; width:${PREVIEW_W}px; height:${PREVIEW_H}px; }
     :is(#gather-mods-modal, #gather-mods-popover) .gm-outfit-img { position:absolute; visibility:hidden; }
     :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-preview { position:relative; flex-shrink:0; }
     :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-preview img { position:absolute; }
-    :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-floor { position:absolute; background:var(--gm-surface-hover); }
-    :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-zone { position:absolute; box-sizing:border-box; border:1px dashed var(--theme-color-accent,#6c5ce7); pointer-events:none; }
-    #gather-mods-popover { position:fixed; z-index:2147483000; width:${PREVIEW_W + 26}px; padding:6px; box-sizing:border-box; pointer-events:none;
-      background:var(--gm-bg); border:1px solid var(--gm-border); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.25); font-family:inherit; }
-    #gather-mods-popover .gm-empty { color:var(--gm-muted); font-size:12px; }
+    :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-floor { position:absolute; border-radius:2px; background:var(--gm-fill-2); }
+    :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-zone { position:absolute; box-sizing:border-box; border:1px dashed var(--gm-accent); border-radius:2px; pointer-events:none; }
+    #gather-mods-popover { position:fixed; z-index:2147483000; width:${PREVIEW_W + 26}px; padding:8px; box-sizing:border-box; pointer-events:none;
+      background:var(--gm-surface); border-radius:14px; box-shadow:var(--gm-shadow-pop); }
   `);
 
   return {

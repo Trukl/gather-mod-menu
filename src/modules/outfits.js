@@ -6,8 +6,8 @@ window.__gatherMods.define("outfits", (ctx) => {
   const OUTFITS_KEY = "gathermodv2:outfits";
   const BOWTIE_ID = "9bdd32b6-afa0-4325-ad5b-8702c9ac2eb3";
   const BUILTIN_OUTFITS = [
-    { name: "No outfit", summary: "Empty, shows after reload", outfit: {} },
-    { name: "Invisible", summary: "Bowtie", outfit: { other: BOWTIE_ID } },
+    { name: "No outfit", summary: "Empty, shows after reload", outfit: {}, icon: "ban" },
+    { name: "Invisible", summary: "Bowtie", outfit: { other: BOWTIE_ID }, icon: "ghost" },
   ];
 
   const getOutfits = () => readJson(OUTFITS_KEY, []);
@@ -49,11 +49,11 @@ window.__gatherMods.define("outfits", (ctx) => {
     const hub = ctx.use("hub");
     const builtinRows = BUILTIN_OUTFITS.map(
       (p, i) =>
-        `<div class="gm-item" data-builtin="${i}" title="${escapeHtml(p.summary)}"><span class="gm-name">${escapeHtml(p.name)}</span></div>`,
+        `<div class="gm-item" data-builtin="${i}" title="${escapeHtml(p.summary)}"><i class="gm-i" data-i="${p.icon}"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(p.name)}</span></div></div>`,
     );
     const savedRows = getOutfits().map(
       (p, i) =>
-        `<div class="gm-item" data-idx="${i}" title="${escapeHtml(p.summary || "")}"><span class="gm-name">${escapeHtml(p.name)}</span><span class="gm-actions">${hub ? `<span class="gm-pub" data-pub="${i}" title="Publish to the community hub">⇪</span>` : ""}<span class="gm-del" data-del="${i}">✕</span></span></div>`,
+        `<div class="gm-item" data-idx="${i}" title="${escapeHtml(p.summary || "")}"><i class="gm-i" data-i="shirt"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(p.name)}</span></div><div class="gm-actions">${hub ? `<button class="gm-iconbtn" data-pub="${i}" title="Publish to the community hub"><i class="gm-i" data-i="upload"></i></button>` : ""}<button class="gm-iconbtn gm-danger" data-del="${i}" title="Delete"><i class="gm-i" data-i="trash-2"></i></button></div></div>`,
     );
     previews.hidePopover();
     list.innerHTML = [...builtinRows, ...savedRows].join("");
@@ -69,7 +69,7 @@ window.__gatherMods.define("outfits", (ctx) => {
         if (preset) applyOutfit(preset);
       };
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll("[data-del]").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const l = getOutfits();
@@ -78,7 +78,7 @@ window.__gatherMods.define("outfits", (ctx) => {
         renderList();
       };
     });
-    list.querySelectorAll(".gm-pub").forEach((b) => {
+    list.querySelectorAll("[data-pub]").forEach((b) => {
       b.onclick = (e) => {
         e.stopPropagation();
         hub?.publish("outfit", getOutfits()[+b.dataset.pub]);
@@ -101,9 +101,9 @@ window.__gatherMods.define("outfits", (ctx) => {
   ctx.section({
     title: "Outfits",
     html: `
-      <div class="gm-row">
-        <input class="gm-input" id="gm-outfit-name" placeholder="Name this outfit..." />
-        <button class="gm-btn" id="gm-outfit-save">Save</button>
+      <div class="gm-field">
+        <input class="gm-input" id="gm-outfit-name" placeholder="Name this outfit" />
+        <button class="gm-btn gm-primary gm-sm" id="gm-outfit-save">Save</button>
       </div>
       <div class="gm-list" id="gm-outfits"></div>`,
     mount(el) {

@@ -774,21 +774,20 @@ window.__gatherMods.define("custom", (ctx) => {
     if (!root?.isConnected) return;
     const $ = (sel) => root.querySelector(sel);
     const editing = draft?.editId;
-    $("#gm-co-new").textContent =
-      draft?.mode === "free" ? (editing ? "Cancel editing" : "Cancel new image") : "New image…";
-    $("#gm-co-new").classList.toggle("active", draft?.mode === "free");
-    $("#gm-co-skin").textContent =
+    $("#gm-co-new").innerHTML =
+      draft?.mode === "free"
+        ? `<i class="gm-i" data-i="x"></i>${editing ? "Cancel editing" : "Cancel"}`
+        : '<i class="gm-i" data-i="image-plus"></i>New image';
+    $("#gm-co-skin").innerHTML =
       draft?.mode === "skin"
-        ? editing
-          ? "Cancel editing"
-          : "Cancel restyle"
-        : "Restyle an object…";
-    $("#gm-co-skin").classList.toggle("active", draft?.mode === "skin");
+        ? `<i class="gm-i" data-i="x"></i>${editing ? "Cancel editing" : "Cancel"}`
+        : '<i class="gm-i" data-i="paintbrush"></i>Restyle';
     $("#gm-co-editor").style.display = draft ? "" : "none";
     if (!draft) return;
     const mode = pick.current();
     const loading = draft.imageUrl && textures.get(draft.imageUrl) === "loading";
     const broken = draft.imageUrl && textures.get(draft.imageUrl) === "error";
+    $("#gm-co-status").closest(".gm-note").classList.toggle("gm-err", !!broken);
     $("#gm-co-status").textContent = broken
       ? "This image could not be loaded"
       : !draft.imageUrl
@@ -809,13 +808,15 @@ window.__gatherMods.define("custom", (ctx) => {
     });
     $("#gm-co-base-row").style.display =
       draft.mode === "free" && draft.free.layer === "sorted" ? "" : "none";
-    $("#gm-co-place").textContent =
-      draft.free.x === undefined ? "Place on the map" : "Move on the map";
-    $("#gm-co-place").classList.toggle("active", mode === "custom-place");
-    $("#gm-co-pick").textContent = draft.skin ? "Pick another object" : "Pick the object";
-    $("#gm-co-pick").classList.toggle("active", mode === "custom-skin");
+    $("#gm-co-place").innerHTML =
+      draft.free.x === undefined
+        ? '<i class="gm-i" data-i="map-pin"></i>Place it on the map'
+        : '<i class="gm-i" data-i="move"></i>Move it on the map';
+    $("#gm-co-place").classList.toggle("is-on", mode === "custom-place");
+    $("#gm-co-pick").innerHTML =
+      `<i class="gm-i" data-i="mouse-pointer-click"></i>${draft.skin ? "Pick another object" : "Pick the object"}`;
+    $("#gm-co-pick").classList.toggle("is-on", mode === "custom-skin");
     $("#gm-co-save").disabled = !isReady() || broken;
-    $("#gm-co-save").textContent = editing ? "Save changes" : "Save";
     renderPlane();
   }
   function renderPlane() {
@@ -824,6 +825,8 @@ window.__gatherMods.define("custom", (ctx) => {
     const ready = !!placementOf(draft);
     $("#gm-co-back").disabled = !ready;
     $("#gm-co-front").disabled = !ready;
+    $("#gm-co-back").classList.toggle("on", draft.plane?.relation === "behind");
+    $("#gm-co-front").classList.toggle("on", draft.plane?.relation === "front");
     $("#gm-co-plane-reset").style.display = draft.plane ? "" : "none";
     $("#gm-co-plane-status").textContent =
       draft.planeMessage ||
@@ -846,7 +849,7 @@ window.__gatherMods.define("custom", (ctx) => {
       ? own
           .map(
             (o) =>
-              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id ? " gm-editing" : ""}" data-id="${escapeHtml(o.id)}" title="Hover to see it on the map, outlined in red"><span class="gm-name">${escapeHtml(o.name)}</span><span class="gm-actions"><span class="gm-co-mode">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><span class="gm-edit gm-copy" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}">＋</span><span class="gm-edit" data-edit="${escapeHtml(o.id)}" title="Edit this object">✎</span><span class="gm-del" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone">✕</span></span></div>`,
+              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id ? " is-on" : ""}" data-id="${escapeHtml(o.id)}" title="Hover to see it on the map, outlined in red"><span class="gm-thumb" style="background-image:url(&quot;${escapeHtml(imageSrc(o.imageUrl))}&quot;)"></span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(o.name)}</span></div><span class="gm-tail hide-on-hover">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><div class="gm-actions"><button class="gm-iconbtn${o.id === stamp?.id ? " on" : ""}" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}"><i class="gm-i sm" data-i="copy"></i></button><button class="gm-iconbtn" data-edit="${escapeHtml(o.id)}" title="Edit this object"><i class="gm-i sm" data-i="pencil"></i></button><button class="gm-iconbtn gm-danger" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone"><i class="gm-i sm" data-i="trash-2"></i></button></div></div>`,
           )
           .join("")
       : '<div class="gm-empty">You have no custom objects on this map</div>';
@@ -870,7 +873,7 @@ window.__gatherMods.define("custom", (ctx) => {
         else startStamp(o);
       };
     });
-    list.querySelectorAll(".gm-del").forEach((el) => {
+    list.querySelectorAll("[data-del]").forEach((el) => {
       el.onclick = () => {
         const o = find(el.dataset.del);
         if (o) deleteObject(o);
@@ -938,52 +941,57 @@ window.__gatherMods.define("custom", (ctx) => {
     .join("");
   ctx.section({
     title: "Custom objects",
+    status: () =>
+      draft
+        ? draft.editId
+          ? "Editing"
+          : draft.mode === "skin"
+            ? "Restyling"
+            : "New image"
+        : stamp
+          ? "Placing copies"
+          : null,
     html: `
-      <div class="gm-sublabel">Your images on the map, seen by everyone with this module</div>
-      <div class="gm-row">
-        <button class="gm-btn" id="gm-co-new" title="Draw an image anywhere: size, layer, base line and collision like a real object.">New image…</button>
-        <button class="gm-btn" id="gm-co-skin" title="Replace the look of a real object with an image: it keeps its collision and seats.">Restyle an object…</button>
+      <div class="gm-btn-row">
+        <button class="gm-btn" id="gm-co-new" title="Draw an image anywhere: size, layer, base line and collision like a real object."><i class="gm-i" data-i="image-plus"></i>New image</button>
+        <button class="gm-btn" id="gm-co-skin" title="Replace the look of a real object with an image: it keeps its collision and seats."><i class="gm-i" data-i="paintbrush"></i>Restyle</button>
       </div>
-      <div id="gm-co-editor" style="display:none">
-        <div class="gm-status"><span id="gm-co-status"></span></div>
-        <div class="gm-row">
-          <input class="gm-input" id="gm-co-url" placeholder="Image URL (https)..." />
-          <button class="gm-btn" id="gm-co-upload" title="png, jpeg, gif or webp, 512 KB max">Upload</button>
-          <input type="file" id="gm-co-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden />
+      <div class="gm-card" id="gm-co-editor" style="display:none">
+        <div class="gm-field">
+          <input class="gm-input" id="gm-co-url" placeholder="Image URL (https)" />
+          <button class="gm-btn gm-sm" id="gm-co-upload" title="png, jpeg, gif or webp, 512 KB max">Upload</button>
         </div>
-        <div data-co-for="free">
-          <button class="gm-btn" id="gm-co-place"></button>
-          <label class="gm-co-param">Width (tiles)<input class="gm-input" id="gm-co-width" type="number" min="0.25" max="30" step="0.25" /></label>
-          <label class="gm-co-param">Height (tiles)<input class="gm-input" id="gm-co-height" type="number" min="0.25" max="30" step="0.25" /></label>
-          <label class="gm-co-param">Layer<select class="gm-input" id="gm-co-layer">${layerOptions}</select></label>
-          <label class="gm-co-param" id="gm-co-base-row" title="Avatars standing above this line are drawn behind the image, below it in front.">Base line (tiles from the top)<input class="gm-input" id="gm-co-base" type="number" min="0" max="30" step="0.25" /></label>
-          <label class="gm-co-param" title="The tiles from the base line down block avatars (for people who have this module).">Collision<input type="checkbox" id="gm-co-collision" /></label>
+        <input type="file" id="gm-co-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden />
+        <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-co-status"></span></div>
+        <div class="gm-co-group" data-co-for="free">
+          <button class="gm-btn gm-block" id="gm-co-place"></button>
+          <div class="gm-prop"><span>Size</span><div class="gm-co-size"><label class="gm-field"><input class="gm-input" id="gm-co-width" type="number" min="0.25" max="30" step="0.25" title="Width (tiles)" /><span class="gm-unit">w</span></label><label class="gm-field"><input class="gm-input" id="gm-co-height" type="number" min="0.25" max="30" step="0.25" title="Height (tiles)" /><span class="gm-unit">h</span></label></div></div>
+          <div class="gm-prop"><span>Layer</span><select class="gm-select" id="gm-co-layer">${layerOptions}</select></div>
+          <div class="gm-prop" id="gm-co-base-row" title="Avatars standing above this line are drawn behind the image, below it in front."><span>Base line</span><label class="gm-field"><input class="gm-input" id="gm-co-base" type="number" min="0" max="30" step="0.25" title="Tiles from the top" /><span class="gm-unit">tiles</span></label></div>
+          <label class="gm-prop" title="The tiles from the base line down block avatars (for people who have this module)."><span>Collision</span><input type="checkbox" class="gm-switch" id="gm-co-collision" /></label>
         </div>
-        <div data-co-for="skin">
-          <button class="gm-btn" id="gm-co-pick"></button>
+        <div class="gm-co-group" data-co-for="skin">
+          <button class="gm-btn gm-block" id="gm-co-pick"></button>
         </div>
-        <label class="gm-co-param">Opacity<input id="gm-co-opacity" type="range" min="0.1" max="1" step="0.05" /></label>
-        <div class="gm-co-param" title="Draw order: move the image behind or in front of the objects it overlaps, one at a time.">Plane<span class="gm-co-plane"><button class="gm-btn" id="gm-co-back" title="Behind the next object it overlaps">▼ Back</button><button class="gm-btn" id="gm-co-front" title="In front of the next object it overlaps">▲ Front</button></span></div>
-        <div class="gm-status"><span id="gm-co-plane-status"></span><span class="gm-link" id="gm-co-plane-reset">Reset</span></div>
-        <div class="gm-row">
-          <input class="gm-input" id="gm-co-name" placeholder="Name this object..." />
-          <button class="gm-btn" id="gm-co-save">Save</button>
+        <div class="gm-prop"><span>Opacity</span><input class="gm-co-range" id="gm-co-opacity" type="range" min="0.1" max="1" step="0.05" /></div>
+        <div class="gm-prop" title="Draw order: move the image behind or in front of the objects it overlaps, one at a time."><span>Plane</span><div class="gm-seg"><button id="gm-co-back" title="Behind the next object it overlaps"><i class="gm-i xs" data-i="arrow-down"></i> Back</button><button id="gm-co-front" title="In front of the next object it overlaps"><i class="gm-i xs" data-i="arrow-up"></i> Front</button></div></div>
+        <div class="gm-note"><i class="gm-i sm" data-i="layers"></i><span id="gm-co-plane-status"></span><span class="gm-link gm-co-reset" id="gm-co-plane-reset">Reset</span></div>
+        <div class="gm-field">
+          <input class="gm-input" id="gm-co-name" placeholder="Name this image" />
+          <button class="gm-btn gm-primary gm-sm" id="gm-co-save">Save</button>
         </div>
       </div>
       <div class="gm-list" id="gm-co-list"></div>
-      <div class="gm-status"><span id="gm-co-list-status"></span></div>`,
+      <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-co-list-status"></span></div>`,
     mount,
   });
   ctx.style(`
-    #gather-mods-panel .gm-co-param { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--gm-muted); }
-    #gather-mods-panel .gm-co-param .gm-input { width:110px; flex:none; }
-    #gather-mods-panel .gm-co-param input[type=range] { width:110px; }
-    #gather-mods-panel .gm-co-mode { font-size:11px; color:var(--gm-muted); }
-    #gather-mods-panel .gm-co-plane { display:flex; gap:4px; }
-    #gather-mods-panel .gm-co-plane button.gm-btn { width:auto; margin:0; padding:3px 8px; }
-    #gather-mods-panel .gm-edit { color:var(--gm-muted); font-size:13px; flex-shrink:0; }
-    #gather-mods-panel .gm-edit:hover { color:var(--gm-fg); }
-    #gather-mods-panel .gm-item.gm-editing { box-shadow:inset 0 0 0 1px var(--theme-color-accent,#6c5ce7); }
+    #gather-mods-panel .gm-co-group { display:flex; flex-direction:column; gap:8px; }
+    #gather-mods-panel .gm-co-size { display:flex; gap:4px; width:132px; flex:none; }
+    #gather-mods-panel .gm-co-size > .gm-field { flex:1; min-width:0; }
+    #gather-mods-panel .gm-co-size .gm-input { padding-left:8px; padding-right:3px; }
+    #gather-mods-panel .gm-co-range { width:132px; flex:none; margin:0; accent-color:var(--gm-accent); }
+    #gather-mods-panel .gm-co-reset { margin-left:auto; flex:none; }
   `);
 
   ctx.onTick(() => {

@@ -33,6 +33,20 @@ window.__gatherMods.define("teleport", (ctx) => {
 
   const getLocations = () => readJson(LOCATIONS_KEY, []);
 
+  const initials = (name) =>
+    (name || "?")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => [...w][0])
+      .join("")
+      .toUpperCase() || "?";
+  const avatarColor = (id) => {
+    let hue = 0;
+    for (const c of String(id)) hue = (hue * 31 + c.charCodeAt(0)) % 360;
+    return `hsl(${hue} 55% 55%)`;
+  };
+
   function renderPlayers(root) {
     const list = root.querySelector("#gm-players");
     const search = root.querySelector("#gm-player-search").value.toLowerCase();
@@ -45,7 +59,7 @@ window.__gatherMods.define("teleport", (ctx) => {
       ? players
           .map(
             (p) =>
-              `<div class="gm-item" data-pid="${escapeHtml(p.id)}"><span class="gm-name">${escapeHtml((p.name || "?").slice(0, 24))}</span></div>`,
+              `<div class="gm-item" data-pid="${escapeHtml(p.id)}"><span class="gm-avatar" style="background:${avatarColor(p.id)}">${escapeHtml(initials(p.name))}</span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml((p.name || "?").slice(0, 24))}</span></div><div class="gm-actions"><button class="gm-iconbtn" title="Teleport to them"><i class="gm-i" data-i="navigation"></i></button></div></div>`,
           )
           .join("")
       : '<div class="gm-empty">No players</div>';
@@ -67,7 +81,7 @@ window.__gatherMods.define("teleport", (ctx) => {
       ? locations
           .map(
             (loc, i) =>
-              `<div class="gm-item" data-idx="${i}" title="(${loc.x}, ${loc.y})"><span class="gm-name">${escapeHtml(loc.name)}</span><span class="gm-del" data-del="${i}">✕</span></div>`,
+              `<div class="gm-item" data-idx="${i}" title="(${loc.x}, ${loc.y})"><i class="gm-i" data-i="map-pin"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(loc.name)}</span></div><div class="gm-actions"><button class="gm-iconbtn gm-danger" data-del="${i}" title="Delete"><i class="gm-i" data-i="trash-2"></i></button></div></div>`,
           )
           .join("")
       : '<div class="gm-empty">No saved locations</div>';
@@ -79,7 +93,7 @@ window.__gatherMods.define("teleport", (ctx) => {
         tpTo(x, y, floorId);
       };
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll("[data-del]").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const l = getLocations();
@@ -116,6 +130,7 @@ window.__gatherMods.define("teleport", (ctx) => {
   let root = null;
   ctx.section({
     title: "Teleport",
+    status: () => (tpMode ? "On" : null),
     parts: [
       { id: "mode", label: "Teleport mode" },
       { id: "desk", label: "TP to my desk" },
@@ -123,33 +138,28 @@ window.__gatherMods.define("teleport", (ctx) => {
       { id: "locations", label: "Saved locations" },
     ],
     html: `
-      <button class="gm-btn" id="gm-tp-mode" data-part="mode">Teleport mode: OFF</button>
-      <button class="gm-btn" id="gm-tp-desk" data-part="desk">TP to my desk</button>
+      <label class="gm-toggle" data-part="mode">
+        <span class="gm-toggle-text"><span class="gm-toggle-title">Teleport mode</span><span class="gm-hint">“Go to” and double-click teleport instead of walking</span></span>
+        <input type="checkbox" class="gm-switch" id="gm-tp-mode" />
+      </label>
+      <button class="gm-btn gm-block" id="gm-tp-desk" data-part="desk"><i class="gm-i" data-i="armchair"></i>Teleport to my desk</button>
       <div data-part="players">
-        <div class="gm-sublabel">Players</div>
-        <input class="gm-input" id="gm-player-search" placeholder="Search player..." />
+        <div class="gm-sub">Players</div>
+        <div class="gm-field"><i class="gm-i" data-i="search"></i><input class="gm-input" id="gm-player-search" placeholder="Search players" /></div>
         <div class="gm-list" id="gm-players"></div>
       </div>
       <div data-part="locations">
-        <div class="gm-sublabel">Saved locations</div>
-        <div class="gm-row">
-          <input class="gm-input" id="gm-loc-name" placeholder="Name this spot..." />
-          <button class="gm-btn" id="gm-loc-save">Save</button>
-        </div>
+        <div class="gm-sub">Saved locations</div>
+        <div class="gm-field"><input class="gm-input" id="gm-loc-name" placeholder="Name this spot" /><button class="gm-btn gm-primary gm-sm" id="gm-loc-save">Save</button></div>
         <div class="gm-list" id="gm-locations"></div>
       </div>`,
     mount(el) {
       root = el;
-      const tpBtn = el.querySelector("#gm-tp-mode");
-      const syncTpBtn = () => {
-        tpBtn.textContent = "Teleport mode: " + (tpMode ? "ON" : "OFF");
-        tpBtn.classList.toggle("active", tpMode);
-      };
-      tpBtn.onclick = () => {
-        tpMode = !tpMode;
-        syncTpBtn();
-      };
-      syncTpBtn();
+      const tpSwitch = el.querySelector("#gm-tp-mode");
+      tpSwitch.checked = tpMode;
+      tpSwitch.addEventListener("change", () => {
+        tpMode = tpSwitch.checked;
+      });
       const deskBtn = el.querySelector("#gm-tp-desk");
       deskBtn.onclick = () => {
         if (!tpToDesk()) flash(deskBtn, "No desk assigned");

@@ -166,30 +166,33 @@ window.__gatherMods.define("constructions", (ctx) => {
     if (!root?.isConnected) return;
     const $ = (sel) => root.querySelector(sel);
     const selecting = pick.current() === "construct";
-    $("#gm-construct-new").textContent = selecting ? "Cancel new construction" : "New construction";
-    $("#gm-construct-new").classList.toggle("active", selecting);
+    const newBtn = $("#gm-construct-new");
+    newBtn.innerHTML = selecting
+      ? '<i class="gm-i" data-i="x"></i>Cancel'
+      : '<i class="gm-i" data-i="plus"></i>New';
+    newBtn.classList.toggle("is-on", selecting);
     $("#gm-construct-save-row").style.display = selecting ? "" : "none";
     const current = pick.current() === "stamp" && stamped();
-    $("#gm-construct-status").textContent = selecting
+    const status = $("#gm-construct-status");
+    status.textContent = selecting
       ? `${state.selected.length} selected, click or drag on the map`
       : current
         ? `Click on the map to place "${current.name}" (Esc to cancel)${jobs.queuedSuffix("constructions")}`
         : jobs.busy("constructions")
           ? state.status + jobs.queuedSuffix("constructions")
           : state.status;
+    status.parentElement.classList.toggle("gm-err", /failed/i.test(status.textContent));
     root.querySelectorAll("#gm-constructions .gm-item").forEach((row) => {
       row.classList.toggle(
-        "active",
+        "is-on",
         pick.current() === "stamp" && +row.dataset.idx === state.stampIndex,
       );
     });
     const undo = $("#gm-construct-undo");
     const [last] = placements.list("construction");
     undo.style.display = last ? "" : "none";
-    if (last) {
-      undo.textContent = `↶ Delete last: "${last.name}"`;
-      undo.title = "Delete the objects of the last construction you placed on this map";
-    }
+    if (last)
+      undo.title = `Delete the objects of "${last.name}", the last construction you placed on this map`;
   }
 
   function renderList() {
@@ -202,7 +205,7 @@ window.__gatherMods.define("constructions", (ctx) => {
       getConstructions()
         .map(
           (p, i) =>
-            `<div class="gm-item" data-idx="${i}" title="${summary(p)}"><span class="gm-name">${escapeHtml(p.name)}</span><span class="gm-actions">${hub ? `<span class="gm-pub" data-pub="${i}" title="Publish to the community hub">⇪</span>` : ""}<span class="gm-del" data-del="${i}">✕</span></span></div>`,
+            `<div class="gm-item" data-idx="${i}" title="${summary(p)}"><i class="gm-i" data-i="boxes"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(p.name)}</span></div><span class="gm-tail hide-on-hover">${p.items.length} objects</span><div class="gm-actions">${hub ? `<button class="gm-iconbtn gm-pub" data-pub="${i}" title="Publish to the community hub"><i class="gm-i" data-i="upload"></i></button>` : ""}<button class="gm-iconbtn gm-danger gm-construct-del" data-del="${i}" title="Delete"><i class="gm-i" data-i="trash-2"></i></button></div></div>`,
         )
         .join("") || '<div class="gm-empty">No saved constructions</div>';
     list.querySelectorAll(".gm-item").forEach((row) => {
@@ -216,7 +219,7 @@ window.__gatherMods.define("constructions", (ctx) => {
       );
       row.onclick = () => startStamp(+row.dataset.idx);
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll(".gm-construct-del").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         pick.stop("stamp");
@@ -252,14 +255,24 @@ window.__gatherMods.define("constructions", (ctx) => {
   placements.onChange(render);
   ctx.section({
     title: "Constructions",
+    status: () =>
+      pick.current() === "stamp"
+        ? "Placing"
+        : pick.current() === "construct"
+          ? "Selecting"
+          : jobs.busy("constructions")
+            ? "Working"
+            : null,
     html: `
-      <button class="gm-btn" id="gm-construct-new" title="Click objects, or drag a box around them, to select them (objects on them come along), then name and save. Esc to cancel.">New construction</button>
-      <div class="gm-row" id="gm-construct-save-row">
-        <input class="gm-input" id="gm-construct-name" placeholder="Name this construction..." />
-        <button class="gm-btn" id="gm-construct-save">Save</button>
+      <div class="gm-btn-row">
+        <button class="gm-btn" id="gm-construct-new" title="Click objects, or drag a box around them, to select them (objects on them come along), then name and save. Esc to cancel."><i class="gm-i" data-i="plus"></i>New</button>
+        <button class="gm-btn" id="gm-construct-undo"><i class="gm-i" data-i="undo-2"></i>Remove last</button>
       </div>
-      <div class="gm-status"><span id="gm-construct-status"></span></div>
-      <button class="gm-btn" id="gm-construct-undo"></button>
+      <div class="gm-field" id="gm-construct-save-row">
+        <input class="gm-input" id="gm-construct-name" placeholder="Name this construction" />
+        <button class="gm-btn gm-primary gm-sm" id="gm-construct-save">Save</button>
+      </div>
+      <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-construct-status"></span></div>
       <div class="gm-list" id="gm-constructions"></div>`,
     mount(el) {
       root = el;

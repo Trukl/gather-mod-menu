@@ -239,52 +239,64 @@ window.__gatherMods.define("build", (ctx) => {
   function render() {
     if (!root?.isConnected) return;
     const $ = (sel) => root.querySelector(sel);
-    const freeBtn = $("#gm-free-placement");
-    freeBtn.textContent = "Free placement: " + (freePlacement ? "ON (Cmd to snap)" : "OFF");
-    freeBtn.classList.toggle("active", freePlacement);
+    // A note shows while it has text or a visible link.
+    const showNote = (sel, text, links) => {
+      const status = $(sel);
+      status.textContent = text;
+      for (const [link, shown] of links) link.style.display = shown ? "" : "none";
+      status.closest(".gm-note").style.display =
+        text || links.some(([, shown]) => shown) ? "" : "none";
+    };
+    $("#gm-free-placement").checked = freePlacement;
 
     const placing = pick.current() === "place";
-    $("#gm-place-on").textContent = placing ? "Cancel place on…" : "Place on…";
-    $("#gm-place-on").classList.toggle("active", placing);
-    const status = $("#gm-place-status");
+    $("#gm-place-on").classList.toggle("is-on", placing);
     const action = $("#gm-place-action");
     const support = place.supportId && GD().Repos.MapObject.get(place.supportId);
+    let placeText;
     if (placing && place.step === "objects") {
-      status.textContent = `${place.selected.length} selected, click or drag on the map`;
+      placeText = `${place.selected.length} selected, click or drag on the map`;
       action.textContent = "Next: pick support";
-      action.style.display = place.selected.length ? "" : "none";
     } else if (placing) {
-      status.textContent = support
+      placeText = support
         ? `Support: ${map.objectName(support)}`
         : "Click the object to put them on";
       action.textContent = "Place here";
-      action.style.display = support ? "" : "none";
     } else {
-      status.textContent = jobs.busy("place-on")
-        ? "Placing…" + jobs.queuedSuffix("place-on")
-        : place.status;
-      action.style.display = "none";
+      placeText = jobs.busy("place-on") ? "Placing…" + jobs.queuedSuffix("place-on") : place.status;
     }
+    showNote("#gm-place-status", placeText, [
+      [action, placing && (place.step === "objects" ? place.selected.length : support)],
+      [$("#gm-place-cancel"), placing],
+    ]);
+
     const showingLinks = pick.current() === "links";
-    $("#gm-links").textContent = showingLinks ? "Hide linked objects" : "Show linked objects…";
-    $("#gm-links").classList.toggle("active", showingLinks);
-    $("#gm-links-status").textContent = showingLinks ? linksStatus() : "";
+    $("#gm-links").classList.toggle("is-on", showingLinks);
+    showNote("#gm-links-status", showingLinks ? linksStatus() : "", [
+      [$("#gm-links-cancel"), showingLinks],
+    ]);
 
     const deleting = pick.current() === "bulk-delete";
     const count = deleting ? map.liveObjects(bulk.selected).length : 0;
-    $("#gm-bulk-delete").textContent = deleting ? "Cancel bulk delete" : "Bulk delete…";
-    $("#gm-bulk-delete").classList.toggle("active", deleting);
-    $("#gm-bulk-status").textContent = deleting
-      ? `${count} selected, click or drag on the map${jobs.queuedSuffix("bulk-delete")}`
-      : jobs.busy("bulk-delete")
-        ? "Deleting…" + jobs.queuedSuffix("bulk-delete")
-        : bulk.status;
+    $("#gm-bulk-delete").classList.toggle("is-on", deleting);
     $("#gm-bulk-action").textContent = `Delete ${count}`;
-    $("#gm-bulk-action").style.display = deleting && count ? "" : "none";
+    showNote(
+      "#gm-bulk-status",
+      deleting
+        ? `${count} selected, click or drag on the map${jobs.queuedSuffix("bulk-delete")}`
+        : jobs.busy("bulk-delete")
+          ? "Deleting…" + jobs.queuedSuffix("bulk-delete")
+          : bulk.status,
+      [
+        [$("#gm-bulk-action"), deleting && count],
+        [$("#gm-bulk-cancel"), deleting],
+      ],
+    );
   }
   pick.onChange(render);
   jobs.onChange(render);
 
+  const TOOL_STATUS = { place: "Place on", links: "Links", "bulk-delete": "Bulk delete" };
   ctx.section({
     title: "Build",
     parts: [
@@ -292,36 +304,47 @@ window.__gatherMods.define("build", (ctx) => {
       { id: "place-on", label: "Place on…" },
       { id: "bulk-delete", label: "Bulk delete" },
     ],
+    status: () => TOOL_STATUS[pick.current()] ?? (freePlacement ? "On" : null),
     html: `
-      <button class="gm-btn" id="gm-free-placement" data-part="free" title="Build tool: objects no longer snap to tiles. Hold Cmd to snap.">Free placement: OFF</button>
+      <label class="gm-toggle" data-part="free" title="Build tool: objects no longer snap to tiles. Hold Cmd to snap.">
+        <span class="gm-toggle-text"><span class="gm-toggle-title">Free placement</span><span class="gm-hint">Nothing snaps to tiles · hold ⌘ to snap</span></span>
+        <input type="checkbox" class="gm-switch" id="gm-free-placement" />
+      </label>
       <div data-part="place-on">
-        <button class="gm-btn" id="gm-place-on" title="Select objects (click, or drag a box), then the object to put them on (works on any object). Esc to cancel.">Place on…</button>
-        <div class="gm-status"><span id="gm-place-status"></span><span class="gm-link" id="gm-place-action"></span></div>
-        <button class="gm-btn" id="gm-links" title="Outline what sits on what (Place on…, tables, shelves): supports in green, objects on them in cyan. Click an object to see only its group. Esc to close.">Show linked objects…</button>
-        <div class="gm-status"><span id="gm-links-status"></span></div>
+        <button class="gm-btn gm-block" id="gm-place-on" title="Select objects (click, or drag a box), then the object to put them on (works on any object). Esc to cancel."><i class="gm-i" data-i="layers"></i>Place on…</button>
+        <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span class="gm-build-msg"><span id="gm-place-status"></span><span class="gm-link" id="gm-place-action"></span><span class="gm-link" id="gm-place-cancel">Cancel</span></span></div>
+        <button class="gm-btn gm-block" id="gm-links" title="Outline what sits on what (Place on…, tables, shelves): supports in green, objects on them in cyan. Click an object to see only its group. Esc to close."><i class="gm-i" data-i="link-2"></i>Show linked objects</button>
+        <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span class="gm-build-msg"><span id="gm-links-status"></span><span class="gm-link" id="gm-links-cancel">Hide</span></span></div>
       </div>
       <div data-part="bulk-delete">
-        <button class="gm-btn" id="gm-bulk-delete" title="Select objects (click, or drag a box), then delete them all. Esc to cancel.">Bulk delete…</button>
-        <div class="gm-status"><span id="gm-bulk-status"></span><span class="gm-link" id="gm-bulk-action"></span></div>
+        <button class="gm-btn gm-block" id="gm-bulk-delete" title="Select objects (click, or drag a box), then delete them all. Esc to cancel."><i class="gm-i" data-i="trash-2"></i>Bulk delete…</button>
+        <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span class="gm-build-msg"><span id="gm-bulk-status"></span><span class="gm-link gm-danger" id="gm-bulk-action"></span><span class="gm-link" id="gm-bulk-cancel">Cancel</span></span></div>
       </div>`,
     mount(el) {
       root = el;
-      el.querySelector("#gm-free-placement").onclick = () => {
-        freePlacement = !freePlacement;
+      el.querySelector("#gm-free-placement").onchange = (e) => {
+        freePlacement = e.target.checked;
         localStorage.setItem(FREE_PLACEMENT_KEY, freePlacement);
         render();
       };
       el.querySelector("#gm-place-on").onclick = () =>
         pick.current() === "place" ? pick.stop("place") : pick.start(placeSession);
       el.querySelector("#gm-place-action").onclick = advancePlaceOn;
+      el.querySelector("#gm-place-cancel").onclick = () => pick.stop("place");
       el.querySelector("#gm-links").onclick = () =>
         pick.current() === "links" ? pick.stop("links") : pick.start(linksSession);
+      el.querySelector("#gm-links-cancel").onclick = () => pick.stop("links");
       el.querySelector("#gm-bulk-delete").onclick = () =>
         pick.current() === "bulk-delete" ? pick.stop("bulk-delete") : pick.start(bulkSession);
       el.querySelector("#gm-bulk-action").onclick = deleteBulkSelection;
+      el.querySelector("#gm-bulk-cancel").onclick = () => pick.stop("bulk-delete");
       render();
     },
   });
+  ctx.style(`
+    #gather-mods-panel .gm-build-msg { display:flex; flex-wrap:wrap; column-gap:6px; }
+    #gather-mods-panel .gm-build-msg > :empty { display:none; }
+  `);
 
   return { freePlacement: () => freePlacement };
 });

@@ -90,11 +90,11 @@ Shared code lives in internal libraries (map helpers, map picking, previews, pla
 **Animations** make map objects move, in sync for everyone on the map who has this module.
 
 - **Animation studio**: a floating window. Select objects, then click points on the map: each point is a step, drawn as a dashed path with numbered points you can drag.
-- **Each step** has a shape (line, wave, arc, orbit around a point, or your own `x(t)` and `y(t)` formulas), an easing (smooth, overshoot, bounce, elastic, or your own `f(t)`), a duration, a pause and a turn. ↑ ↓ reorder steps, ⧉ duplicates one.
+- **Each step** has a shape (line, wave, arc, orbit around a point, or your own `x(t)` and `y(t)` formulas), an easing (smooth, overshoot, bounce, elastic, or your own `f(t)`), a duration, a pause and a turn. The arrow buttons reorder steps, the copy button duplicates one.
 - **Block or each**: the selection moves as one block, turning as one piece around its center, or each object on its own, one after the other with a stagger.
 - **At the end** the path loops, plays back (ping-pong) or stops. Preview with play, pause and a timeline, then save.
-- **Your animations**: click one to start or stop it for everyone, ✎ to edit it in the studio (the preview replaces it until you save).
-- **Others' animations** are listed with their author: “Hide” stops showing one on your screen only.
+- **Your animations**: click one to start or stop it for everyone; the pencil (on hover) edits it in the studio (the preview replaces it until you save).
+- **Others' animations** are listed with their author: the eye button hides one on your screen only.
 
 Animations are stored on the community hub and refreshed every minute. Nothing is sent to Gather's server: objects only move on screen, and the map is redrawn at 30 fps at most while one runs.
 
@@ -132,15 +132,15 @@ Save and apply outfits, with built-in “No outfit” and “Invisible” (bowti
 - Save and apply your desk decoration: only differing objects are removed or added.
 - Pick which objects belong to your desk.
 - Hover a preset to preview it, click to apply it; picking another one while a desk is being applied stops it and applies the new one.
-- “↩ Previous desk” goes back to the automatic backup.
+- “Previous desk” goes back to the automatic backup.
 
 ![Desks](docs/media/desk-presets.gif)
 
 ### Constructions
 
-- **New construction**: select objects (what sits on them comes along), name it, save.
+- **New**: select objects (what sits on them comes along), name it, save.
 - **Place it**: click it, a ghost follows the pointer, click on the map (snapped to tiles unless free placement is on; Esc to cancel).
-- **“↶ Delete last”** removes the objects of the last construction placed on this map (the recording shows its former name, “↶ Undo”).
+- **Remove last** removes the objects of the last construction placed on this map.
 
 ![Constructions](docs/media/constructions.gif)
 
@@ -154,7 +154,7 @@ Export and import the presets of your installed modules as JSON.
 
 ### Community hub
 
-Browse, preview, add and publish outfits, desks and constructions shared by others: one tab per installed preset module, with search.
+Browse, preview, add and publish outfits, desks and constructions shared by others: one switch per installed preset type, with search.
 
 ![Community hub](docs/media/community-hub.gif)
 
@@ -162,13 +162,13 @@ Browse, preview, add and publish outfits, desks and constructions shared by othe
 
 Your own images on the map, since Gather V2 cannot add custom objects. Everyone on the map who has this module sees them.
 
-- **New image…**: an https image URL or an upload (png/jpeg/gif/webp, 512 KB max, stored on the community hub), dropped where you click (it follows the pointer). Set its width and height in tiles, its layer (floor: under everyone; sorted: avatars standing above its base line pass behind it, below it in front; above everything), opacity and collision (the tiles from the base line down block avatars).
-- **Restyle an object…**: an image drawn over a real object, which keeps its collision and seats, and follows it when it is animated.
-- **＋** places copies like a Gather object: the ghost follows the pointer and every click places one more (for a restyle, every clicked object gets the image). Esc to stop.
-- **Plane**: “▼ Back” and “▲ Front” move the image behind or in front of the objects it overlaps, one at a time (the object it is set against is outlined in green); “Reset” goes back to its layer, or to the restyled object's plane.
+- **New image**: an https image URL or an upload (png/jpeg/gif/webp, 512 KB max, stored on the community hub), dropped where you click (it follows the pointer). Set its width and height in tiles, its layer (floor: under everyone; sorted: avatars standing above its base line pass behind it, below it in front; above everything), opacity and collision (the tiles from the base line down block avatars).
+- **Restyle**: an image drawn over a real object, which keeps its collision and seats, and follows it when it is animated.
+- **The copy button** places copies like a Gather object: the ghost follows the pointer and every click places one more (for a restyle, every clicked object gets the image). Esc to stop.
+- **Plane**: “Back” and “Front” move the image behind or in front of the objects it overlaps, one at a time (the object it is set against is outlined in green); “Reset” goes back to its layer, or to the restyled object's plane.
 - **Animated GIFs** (and animated WebP or PNG) play on the map, in sync for everyone, for images and restyles alike.
 - Placed images behave like map objects: Fun animates them and Bulk delete deletes them. They are hidden in Gather's simplified view, like the map's own objects.
-- **Your images** are listed: hover one to see it outlined in red on the map, ✎ to edit, ✕ to delete.
+- **Your images** are listed: hover one to see it outlined in red on the map; the pencil and trash buttons (on hover) edit or delete it.
 
 Nothing is sent to Gather's server: people without the module see the map as it is, and collisions only stop the avatars of people who have it.
 
@@ -203,25 +203,25 @@ Nothing is sent to Gather's server: people without the module see the map as it 
 
 **Install only what you want** from ⚙ Settings; “What's new” lists the changelogs.
 
-![Modules](docs/media/modules.gif)
+![The Mods panel and its windows, light and dark](docs/media/ui-redesign.gif)
 
-- **Selecting objects on the map** (Place on…, Bulk delete…, Pick desk objects, New construction, New animation, Restyle an object…): click to add or remove an object, or drag a box to toggle every object fully inside it (unselected ones are added, selected ones removed). Scroll to cycle through stacked objects, Esc to cancel.
+- **Selecting objects on the map** (Place on…, Bulk delete…, Pick desk objects, a new construction or animation, Restyle): click to add or remove an object, or drag a box to toggle every object fully inside it (unselected ones are added, selected ones removed). Scroll to cycle through stacked objects, Esc to cancel.
 - **Map edits never make you wait**: placing constructions, Place on…, bulk delete and deletions from Placed objects are queued and run one after the other, in click order (the status shows how many are queued).
-- Every preset shows a preview on hover, and the light/dark theme follows Gather. Click a section title to fold it; the panel scrolls past 60% of the screen height.
+- Every preset shows a preview on hover, and the light/dark theme follows Gather. Click a section title to fold it: a folded section shows what is running (“On”, “Picking”, “2 playing”…). The panel scrolls past 60% of the screen height.
 
 ### Settings
 
 Open them with ⚙ in the panel header. A dot there means updates or new modules are available.
 
-- **Modules**: install or uninstall each module (uninstalling keeps its data). Every module has a **Changelog** link, installed or not. Turning on a module you don't have asks first, with its version, latest changes and the libraries it brings. Modules with several features (Teleport, Fun, Build) list them under their row: click one to hide it from the panel and turn it off (e.g. Flee mode). Modules published after you last opened the settings show a green **New** badge; they are never installed automatically. A module being uninstalled, or no longer published (**Removed** badge, with an **Uninstall** button), is shown in red.
-- **What's new**: updates not installed yet and the latest version of modules you don't have (green), and the changes of the last update installed for each module, in Gather's accent color (“installed”) until its next update. “Show full history” unfolds every other changelog entry. Changes starting with `Removed:` are shown in red.
+- **Modules**: install or uninstall each module (uninstalling keeps its data). Every module has a **Changelog** link, installed or not. Turning on a module you don't have asks first, with its version, latest changes and the libraries it brings. Modules with several features (Teleport, Fun, Build) list them as chips under their row: click one to hide it from the panel and turn it off (e.g. Flee mode). Modules published after you last opened the settings show a **New** badge; they are never installed automatically. A module being uninstalled, or no longer published (**Removed** badge, with an **Uninstall** button), is shown in red.
+- **What's new**: updates not installed yet (“Update available”), the latest version of modules you don't have (“Not installed”), and the changes of the last update installed for each module (“Installed”) until its next update; the tab counts them. “Show full history” unfolds every other changelog entry. Changes starting with `Removed:` are shown in red.
 - **Updates**: launcher status, last check, latest release (commit and date), pending updates, automatic updates on/off, “Check now” and “Review & install”, which shows each module's changelog next to the exact code diff before installing.
 
 ### News, required updates and announcements
 
 - **Mod news**: important changes (a breaking change, something to redo) open a “Mod news” window once, when you open Gather or when an update brings them: for installed modules, and for their pending updates (with “Review & install”). They also stand out in the changelogs. A fresh install starts with every past news item marked as read.
 - **Required updates**: a changelog entry marked `"breaking": true` is the minimum version of its module. Below it, the module stays off and an “Update required” window, which only closes through its buttons, offers to update it now (launcher) or to disable it, with the modules that depend on it. When the core itself is outdated, the whole mod stays off until you update it or turn it off for this session. The hub also knows these minimum versions: mods from Core 1.4.0 send their running versions with every hub request, and the hub answers `426` with the breaking changes they miss, which opens the same window (even without the launcher, whose catalog is the one of the pasted bundle).
-- **Announcements**: the author can send a message to every user (maintenance, incident, new feature) from the community hub (`npm run announce` in [gather-mod-hub](https://github.com/Trukl/gather-mod-hub#announcements)). The core checks every 10 minutes: a new announcement opens a window once, and active ones stay at the top of the Mods panel until they expire (click one to read it again).
+- **Announcements**: the author can send a message to every user (maintenance, incident, new feature) from the community hub (`npm run announce` in [gather-mod-hub](https://github.com/Trukl/gather-mod-hub#announcements)). The core checks every 10 minutes: a new announcement opens a window once, and active ones show as a card at the top of the Mods panel until they expire (click it to read them again, one after the other).
 
 <details>
 <summary>Recordings</summary>
@@ -257,7 +257,9 @@ updates/                  Cloudflare worker: GET /catalog, GET /modules/:hash, P
 docs/media/               README recordings
 ```
 
-A module is a file that calls `window.__gatherMods.define(id, (ctx) => { … })`. `ctx` gives engine helpers, `ctx.section({ title, html, mount })` for its panel section, `ctx.use(id)` for libraries and other modules, `ctx.onCleanup` for uninstall, and `ctx.registerPresetType` to plug presets into Share and the hub. Modules are listed in `modules.json` in load order (core first, dependencies before dependents); `requires` maps each dependency to its minimum version.
+A module is a file that calls `window.__gatherMods.define(id, (ctx) => { … })`. `ctx` gives engine helpers, `ctx.section({ title, html, mount, status })` for its panel section (`status()` returns a short text such as “On”, shown while the section is folded), `ctx.use(id)` for libraries and other modules, `ctx.onCleanup` for uninstall, and `ctx.registerPresetType` to plug presets into Share and the hub. Modules are listed in `modules.json` in load order (core first, dependencies before dependents); `requires` maps each dependency to its minimum version, and `icon` names the [Lucide](https://lucide.dev/icons) icon of the module in the panel and the settings.
+
+The core ships the UI kit, so the mod looks like Gather: elements a module adds to the page call `ctx.applyTheme(el)` (light or dark tokens `--gm-*`), use its classes (`gm-btn`, `gm-toggle` with a `gm-switch`, `gm-field`, `gm-seg`, `gm-list` / `gm-item`, `gm-note`, `gm-window`…), and draw icons with `<i class="gm-i" data-i="name"></i>`. The icons are Lucide paths listed in `src/core.js`; add the ones a new module needs there.
 
 The community hub (presets, animations and custom objects API) lives in a separate repo, [gather-mod-hub](https://github.com/Trukl/gather-mod-hub).
 

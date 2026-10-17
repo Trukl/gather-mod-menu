@@ -11,10 +11,16 @@ window.__gatherMods.define("hub", (ctx) => {
 
   const isModalOpen = () => !!document.getElementById("gm-hub-grid");
   const presetType = () => ctx.presetType(hub.type);
-  function setStatus(text) {
+  const STATUS_ICONS = { ok: "circle-check", err: "circle-alert" };
+  function setStatus(text, tone) {
     for (const id of ["gm-hub-status", "gm-modal-status"]) {
       const el = document.getElementById(id);
-      if (el) el.textContent = text;
+      if (!el) continue;
+      el.textContent = text;
+      const note = el.parentElement;
+      note.classList.toggle("gm-ok", tone === "ok");
+      note.classList.toggle("gm-err", tone === "err");
+      note.querySelector(".gm-i").dataset.i = STATUS_ICONS[tone] ?? "info";
     }
   }
 
@@ -41,7 +47,7 @@ window.__gatherMods.define("hub", (ctx) => {
       setStatus(hub.items.length ? "" : "Nothing here yet");
     } catch (e) {
       hub.items = [];
-      setStatus("Hub error: " + e.message);
+      setStatus("Hub error: " + e.message, "err");
     }
     renderGrid();
   }
@@ -50,11 +56,9 @@ window.__gatherMods.define("hub", (ctx) => {
   function addFromHub(id) {
     const item = hub.items.find((i) => i.id === id);
     if (!item) return;
-    setStatus(
-      ctx.addPresets(item.type, [item.data])
-        ? `Added "${item.name}" to my ${item.type}s`
-        : `"${item.name}" is already in my ${item.type}s`,
-    );
+    if (ctx.addPresets(item.type, [item.data]))
+      setStatus(`Added "${item.name}" to my ${item.type}s`, "ok");
+    else setStatus(`"${item.name}" is already in my ${item.type}s`);
   }
   async function publish(type, preset) {
     setStatus("Publishing…");
@@ -65,19 +69,19 @@ window.__gatherMods.define("hub", (ctx) => {
         body: JSON.stringify({ author: me().name, data: preset }),
       });
       if (hub.type === type) await refresh();
-      setStatus(`Published "${preset.name}"`);
+      setStatus(`Published "${preset.name}"`, "ok");
     } catch (e) {
-      setStatus("Publish failed: " + e.message);
+      setStatus("Publish failed: " + e.message, "err");
     }
   }
   async function remove(type, id) {
     try {
       await api.request(`/presets/${type}/${id}`, { method: "DELETE" });
       hub.items = hub.items.filter((i) => i.id !== id);
-      setStatus("Deleted from the hub");
+      setStatus("Deleted from the hub", "ok");
       renderGrid();
     } catch (e) {
-      setStatus("Delete failed: " + e.message);
+      setStatus("Delete failed: " + e.message, "err");
     }
   }
 
@@ -88,12 +92,16 @@ window.__gatherMods.define("hub", (ctx) => {
     grid.innerHTML = hub.items
       .map((p) => {
         const id = escapeHtml(p.id);
-        const del = p.mine ? `<button class="gm-btn" data-hdel="${id}">Delete</button>` : "";
-        return `<div class="gm-card" title="${escapeHtml(p.summary)}">
+        const del = p.mine
+          ? `<button class="gm-btn gm-sm gm-ghost gm-danger" data-hdel="${id}"><i class="gm-i sm" data-i="trash-2"></i>Delete</button>`
+          : "";
+        return `<div class="gm-hub-card" title="${escapeHtml(p.summary)}">
           <div class="gm-preview">${type.preview(p.data)}</div>
-          <div class="gm-card-name">${escapeHtml(p.name)}</div>
-          <div class="gm-card-author">by ${escapeHtml(p.author)}</div>
-          <div class="gm-card-actions"><button class="gm-btn" data-add="${id}">Add</button>${del}</div>
+          <div class="gm-hub-card-text">
+            <div class="gm-hub-card-name">${escapeHtml(p.name)}</div>
+            <div class="gm-hub-card-meta">by ${escapeHtml(p.author)}</div>
+          </div>
+          <div class="gm-hub-card-actions"><button class="gm-btn gm-sm gm-primary" data-add="${id}"><i class="gm-i sm" data-i="plus"></i>Add</button>${del}</div>
         </div>`;
       })
       .join("");
@@ -117,17 +125,21 @@ window.__gatherMods.define("hub", (ctx) => {
     const modal = ctx.openModal(
       "Community hub",
       `
-      <div class="gm-toolbar">
-        ${types.map((t) => `<button class="gm-btn" data-hub-type="${t.type}">${escapeHtml(t.label)}</button>`).join("")}
-        <input class="gm-input" id="gm-hub-search" placeholder="Search by name, author or item..." />
-      </div>
-      <div class="gm-grid" id="gm-hub-grid"></div>
-      <div class="gm-status"><span id="gm-modal-status"></span><span class="gm-link" id="gm-hub-refresh">Refresh</span></div>`,
+      <div class="gm-window-body">
+        <div class="gm-hub-toolbar">
+          <div class="gm-field gm-hub-search"><i class="gm-i" data-i="search"></i><input class="gm-input" id="gm-hub-search" placeholder="Search by name, author or item" /></div>
+          ${types.length > 1 ? `<div class="gm-seg">${types.map((t) => `<button data-hub-type="${t.type}">${escapeHtml(t.label)}</button>`).join("")}</div>` : ""}
+          <button class="gm-iconbtn" id="gm-hub-refresh" title="Refresh"><i class="gm-i" data-i="refresh-cw"></i></button>
+        </div>
+        <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-modal-status"></span></div>
+        <div class="gm-hub-grid" id="gm-hub-grid"></div>
+      </div>`,
+      "gm-modal-hub",
     );
     const syncTabs = () =>
       modal
         .querySelectorAll("[data-hub-type]")
-        .forEach((b) => b.classList.toggle("active", b.dataset.hubType === hub.type));
+        .forEach((b) => b.classList.toggle("on", b.dataset.hubType === hub.type));
     modal.querySelectorAll("[data-hub-type]").forEach((b) => {
       b.onclick = () => {
         hub.type = b.dataset.hubType;
@@ -153,22 +165,28 @@ window.__gatherMods.define("hub", (ctx) => {
   ctx.section({
     title: "Community hub",
     html: `
-      <button class="gm-btn" id="gm-hub-open">Browse community presets</button>
-      <div class="gm-status"><span id="gm-hub-status"></span></div>`,
+      <button class="gm-btn gm-block" id="gm-hub-open"><i class="gm-i" data-i="globe"></i>Browse community presets</button>
+      <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-hub-status"></span></div>`,
     mount(el) {
       el.querySelector("#gm-hub-open").onclick = openHubModal;
     },
   });
   ctx.style(`
-    #gather-mods-modal .gm-toolbar { display:flex; gap:6px; align-items:center; }
-    #gather-mods-modal .gm-toolbar button.gm-btn { width:auto; text-align:center; padding:7px 14px; margin:0; }
-    #gather-mods-modal .gm-toolbar .gm-input { flex:1; margin:0; }
-    #gather-mods-modal .gm-grid { flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:10px; align-content:start; }
-    #gather-mods-modal .gm-card { display:flex; flex-direction:column; gap:4px; padding:8px; background:var(--gm-surface); border-radius:10px; }
-    #gather-mods-modal .gm-card-name { font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
-    #gather-mods-modal .gm-card-author { font-size:11px; color:var(--gm-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #gather-mods-modal .gm-card-actions { display:flex; gap:6px; margin-top:4px; }
-    #gather-mods-modal .gm-card-actions button.gm-btn { flex:1; text-align:center; padding:5px; margin:0; }
+    #gather-mods-modal .gm-modal-hub { width:min(900px, 92vw); height:min(680px, 86vh); }
+    #gather-mods-modal .gm-modal-hub .gm-window-body { flex:1; min-height:0; overflow:hidden; }
+    #gather-mods-modal .gm-hub-toolbar { display:flex; gap:8px; align-items:center; }
+    #gather-mods-modal .gm-hub-search { flex:1; min-width:0; }
+    #gather-mods-modal .gm-hub-search .gm-input { width:100%; }
+    #gather-mods-modal .gm-hub-toolbar .gm-seg { flex-shrink:0; }
+    #gather-mods-modal .gm-hub-grid { flex:1; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(168px, 1fr));
+      gap:12px; align-content:start; }
+    #gather-mods-modal .gm-hub-card { display:flex; flex-direction:column; gap:8px; padding:8px; border:1px solid var(--gm-line); border-radius:12px;
+      background:var(--gm-surface); }
+    #gather-mods-modal .gm-hub-card-text { display:flex; flex-direction:column; gap:1px; min-width:0; padding:0 2px; }
+    #gather-mods-modal .gm-hub-card-name { font-size:13px; font-weight:600; color:var(--gm-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #gather-mods-modal .gm-hub-card-meta { font-size:11.5px; color:var(--gm-text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #gather-mods-modal .gm-hub-card-actions { display:flex; gap:6px; }
+    #gather-mods-modal .gm-hub-card-actions .gm-btn { flex:1; }
   `);
 
   return { publish };

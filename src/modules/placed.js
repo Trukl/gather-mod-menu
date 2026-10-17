@@ -13,9 +13,15 @@ window.__gatherMods.define("placed", (ctx) => {
   const describe = (e) => {
     const count = placements.liveIds(e).length;
     const time = e.at
-      ? new Date(e.at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })
+      ? new Date(e.at).toLocaleString([], {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
       : "";
-    return `${e.source} · ${count} object${count > 1 ? "s" : ""}${time ? " · " + time : ""}`;
+    const kind = e.source.charAt(0).toUpperCase() + e.source.slice(1);
+    return `${kind} · ${count} object${count > 1 ? "s" : ""}${time ? " · " + time : ""}`;
   };
 
   function drawHighlight(entries) {
@@ -81,17 +87,19 @@ window.__gatherMods.define("placed", (ctx) => {
     const entries = placements.list();
     const last = root.querySelector("#gm-placed-last");
     last.style.display = entries.length ? "" : "none";
-    if (entries.length) last.textContent = `↶ Delete last: "${entries[0].name}"`;
+    if (entries.length)
+      last.innerHTML = `<i class="gm-i" data-i="undo-2"></i><span>Remove last: ${escapeHtml(entries[0].name)}</span>`;
     root.querySelector("#gm-placed-status").textContent =
       state.status + (jobs.busy("placed") ? jobs.queuedSuffix("placed") : "");
-    const all = root.querySelector("#gm-placed-all");
-    all.style.display = entries.length > 1 && !state.confirmAll ? "" : "none";
+    root.querySelector("#gm-placed-head").style.display = entries.length ? "" : "none";
+    root.querySelector("#gm-placed-all").style.display =
+      entries.length > 1 && !state.confirmAll ? "" : "none";
     const confirmBox = root.querySelector("#gm-placed-confirm");
     if (state.confirmAll && !entries.length) state.confirmAll = false;
     confirmBox.style.display = state.confirmAll ? "" : "none";
     if (state.confirmAll) {
       const count = entries.reduce((n, e) => n + placements.liveIds(e).length, 0);
-      confirmBox.querySelector("span").textContent =
+      confirmBox.querySelector(".gm-confirm-text").textContent =
         `Delete the ${count} objects outlined in red (${entries.length} placements, listed below)?`;
       confirmBox.querySelector("#gm-placed-confirm-yes").textContent = `Delete ${count}`;
     }
@@ -100,7 +108,7 @@ window.__gatherMods.define("placed", (ctx) => {
       ? entries
           .map(
             (e, i) =>
-              `<div class="gm-item" data-idx="${i}" title="Hover to see the objects on the map"><span class="gm-placed-text"><span class="gm-name">${escapeHtml(e.name)}</span><span class="gm-placed-meta">${escapeHtml(describe(e))}</span></span><span class="gm-del" data-del="${i}" title="Delete these objects">✕</span></div>`,
+              `<div class="gm-item" data-idx="${i}" title="Hover to see the objects on the map"><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(e.name)}</span><span class="gm-item-meta">${escapeHtml(describe(e))}</span></div><div class="gm-actions"><button class="gm-iconbtn gm-danger" data-del="${i}" title="Delete these objects"><i class="gm-i" data-i="trash-2"></i></button></div></div>`,
           )
           .join("")
       : '<div class="gm-empty">Nothing placed with the mod on this map</div>';
@@ -109,7 +117,7 @@ window.__gatherMods.define("placed", (ctx) => {
       row.addEventListener("mouseenter", () => hover(keyOf(entry)));
       row.addEventListener("mouseleave", () => hover(null));
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll("[data-del]").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const entry = entries[+d.dataset.del];
@@ -127,11 +135,12 @@ window.__gatherMods.define("placed", (ctx) => {
   ctx.section({
     title: "Placed objects",
     html: `
-      <button class="gm-btn" id="gm-placed-last" title="Delete the objects of the last placement made with the mod on this map"></button>
-      <div class="gm-status"><span id="gm-placed-status"></span><span class="gm-link" id="gm-placed-all" title="Outline everything that would be deleted, then confirm">Delete all…</span></div>
-      <div class="gm-placed-confirm" id="gm-placed-confirm"><span></span>
-        <div class="gm-row"><button class="gm-btn" id="gm-placed-confirm-no">Cancel</button><button class="gm-btn gm-danger" id="gm-placed-confirm-yes"></button></div>
+      <button class="gm-btn gm-block" id="gm-placed-last" title="Delete the objects of the last placement made with the mod on this map"></button>
+      <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-placed-status"></span></div>
+      <div class="gm-card gm-confirm" id="gm-placed-confirm"><span class="gm-confirm-text"></span>
+        <div class="gm-btn-row"><button class="gm-btn gm-sm" id="gm-placed-confirm-no">Cancel</button><button class="gm-btn gm-sm gm-danger gm-solid" id="gm-placed-confirm-yes"></button></div>
       </div>
+      <div class="gm-sub" id="gm-placed-head">On this map<span class="gm-spacer"></span><span class="gm-link gm-danger" id="gm-placed-all" title="Outline everything that would be deleted, then confirm">Delete all…</span></div>
       <div class="gm-list" id="gm-placed-list"></div>`,
     mount(el) {
       root = el;
@@ -162,11 +171,4 @@ window.__gatherMods.define("placed", (ctx) => {
       render();
     },
   });
-  ctx.style(`
-    #gather-mods-panel .gm-placed-text { display:flex; flex-direction:column; min-width:0; }
-    #gather-mods-panel .gm-placed-meta { font-size:11px; color:var(--gm-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #gather-mods-panel .gm-placed-confirm { font-size:12px; color:var(--gm-fg); padding:6px 8px; margin:3px 0; border-radius:8px; background:rgba(255,59,48,.12); }
-    #gather-mods-panel .gm-placed-confirm .gm-row button.gm-btn { flex:1; text-align:center; }
-    #gather-mods-panel button.gm-btn.gm-danger { background:#ff3b30; color:#fff; }
-  `);
 });

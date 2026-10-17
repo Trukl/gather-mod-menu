@@ -6,9 +6,19 @@
       "name": "Core",
       "description": "Mods panel, settings, module manager and launcher bridge. Always installed.",
       "file": "src/core.js",
-      "version": "1.5.0",
+      "icon": "puzzle",
+      "version": "1.6.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.6.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: the Mods panel lists your modules with their icon, a badge on a folded section tells what is running (“On”, “2 playing”…), and announcements fit in one card.",
+            "Settings in three tabs (Modules, What's new, Updates); each module shows its icon, version, features and a switch.",
+            "Announcements, mod news and required updates open in a cleaner window; several announcements are read one after the other with “Next”."
+          ]
+        },
         {
           "version": "1.5.0",
           "date": "2026-10-14",
@@ -117,9 +127,16 @@
       "name": "Map picking",
       "description": "Shared object selection on the map (click, box, scroll to cycle).",
       "file": "src/lib/map-pick.js",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "requires": { "map": "1.3.0" },
       "changelog": [
+        {
+          "version": "1.3.0",
+          "date": "2026-10-17",
+          "changes": [
+            "Map tooltips look like Gather's (dark, with a 2/3 counter) and the box selection uses the space's accent color."
+          ]
+        },
         {
           "version": "1.2.0",
           "date": "2026-10-15",
@@ -151,9 +168,18 @@
       "name": "Previews",
       "description": "Shared outfit and object previews.",
       "file": "src/lib/previews.js",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "requires": {},
-      "changelog": [{ "version": "1.0.0", "date": "2026-10-08", "changes": ["Initial version."] }]
+      "changelog": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-17",
+          "changes": [
+            "Hover previews are a floating card that follows Gather's light or dark theme."
+          ]
+        },
+        { "version": "1.0.0", "date": "2026-10-08", "changes": ["Initial version."] }
+      ]
     },
     {
       "id": "placements",
@@ -233,9 +259,17 @@
       "name": "Teleport",
       "description": "Teleport mode (every “Go to” and double-click teleports), TP to your desk, TP to players and saved locations.",
       "file": "src/modules/teleport.js",
-      "version": "1.2.0",
+      "icon": "zap",
+      "version": "1.3.0",
       "requires": { "map": "1.2.0" },
       "changelog": [
+        {
+          "version": "1.3.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: Teleport mode is a switch, players have avatars, teleport and delete buttons appear on hover, and “On” shows on the folded section."
+          ]
+        },
         {
           "version": "1.2.0",
           "date": "2026-10-13",
@@ -265,9 +299,19 @@
       "name": "Fun",
       "description": "Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects follow a path of steps (lines, waves, arcs, orbits, formulas) with easings, pauses and turns, seen by everyone with this module.",
       "file": "src/modules/fun.js",
-      "version": "1.8.0",
+      "icon": "sparkles",
+      "version": "1.9.0",
       "requires": { "map": "1.3.0", "map-pick": "1.2.0", "hub-api": "1.1.0", "motion": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.9.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: avatars and a footprints button to flee, play/pause icons on your animations with edit and delete on hover, and an eye to hide or show the others' animations.",
+            "Cleaner animation studio: segmented choices, fields with units, step actions as icons, a round play button and Save at the bottom.",
+            "The folded section shows “Fleeing” or how many of your animations are playing."
+          ]
+        },
         {
           "version": "1.8.0",
           "date": "2026-10-16",
@@ -351,9 +395,17 @@
       "name": "Build",
       "description": "Free placement in the build tool, “Place on…” to put objects on any other object, and bulk delete (click or drag a box to select).",
       "file": "src/modules/build.js",
-      "version": "1.5.0",
+      "icon": "hammer",
+      "version": "1.6.0",
       "requires": { "map": "1.3.0", "map-pick": "1.2.0", "placements": "1.0.0", "jobs": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.6.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: Free placement is a switch; Place on…, Show linked objects and Bulk delete… light up while active, with their status and Cancel right under them."
+          ]
+        },
         {
           "version": "1.5.0",
           "date": "2026-10-15",
@@ -401,9 +453,17 @@
       "name": "Outfits",
       "description": "Save and apply outfits, including “No outfit” and “Invisible”.",
       "file": "src/modules/outfits.js",
-      "version": "1.0.0",
+      "icon": "shirt",
+      "version": "1.1.0",
       "requires": { "previews": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: name and Save in one field, icons for No outfit, Invisible and your outfits, publish and delete on hover."
+          ]
+        },
         { "version": "1.0.0", "date": "2026-10-08", "changes": ["Outfit presets as a module."] }
       ]
     },
@@ -413,7 +473,8 @@
       "name": "Desks",
       "description": "Save and swap your desk decoration, and pick which objects belong to your desk.",
       "file": "src/modules/desks.js",
-      "version": "1.3.0",
+      "icon": "lamp-desk",
+      "version": "1.4.0",
       "requires": {
         "map": "1.2.0",
         "map-pick": "1.0.0",
@@ -422,6 +483,13 @@
         "jobs": "1.0.0"
       },
       "changelog": [
+        {
+          "version": "1.4.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: picking desk objects is a switch that shows how many objects your desk has, with Reset next to it; publish and delete appear on hover."
+          ]
+        },
         {
           "version": "1.3.0",
           "date": "2026-10-13",
@@ -451,7 +519,8 @@
       "name": "Constructions",
       "description": "Save a group of objects and place it anywhere on the map in one click.",
       "file": "src/modules/constructions.js",
-      "version": "1.2.0",
+      "icon": "boxes",
+      "version": "1.3.0",
       "requires": {
         "map": "1.1.0",
         "map-pick": "1.0.0",
@@ -460,6 +529,13 @@
         "jobs": "1.0.0"
       },
       "changelog": [
+        {
+          "version": "1.3.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: New and Remove last side by side, the object count of each construction, publish and delete on hover."
+          ]
+        },
         {
           "version": "1.2.0",
           "date": "2026-10-09",
@@ -484,9 +560,17 @@
       "name": "Placed objects",
       "description": "Everything you placed with the mod on this map (constructions, desk presets, Place on…): delete the last one, any of them, or all.",
       "file": "src/modules/placed.js",
-      "version": "1.2.0",
+      "icon": "history",
+      "version": "1.3.0",
       "requires": { "map": "1.2.0", "placements": "1.1.0", "jobs": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.3.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: a Remove last button, Delete all asks in a red card with the count, and each placement shows its kind, size and date."
+          ]
+        },
         {
           "version": "1.2.0",
           "date": "2026-10-13",
@@ -514,9 +598,17 @@
       "name": "Share presets",
       "description": "Export and import the presets of your installed modules as JSON.",
       "file": "src/modules/share.js",
-      "version": "1.0.0",
+      "icon": "share-2",
+      "version": "1.1.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: Export, Import and Paste buttons with icons, and a clear success or error message."
+          ]
+        },
         {
           "version": "1.0.0",
           "date": "2026-10-08",
@@ -530,9 +622,17 @@
       "name": "Community hub",
       "description": "Browse, preview, add and publish presets shared by others.",
       "file": "src/modules/hub.js",
-      "version": "1.1.0",
+      "icon": "globe",
+      "version": "1.2.0",
       "requires": { "previews": "1.0.0", "hub-api": "1.1.0" },
       "changelog": [
+        {
+          "version": "1.2.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: a larger browse window with search, a type switch, refresh, and preset cards with Add."
+          ]
+        },
         {
           "version": "1.1.0",
           "date": "2026-10-12",
@@ -558,9 +658,17 @@
       "name": "Custom objects",
       "description": "Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.",
       "file": "src/modules/custom.js",
-      "version": "1.6.0",
+      "icon": "image",
+      "version": "1.7.0",
       "requires": { "map": "1.3.0", "map-pick": "1.2.0", "hub-api": "1.3.0" },
       "changelog": [
+        {
+          "version": "1.7.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: an editor card with property rows, a Collision switch and a Back/Front control, image thumbnails in the list and icon actions on hover."
+          ]
+        },
         {
           "version": "1.6.0",
           "date": "2026-10-16",
@@ -619,9 +727,17 @@
       "name": "Auto away",
       "description": "Sets you Away (or Busy, your choice) after a few minutes without keyboard or mouse on your computer, and back to your status on your next input. The same status set by hand stays. Gather desktop app only.",
       "file": "src/modules/auto-away.js",
-      "version": "1.0.0",
+      "icon": "moon",
+      "version": "1.1.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-17",
+          "changes": [
+            "New look that matches Gather: a switch, Away/Busy as a segmented choice, a minutes field, and your current status on the folded section."
+          ]
+        },
         {
           "version": "1.0.0",
           "date": "2026-10-16",

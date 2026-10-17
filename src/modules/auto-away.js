@@ -75,9 +75,11 @@ window.__gatherMods.define("auto-away", (ctx) => {
   function render() {
     if (!root?.isConnected) return;
     const toggle = root.querySelector("#gm-away-toggle");
-    toggle.textContent = "Auto away: " + (settings.enabled ? "ON" : "OFF");
-    toggle.classList.toggle("active", settings.enabled);
+    toggle.checked = settings.enabled;
     toggle.disabled = !isSupported();
+    root
+      .querySelectorAll("#gm-away-idle-status button")
+      .forEach((b) => b.classList.toggle("on", b.dataset.status === settings.idleStatus));
     root.querySelector("#gm-away-status").textContent = !isSupported()
       ? "Only in the Gather desktop app: a browser tab can't see activity in other apps"
       : status ||
@@ -89,25 +91,33 @@ window.__gatherMods.define("auto-away", (ctx) => {
 
   ctx.section({
     title: "Auto away",
+    status: () => {
+      const auto = readJson(RESTORE_KEY, {})[me()?.id];
+      return auto ? auto.set : settings.enabled && isSupported() ? "On" : null;
+    },
     html: `
-      <button class="gm-btn" id="gm-away-toggle">Auto away: OFF</button>
-      <label class="gm-away-param">Status when idle<select class="gm-input" id="gm-away-idle-status">${IDLE_STATUSES.map((s) => `<option value="${s}">${s}</option>`).join("")}</select></label>
-      <label class="gm-away-param">Minutes without activity<input class="gm-input" id="gm-away-minutes" type="number" min="${MINUTES.min}" max="${MINUTES.max}" step="1" /></label>
-      <div class="gm-status"><span id="gm-away-status"></span></div>`,
+      <label class="gm-toggle">
+        <span class="gm-toggle-text"><span class="gm-toggle-title">Auto away</span><span class="gm-hint">When you leave your computer, back on your next input</span></span>
+        <input type="checkbox" class="gm-switch" id="gm-away-toggle" />
+      </label>
+      <div class="gm-prop"><span>Status when idle</span><div class="gm-seg" id="gm-away-idle-status">${IDLE_STATUSES.map((s) => `<button data-status="${s}">${s}</button>`).join("")}</div></div>
+      <div class="gm-prop"><span>After</span><label class="gm-field"><input class="gm-input" id="gm-away-minutes" type="number" min="${MINUTES.min}" max="${MINUTES.max}" step="1" /><span class="gm-unit">min</span></label></div>
+      <div class="gm-note"><i class="gm-i sm" data-i="moon"></i><span id="gm-away-status"></span></div>`,
     mount(el) {
       root = el;
-      el.querySelector("#gm-away-toggle").onclick = () => {
-        settings.enabled = !settings.enabled;
+      const toggle = el.querySelector("#gm-away-toggle");
+      toggle.addEventListener("change", () => {
+        settings.enabled = toggle.checked;
         save();
         render();
-      };
-      const idleStatus = el.querySelector("#gm-away-idle-status");
-      idleStatus.value = settings.idleStatus;
-      idleStatus.onchange = () => {
-        settings.idleStatus = idleStatus.value;
-        save();
-        render();
-      };
+      });
+      el.querySelectorAll("#gm-away-idle-status button").forEach((b) => {
+        b.onclick = () => {
+          settings.idleStatus = b.dataset.status;
+          save();
+          render();
+        };
+      });
       const minutes = el.querySelector("#gm-away-minutes");
       minutes.value = settings.minutes;
       minutes.addEventListener("keydown", (e) => e.stopPropagation());
@@ -121,8 +131,4 @@ window.__gatherMods.define("auto-away", (ctx) => {
       render();
     },
   });
-  ctx.style(`
-    #gather-mods-panel .gm-away-param { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--gm-muted); }
-    #gather-mods-panel .gm-away-param .gm-input { width:80px; flex:none; }
-  `);
 });

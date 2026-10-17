@@ -48,6 +48,25 @@ window.__gatherMods.define("fun", (ctx) => {
     ctx.onCleanup(() => clearInterval(fleeTimer));
   }
 
+  const initials = (name) =>
+    (name || "?")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => [...w][0])
+      .join("")
+      .toUpperCase() || "?";
+  const avatarColor = (id) => {
+    let hue = 0;
+    for (const c of String(id)) hue = (hue * 31 + c.charCodeAt(0)) % 360;
+    return `hsl(${hue} 55% 55%)`;
+  };
+  function playerRow(p) {
+    const on = fleeTargetId === p.id;
+    const name = (p.name || "?").slice(0, 24);
+    const button = `<button class="gm-iconbtn${on ? " on" : ""}" title="${on ? "Stop fleeing" : "Flee from them"}"><i class="gm-i" data-i="footprints"></i></button>`;
+    return `<div class="gm-item${on ? " is-on" : ""}" data-pid="${escapeHtml(p.id)}" title="${on ? "Stop fleeing" : "Flee from this player"}"><span class="gm-avatar" style="background:${avatarColor(p.id)}">${escapeHtml(initials(name))}</span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(name)}</span></div>${on ? `<span class="gm-tail gm-fun-fleeing">Fleeing</span>${button}` : `<div class="gm-actions">${button}</div>`}</div>`;
+  }
   function renderPlayers(root) {
     const list = root.querySelector("#gm-flee-players");
     const search = root.querySelector("#gm-flee-search").value.toLowerCase();
@@ -57,12 +76,7 @@ window.__gatherMods.define("fun", (ctx) => {
         p.id !== myId && p.connected && !p.isBot && (p.name || "").toLowerCase().includes(search),
     );
     const html = players.length
-      ? players
-          .map(
-            (p) =>
-              `<div class="gm-item${fleeTargetId === p.id ? " active" : ""}" data-pid="${escapeHtml(p.id)}" title="Flee from this player"><span class="gm-name">${escapeHtml((p.name || "?").slice(0, 24))}</span><span>🏃</span></div>`,
-          )
-          .join("")
+      ? players.map(playerRow).join("")
       : '<div class="gm-empty">No players</div>';
     if (list.__html === html) return;
     list.__html = html;
@@ -602,60 +616,67 @@ window.__gatherMods.define("fun", (ctx) => {
   let studio = null;
   const option = (value, label) => `<option value="${value}">${label}</option>`;
   const options = (entries) => entries.map(([v, l]) => option(v, l)).join("");
-  const field = (label, input, attrs = "") =>
-    `<label class="gm-st-field"${attrs}>${label}${input}</label>`;
+  const prop = (label, control, attrs = "") =>
+    `<div class="gm-prop"${attrs}><span>${label}</span>${control}</div>`;
+  const unitField = (input, unit, title) =>
+    `<label class="gm-field"${title ? ` title="${title}"` : ""}>${input}${unit ? `<span class="gm-unit">${unit}</span>` : ""}</label>`;
   const number = (key, min, max, step) =>
-    `<input type="number" data-f="${key}" min="${min}" max="${max}" step="${step}" />`;
+    `<input class="gm-input" type="number" data-f="${key}" min="${min}" max="${max}" step="${step}" />`;
+  const formula = (key, placeholder) =>
+    `<input class="gm-input" data-f="${key}" data-expr placeholder="${placeholder}" />`;
+  const note = (text, attrs) =>
+    `<div class="gm-note"${attrs}><i class="gm-i sm" data-i="info"></i><span>${text}</span></div>`;
   const STUDIO_HTML = `
-    <div class="gm-st-head"><span>Animation studio</span><span class="gm-st-close" title="Close without saving">✕</span></div>
-    <div class="gm-st-body">
-      <input data-k="name" maxlength="${MAX_NAME}" placeholder="Name this animation..." />
-      <div class="gm-st-row"><span class="gm-st-label">Objects</span><span class="gm-st-grow" data-k="count"></span><button data-k="select"></button></div>
-      <div class="gm-st-row"><span class="gm-st-label">Move</span><div class="gm-st-seg" data-k="mode"><button data-v="block" title="The selection moves and turns as one piece, around its center">As one block</button><button data-v="each" title="Every object follows the path from its own place and turns on itself">Each on its own</button></div></div>
-      <div class="gm-st-row" data-k="stagger"><span class="gm-st-label">Stagger</span><input type="number" data-k="delay" min="0" max="60" step="0.05" title="Seconds between two objects" /><span>s</span><select class="gm-st-grow" data-k="order">${options(Object.entries(ORDERS))}</select></div>
-      <div class="gm-st-row"><span class="gm-st-label">At the end</span><div class="gm-st-seg" data-k="end"><button data-v="loop" title="Start again from the beginning">Loop</button><button data-v="pingpong" title="Go back along the path, then again">Ping-pong</button><button data-v="once" title="Stay at the last point">Once</button></div></div>
-      <div class="gm-st-label">Steps</div>
-      <div class="gm-st-steps" data-k="steps"></div>
-      <button data-k="add"></button>
-      <div class="gm-st-card" data-k="step">
-        <div class="gm-st-label" data-k="step-title"></div>
-        <div class="gm-st-cols">
-          ${field("Shape", `<select data-f="shape">${options(Object.entries(motion.SHAPES))}</select>`)}
-          ${field("Easing", `<select data-f="easing">${options(Object.entries(motion.EASINGS).map(([v, e]) => [v, e.label]))}</select>`)}
-        </div>
-        ${field("Easing f(t)", '<input data-f="easingExpr" data-expr placeholder="t^2" />', ' data-k="easing-expr"')}
-        <div class="gm-st-cols">
-          ${field("Duration (s)", number("duration", 0.05, 600, 0.1))}
-          ${field("Pause after (s)", number("pause", 0, 600, 0.1))}
-          ${field("Turn (°)", number("rotate", -36000, 36000, 15), ' title="Degrees turned during the step: the block around its center, or each object on itself"')}
-        </div>
-        <div class="gm-st-cols" data-shape="wave">
-          ${field("Height (tiles)", number("amplitude", 0, 50, 0.25))}
-          ${field("Waves", number("waves", 0.5, 50, 0.5))}
-          <label class="gm-st-field gm-st-check"><input type="checkbox" data-f="invert" />Other side</label>
-        </div>
-        <div class="gm-st-cols" data-shape="arc">${field("Bend (tiles, negative for the other side)", number("bend", -50, 50, 0.5))}</div>
-        <div class="gm-st-cols" data-shape="orbit">
-          ${field("Turns", number("turns", 0.05, 100, 0.25))}
-          ${field("Direction", `<select data-f="direction">${option(1, "Clockwise")}${option(-1, "Counter-clockwise")}</select>`)}
-        </div>
-        <div class="gm-st-cols" data-shape="custom">
-          ${field("x(t) (tiles)", '<input data-f="x" data-expr placeholder="0" />')}
-          ${field("y(t) (tiles)", '<input data-f="y" data-expr placeholder="-sin(pi*t)" />')}
-        </div>
-        <div class="gm-st-hint" data-shape="orbit">Its numbered point on the map is the center: drag it.</div>
-        <div class="gm-st-hint" data-shape="custom">Added to the straight line to the point.</div>
-        <div class="gm-st-hint" data-k="syntax">Formulas of t, from 0 to 1: numbers, t, pi, + - * / ^, parentheses, sin cos tan abs sqrt exp floor round sign min max.</div>
+    <div class="gm-window-head" data-k="head"><i class="gm-i" data-i="wand-sparkles"></i><span class="gm-window-title">Animation studio</span><button class="gm-iconbtn" data-k="close" title="Close without saving"><i class="gm-i" data-i="x"></i></button></div>
+    <div class="gm-window-body">
+      <input class="gm-input" data-k="name" maxlength="${MAX_NAME}" placeholder="Name this animation" />
+      ${prop("Objects", '<span class="gm-st-objects"><span data-k="count"></span><button class="gm-btn gm-sm" data-k="select"></button></span>')}
+      ${prop("Move", '<div class="gm-seg" data-k="mode"><button data-v="block" title="The selection moves and turns as one piece, around its center">As one block</button><button data-v="each" title="Every object follows the path from its own place and turns on itself">Each</button></div>')}
+      <div class="gm-st-contents" data-k="stagger">
+        ${prop("Stagger", unitField('<input class="gm-input" type="number" data-k="delay" min="0" max="60" step="0.05" />', "s", "Seconds between two objects"))}
+        ${prop("Order", `<select class="gm-select" data-k="order">${options(Object.entries(ORDERS))}</select>`)}
       </div>
-      <div class="gm-st-row"><button data-k="play"></button><input class="gm-st-grow" type="range" data-k="scrub" min="0" step="0.01" /><span class="gm-st-clock" data-k="clock"></span></div>
-      <div class="gm-st-status" data-k="status"></div>
-      <button class="gm-st-primary" data-k="save"></button>
-    </div>`;
+      ${prop("At the end", '<div class="gm-seg" data-k="end"><button data-v="loop" title="Start again from the beginning">Loop</button><button data-v="pingpong" title="Go back along the path, then again">Ping-pong</button><button data-v="once" title="Stay at the last point">Once</button></div>')}
+      <div class="gm-sub">Steps<span class="gm-spacer"></span><button class="gm-btn gm-ghost gm-sm" data-k="add"></button></div>
+      <div class="gm-list gm-st-steps" data-k="steps"></div>
+      <div class="gm-card gm-st-card" data-k="step">
+        <div class="gm-st-cols">
+          <select class="gm-select" data-f="shape" title="Shape">${options(Object.entries(motion.SHAPES))}</select>
+          <select class="gm-select" data-f="easing" title="Easing">${options(Object.entries(motion.EASINGS).map(([v, e]) => [v, e.label]))}</select>
+        </div>
+        ${prop("Easing f(t)", unitField(formula("easingExpr", "t^2")), ' data-k="easing-expr"')}
+        <div class="gm-st-cols">
+          ${unitField(number("duration", 0.05, 600, 0.1), "s", "Duration in seconds")}
+          ${unitField(number("pause", 0, 600, 0.1), "pause", "Pause after the step, in seconds")}
+          ${unitField(number("rotate", -36000, 36000, 15), "°", "Degrees turned during the step: the block around its center, or each object on itself")}
+        </div>
+        <div class="gm-st-contents" data-shape="wave">
+          ${prop("Height", unitField(number("amplitude", 0, 50, 0.25), "tiles"))}
+          ${prop("Waves", unitField(number("waves", 0.5, 50, 0.5)))}
+          ${prop("Other side", '<input type="checkbox" class="gm-switch" data-f="invert" />')}
+        </div>
+        <div class="gm-st-contents" data-shape="arc">${prop("Bend", unitField(number("bend", -50, 50, 0.5), "tiles", "Negative for the other side"))}</div>
+        <div class="gm-st-contents" data-shape="orbit">
+          ${prop("Turns", unitField(number("turns", 0.05, 100, 0.25)))}
+          ${prop("Direction", `<select class="gm-select" data-f="direction">${option(1, "Clockwise")}${option(-1, "Counter-clockwise")}</select>`)}
+        </div>
+        <div class="gm-st-contents" data-shape="custom">
+          ${prop("x(t)", unitField(formula("x", "0"), "tiles"))}
+          ${prop("y(t)", unitField(formula("y", "-sin(pi*t)"), "tiles"))}
+        </div>
+        ${note("Its numbered point on the map is the center: drag it.", ' data-shape="orbit"')}
+        ${note("Added to the straight line to the point.", ' data-shape="custom"')}
+        ${note("Formulas of t, from 0 to 1: numbers, t, pi, + - * / ^, parentheses, sin cos tan abs sqrt exp floor round sign min max.", ' data-k="syntax"')}
+      </div>
+      <div class="gm-st-player"><button class="gm-iconbtn gm-st-play" data-k="play"></button><input class="gm-st-scrub" type="range" data-k="scrub" min="0" step="0.01" /><span class="gm-st-clock" data-k="clock"></span></div>
+    </div>
+    <div class="gm-window-foot"><div class="gm-note"><i class="gm-i sm" data-i="info"></i><span data-k="status"></span></div><button class="gm-btn gm-primary" data-k="save"></button></div>`;
 
   function openStudio() {
     if (!studio) {
       const win = document.createElement("div");
       win.id = "gm-anim-studio";
+      win.className = "gm-window";
       win.innerHTML = STUDIO_HTML;
       document.body.appendChild(win);
       studio = { win, $: (k) => win.querySelector(`[data-k="${k}"]`) };
@@ -681,7 +702,7 @@ window.__gatherMods.define("fun", (ctx) => {
     win.style.top = Math.round(y) + "px";
   }
   function dragStudio(e) {
-    if (e.button !== 0 || e.target.closest(".gm-st-close")) return;
+    if (e.button !== 0 || e.target.closest('[data-k="close"]')) return;
     const win = studio.win;
     const start = { x: e.clientX, y: e.clientY, left: win.offsetLeft, top: win.offsetTop };
     const move = (m) =>
@@ -698,8 +719,8 @@ window.__gatherMods.define("fun", (ctx) => {
     const $ = (k) => win.querySelector(`[data-k="${k}"]`);
     for (const type of ["keydown", "keyup", "keypress"])
       win.addEventListener(type, (e) => e.stopPropagation());
-    win.querySelector(".gm-st-head").onpointerdown = dragStudio;
-    win.querySelector(".gm-st-close").onclick = closeDraft;
+    $("head").onpointerdown = dragStudio;
+    $("close").onclick = closeDraft;
     $("select").onclick = () => {
       if (pick.current() !== "anim-select") return pick.start(selectSession);
       pick.stop("anim-select");
@@ -715,9 +736,9 @@ window.__gatherMods.define("fun", (ctx) => {
         changed();
       };
     $("steps").onclick = (e) => {
-      const row = e.target.closest("[data-i]");
+      const row = e.target.closest("[data-step]");
       if (!row) return;
-      const i = Number(row.dataset.i);
+      const i = Number(row.dataset.step);
       const action = e.target.closest("[data-act]")?.dataset.act;
       if (action === "del") deleteStep(i);
       else if (action === "up" || action === "down") moveStep(i, action === "up" ? -1 : 1);
@@ -821,10 +842,10 @@ window.__gatherMods.define("fun", (ctx) => {
     selectStep(i + 1);
   }
   const seconds = (n) => `${+n.toFixed(2)} s`;
-  const stepAction = (action, label, title, shown) =>
-    `<span class="gm-st-act${shown ? "" : " gm-st-off"}" data-act="${action}" title="${title}">${label}</span>`;
+  const stepAction = (action, title, icon) =>
+    `<button class="gm-iconbtn${action === "del" ? " gm-danger" : ""}" data-act="${action}" title="${title}">${icon}</button>`;
   const stepRow = (s, i, steps) =>
-    `<div class="gm-st-step${i === draft.selected ? " gm-st-sel" : ""}" data-i="${i}"><span class="gm-st-num">${i + 1}</span><span class="gm-st-grow">${SHAPE_LABELS[s.shape]} · ${seconds(s.duration)}${s.pause ? ` + ${seconds(s.pause)} pause` : ""}${s.rotate ? ` · ${+s.rotate.toFixed(1)}°` : ""}</span>${stepAction("up", "↑", "Move up: reached earlier", i > 0)}${stepAction("down", "↓", "Move down: reached later", i < steps.length - 1)}${stepAction("copy", "⧉", "Duplicate: the same move again from where this step ends", steps.length < MAX_STEPS)}<span class="gm-st-del" data-act="del" title="Delete this step">✕</span></div>`;
+    `<div class="gm-item${i === draft.selected ? " is-on show-actions" : ""}" data-step="${i}"><span class="gm-avatar gm-st-num">${i + 1}</span><div class="gm-item-text"><span class="gm-item-title">${SHAPE_LABELS[s.shape]} · ${seconds(s.duration)}${s.pause ? ` + ${seconds(s.pause)} pause` : ""}${s.rotate ? ` · ${+s.rotate.toFixed(1)}°` : ""}</span></div><div class="gm-actions">${i > 0 ? stepAction("up", "Move up: reached earlier", '<i class="gm-i sm" data-i="arrow-up"></i>') : ""}${i < steps.length - 1 ? stepAction("down", "Move down: reached later", '<i class="gm-i sm" data-i="arrow-down"></i>') : ""}${steps.length < MAX_STEPS ? stepAction("copy", "Duplicate: the same move again from where this step ends", '<i class="gm-i sm" data-i="copy"></i>') : ""}${stepAction("del", "Delete this step", '<i class="gm-i sm" data-i="trash-2"></i>')}</div></div>`;
   function studioStatus(session) {
     if (draft.status) return draft.status;
     if (session === "anim-select")
@@ -843,31 +864,35 @@ window.__gatherMods.define("fun", (ctx) => {
     const session = pick.current();
     const { steps } = draft;
     const step = steps[draft.selected];
-    $("count").textContent = `${draft.ids.length} object${draft.ids.length === 1 ? "" : "s"}`;
+    $("count").textContent = `${draft.ids.length} selected`;
     $("select").textContent =
       session === "anim-select" ? "Done" : draft.ids.length ? "Change" : "Select";
-    $("select").classList.toggle("active", session === "anim-select");
+    $("select").classList.toggle("gm-primary", session === "anim-select");
     for (const k of ["mode", "end"])
-      for (const b of $(k).children) b.classList.toggle("active", b.dataset.v === draft[k]);
+      for (const b of $(k).children) b.classList.toggle("on", b.dataset.v === draft[k]);
     $("stagger").style.display = draft.mode === "each" ? "" : "none";
     $("steps").innerHTML = steps.length
       ? steps.map(stepRow).join("")
-      : '<div class="gm-st-hint">No steps yet</div>';
-    $("add").textContent =
-      session === "anim-point" ? "Done adding points" : "＋ Add points on the map";
-    $("add").classList.toggle("active", session === "anim-point");
-    $("add").disabled =
-      session !== "anim-point" && (!draft.ids.length || steps.length >= MAX_STEPS);
+      : '<div class="gm-empty">No steps yet</div>';
+    const adding = session === "anim-point";
+    $("add").innerHTML = adding
+      ? '<i class="gm-i sm" data-i="check"></i>Done'
+      : '<i class="gm-i sm" data-i="plus"></i>Add points';
+    $("add").title = adding ? "Stop adding points" : "Click the map to add points";
+    $("add").classList.toggle("gm-primary", adding);
+    $("add").classList.toggle("gm-ghost", !adding);
+    $("add").disabled = !adding && (!draft.ids.length || steps.length >= MAX_STEPS);
     $("step").style.display = step ? "" : "none";
     if (step) {
-      $("step-title").textContent = `Step ${draft.selected + 1}`;
       for (const el of studio.win.querySelectorAll("[data-shape]"))
         el.style.display = el.dataset.shape === step.shape ? "" : "none";
       $("easing-expr").style.display = step.easing === "custom" ? "" : "none";
       $("syntax").style.display = step.easing === "custom" || step.shape === "custom" ? "" : "none";
     }
     $("play").disabled = $("scrub").disabled = !steps.length;
-    $("status").textContent = studioStatus(session);
+    const status = studioStatus(session);
+    $("status").textContent = status;
+    $("status").parentElement.classList.toggle("gm-err", /^(Save failed|Step \d+:)/.test(status));
     $("save").disabled = !canSave();
     $("save").textContent = draft.editId ? "Save changes" : "Save";
     updateClock();
@@ -893,8 +918,10 @@ window.__gatherMods.define("fun", (ctx) => {
     studio.$("scrub").max = span;
     studio.$("scrub").value = t;
     studio.$("clock").textContent = `${t.toFixed(1)} / ${span.toFixed(1)} s`;
-    studio.$("play").textContent = ended ? "↺" : draft.paused ? "▶" : "⏸";
-    studio.$("play").title = ended ? "Play again" : draft.paused ? "Play" : "Pause";
+    const play = studio.$("play");
+    const icon = `<i class="gm-i sm" data-i="${ended ? "rotate-ccw" : draft.paused ? "play" : "pause"}"></i>`;
+    if (play.innerHTML !== icon) play.innerHTML = icon;
+    play.title = ended ? "Play again" : draft.paused ? "Play" : "Pause";
   }
   function togglePlay() {
     const span = timelineSpan();
@@ -1112,20 +1139,23 @@ window.__gatherMods.define("fun", (ctx) => {
   function renderAnimations() {
     if (!root?.isConnected) return;
     const button = root.querySelector("#gm-anim-new");
-    button.textContent = !draft
-      ? "New animation…"
+    button.innerHTML = draft
+      ? '<i class="gm-i sm" data-i="x"></i>Cancel'
+      : '<i class="gm-i sm" data-i="plus"></i>New';
+    button.title = !draft
+      ? "Opens the animation studio: select objects, add points on the map, adjust each step, save."
       : draft.editId
         ? "Cancel editing"
-        : "Cancel new animation";
-    button.classList.toggle("active", !!draft);
+        : "Cancel the new animation";
+    button.classList.toggle("gm-primary", !draft);
     const list = root.querySelector("#gm-anims");
     const own = shared.items.filter((a) => a.mine);
     list.innerHTML = own.length
       ? own
-          .map(
-            (a) =>
-              `<div class="gm-item${a.running ? " active" : ""}${a.id === draft?.editId ? " gm-editing" : ""}" data-id="${escapeHtml(a.id)}" title="${a.running ? "Click to stop it for everyone" : "Click to start it for everyone"}"><span class="gm-name">${a.running ? "⏸" : "▶"} ${escapeHtml(a.name)}</span><span class="gm-actions"><span class="gm-anim-type">${escapeHtml(typeLabel(a))}</span><span class="gm-edit" data-edit="${escapeHtml(a.id)}" title="Edit this animation in the studio">✎</span><span class="gm-del" data-del="${escapeHtml(a.id)}" title="Delete this animation for everyone">✕</span></span></div>`,
-          )
+          .map((a) => {
+            const editing = a.id === draft?.editId;
+            return `<div class="gm-item${a.running ? " is-on" : ""}${editing ? " gm-fun-editing" : ""}" data-id="${escapeHtml(a.id)}" title="${a.running ? "Click to stop it for everyone" : "Click to start it for everyone"}"><i class="gm-i" data-i="${a.running ? "pause" : "play"}"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(a.name)}</span></div><span class="gm-tail hide-on-hover">${editing ? "Editing" : escapeHtml(typeLabel(a))}</span><div class="gm-actions"><button class="gm-iconbtn" data-edit="${escapeHtml(a.id)}" title="Edit in the studio"><i class="gm-i" data-i="pencil"></i></button><button class="gm-iconbtn gm-danger" data-del="${escapeHtml(a.id)}" title="Delete for everyone"><i class="gm-i" data-i="trash-2"></i></button></div></div>`;
+          })
           .join("")
       : '<div class="gm-empty">You have no animations on this map</div>';
     root.querySelector("#gm-anims-status").textContent = shared.status;
@@ -1136,14 +1166,14 @@ window.__gatherMods.define("fun", (ctx) => {
         if (a) setRunning(a, !a.running);
       };
     });
-    list.querySelectorAll(".gm-edit").forEach((d) => {
+    list.querySelectorAll("[data-edit]").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const a = find(d.dataset.edit);
         if (a) startEdit(a);
       };
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll("[data-del]").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const a = find(d.dataset.del);
@@ -1158,7 +1188,7 @@ window.__gatherMods.define("fun", (ctx) => {
       ? others
           .map((a) => {
             const hidden = hiddenIds.has(a.id);
-            return `<div class="gm-item${hidden ? " gm-anim-hidden" : ""}"><span class="gm-name">${escapeHtml(a.name)}</span><span class="gm-actions"><span class="gm-anim-type">${escapeHtml(a.author || "?")} · ${escapeHtml(typeLabel(a))}${a.running ? "" : " · stopped"}</span><span class="gm-edit" data-hide="${escapeHtml(a.id)}" title="${hidden ? "Play it again on your screen" : "Hide it on your screen only"}">${hidden ? "Show" : "Hide"}</span></span></div>`;
+            return `<div class="gm-item${hidden ? " is-muted" : ""}"><i class="gm-i" data-i="sparkles"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(a.name)}</span><span class="gm-item-meta">${escapeHtml(a.author || "?")} · ${hidden ? "hidden for you" : escapeHtml(typeLabel(a)) + (a.running ? "" : " · stopped")}</span></div><button class="gm-iconbtn" data-hide="${escapeHtml(a.id)}" title="${hidden ? "Show again on your screen" : "Hide on your screen only"}"><i class="gm-i" data-i="${hidden ? "eye-off" : "eye"}"></i></button></div>`;
           })
           .join("")
       : '<div class="gm-empty">No one else has animations on this map</div>';
@@ -1178,19 +1208,23 @@ window.__gatherMods.define("fun", (ctx) => {
       { id: "flee", label: "Flee mode" },
       { id: "animations", label: "Animations" },
     ],
+    status: () => {
+      if (fleeTargetId) return "Fleeing";
+      const playing = shared.items.filter((a) => a.mine && a.running).length;
+      return playing ? `${playing} playing` : null;
+    },
     html: `
       <div data-part="flee">
-        <div class="gm-sublabel">Flee mode: click a player to keep your distance (click again to stop)</div>
-        <input class="gm-input" id="gm-flee-search" placeholder="Search player..." />
+        <div class="gm-sub">Flee mode</div>
+        <div class="gm-field"><i class="gm-i" data-i="search"></i><input class="gm-input" id="gm-flee-search" placeholder="Search players" /></div>
         <div class="gm-list" id="gm-flee-players"></div>
       </div>
       <div data-part="animations">
-      <div class="gm-sublabel">Your animations, seen by everyone with this module: click one to start or stop it</div>
-      <button class="gm-btn" id="gm-anim-new" title="Opens the animation studio: select objects, add points on the map, adjust each step, save.">New animation…</button>
-      <div class="gm-list" id="gm-anims"></div>
-      <div class="gm-status"><span id="gm-anims-status"></span></div>
-      <div class="gm-sublabel">Others' animations: hide one on your screen only</div>
-      <div class="gm-list" id="gm-anims-others"></div>
+        <div class="gm-sub">Your animations<span class="gm-spacer"></span><button class="gm-btn gm-primary gm-sm" id="gm-anim-new"></button></div>
+        <div class="gm-list" id="gm-anims"></div>
+        <div class="gm-note gm-err"><i class="gm-i sm" data-i="circle-alert"></i><span id="gm-anims-status"></span></div>
+        <div class="gm-sub">On this map</div>
+        <div class="gm-list" id="gm-anims-others"></div>
       </div>`,
     mount(el) {
       root = el;
@@ -1203,62 +1237,33 @@ window.__gatherMods.define("fun", (ctx) => {
     },
   });
   ctx.style(`
-    #gather-mods-panel .gm-anim-type { font-size:11px; color:var(--gm-muted); }
-    #gather-mods-panel .gm-item.active .gm-anim-type { color:inherit; }
-    #gather-mods-panel .gm-edit { color:var(--gm-muted); font-size:13px; flex-shrink:0; }
-    #gather-mods-panel .gm-edit:hover { color:var(--gm-fg); }
-    #gather-mods-panel .gm-item.active .gm-edit { color:inherit; }
-    #gather-mods-panel .gm-item.gm-editing { box-shadow:inset 0 0 0 1px var(--theme-color-accent,#6c5ce7); }
-    #gather-mods-panel .gm-item.gm-anim-hidden .gm-name { opacity:.45; text-decoration:line-through; }
-    #gm-anim-studio { position:fixed; z-index:2147482400; width:300px; max-height:calc(100vh - 24px); display:flex; flex-direction:column;
-      background:var(--gm-bg); color:var(--gm-fg); border:1px solid var(--gm-border); border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.35); font-size:13px; }
-    #gm-anim-studio .gm-st-head { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; cursor:move; font-weight:600;
-      border-bottom:1px solid var(--gm-border); user-select:none; }
-    #gm-anim-studio .gm-st-close { cursor:pointer; color:var(--gm-muted); padding:0 2px; }
-    #gm-anim-studio .gm-st-close:hover { color:var(--gm-fg); }
-    #gm-anim-studio .gm-st-body { padding:8px 12px 12px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
-    #gm-anim-studio :is(input, select) { box-sizing:border-box; min-width:0; padding:5px 7px; font-size:12px; font-family:inherit; color:var(--gm-fg);
-      background:var(--gm-input); border:1px solid var(--gm-border); border-radius:6px; outline:none; }
-    #gm-anim-studio :is(input, select):focus { border-color:var(--theme-color-accent,#6c5ce7); }
-    #gm-anim-studio input.gm-st-bad { border-color:var(--gm-red); }
-    #gm-anim-studio input[type=number] { width:100%; }
-    #gm-anim-studio input[type=range] { padding:0; border:none; background:none; accent-color:var(--theme-color-accent,#6c5ce7); }
-    #gm-anim-studio input[type=checkbox] { width:auto; accent-color:var(--theme-color-accent,#6c5ce7); }
-    #gm-anim-studio option { background:var(--gm-bg); }
-    #gm-anim-studio button { padding:5px 9px; font-size:12px; font-family:inherit; color:var(--gm-fg); background:var(--gm-surface);
-      border:1px solid transparent; border-radius:6px; cursor:pointer; white-space:nowrap; }
-    #gm-anim-studio button:hover { background:var(--gm-surface-hover); }
-    #gm-anim-studio button:is(.active, .gm-st-primary) { background:var(--theme-color-accent,#6c5ce7); color:#fff; }
-    #gm-anim-studio button:disabled { opacity:.45; cursor:default; }
-    #gm-anim-studio .gm-st-row { display:flex; align-items:center; gap:6px; }
-    #gm-anim-studio .gm-st-row input[type=number] { width:62px; }
-    #gm-anim-studio .gm-st-grow { flex:1; min-width:0; }
-    #gm-anim-studio .gm-st-label { flex:none; width:68px; font-size:10px; font-weight:600; text-transform:uppercase; color:var(--gm-muted); }
-    #gm-anim-studio .gm-st-seg { flex:1; display:flex; gap:2px; padding:2px; background:var(--gm-surface); border-radius:7px; }
-    #gm-anim-studio .gm-st-seg button { flex:1; padding:4px 5px; background:transparent; }
-    #gm-anim-studio .gm-st-seg button.active { background:var(--theme-color-accent,#6c5ce7); }
-    #gm-anim-studio .gm-st-steps { display:flex; flex-direction:column; gap:2px; max-height:150px; overflow-y:auto; }
-    #gm-anim-studio .gm-st-step { display:flex; align-items:center; gap:7px; padding:4px 8px; font-size:12px; background:var(--gm-surface); border-radius:6px; cursor:pointer; }
-    #gm-anim-studio .gm-st-step:hover { background:var(--gm-surface-hover); }
-    #gm-anim-studio .gm-st-step .gm-st-grow { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #gm-anim-studio .gm-st-sel { box-shadow:inset 0 0 0 1px #ffd400; }
-    #gm-anim-studio .gm-st-num { flex:none; width:18px; height:18px; display:flex; align-items:center; justify-content:center; border-radius:50%;
-      background:#6c5ce7; color:#fff; font-size:10px; font-weight:700; }
-    #gm-anim-studio .gm-st-sel .gm-st-num { background:#ffd400; color:#1f1f23; }
-    #gm-anim-studio .gm-st-del { color:var(--gm-muted); }
-    #gm-anim-studio .gm-st-del:hover { color:var(--gm-red); }
-    #gm-anim-studio .gm-st-act { color:var(--gm-muted); padding:0 1px; }
-    #gm-anim-studio .gm-st-act:hover { color:var(--gm-fg); }
-    #gm-anim-studio .gm-st-off { visibility:hidden; }
-    #gm-anim-studio .gm-st-card { display:flex; flex-direction:column; gap:6px; padding:8px; border:1px solid var(--gm-border); border-radius:8px; }
-    #gm-anim-studio .gm-st-card .gm-st-label { width:auto; }
+    #gather-mods-panel .gm-fun-fleeing { color:var(--gm-accent-text); }
+    #gather-mods-panel .gm-item.gm-fun-editing { box-shadow:inset 0 0 0 1.5px var(--gm-accent); }
+    #gm-anim-studio { position:fixed; z-index:2147482400; width:296px; max-height:calc(100vh - 24px); }
+    #gm-anim-studio .gm-window-head { height:44px; padding:0 8px 0 14px; cursor:move; user-select:none; }
+    #gm-anim-studio .gm-window-head > .gm-i { color:var(--gm-text-2); }
+    #gm-anim-studio .gm-window-body { flex:1; min-height:0; overflow-y:auto; gap:8px; padding:12px 12px 10px; }
+    #gm-anim-studio .gm-window-foot { justify-content:space-between; padding:10px 12px; }
+    #gm-anim-studio .gm-window-foot > .gm-note { flex:1; min-width:0; padding:0; }
+    #gm-anim-studio .gm-st-contents { display:contents; }
+    #gm-anim-studio .gm-prop > :is(.gm-field, .gm-select, .gm-seg) { width:180px; }
+    #gm-anim-studio .gm-st-objects { display:flex; align-items:center; gap:6px; }
+    #gm-anim-studio .gm-st-steps { max-height:150px; overflow-y:auto; }
+    #gm-anim-studio .gm-st-steps .gm-item { min-height:30px; }
+    #gm-anim-studio .gm-st-steps .gm-item-title { font-size:12.5px; }
+    #gm-anim-studio .gm-st-num { width:18px; height:18px; background:#6c5ce7; }
+    #gm-anim-studio .gm-item.is-on .gm-st-num { background:#ffd400; color:#1f1f23; }
+    #gm-anim-studio .gm-st-card { gap:6px; padding:8px; }
     #gm-anim-studio .gm-st-cols { display:flex; gap:6px; }
     #gm-anim-studio .gm-st-cols > * { flex:1; min-width:0; }
-    #gm-anim-studio .gm-st-field { display:flex; flex-direction:column; gap:2px; font-size:11px; color:var(--gm-muted); }
-    #gm-anim-studio .gm-st-field select { width:100%; }
-    #gm-anim-studio .gm-st-check { flex-direction:row; align-items:center; gap:5px; align-self:flex-end; padding-bottom:6px; }
-    #gm-anim-studio .gm-st-hint, #gm-anim-studio .gm-st-status { font-size:11px; color:var(--gm-muted); }
-    #gm-anim-studio .gm-st-clock { flex:none; width:76px; text-align:right; font-size:11px; color:var(--gm-muted); font-variant-numeric:tabular-nums; }
+    #gm-anim-studio .gm-st-cols > .gm-field:has(> .gm-unit) { flex:1 1 auto; padding-right:8px; }
+    #gm-anim-studio .gm-st-cols > .gm-field:has(> .gm-unit) > .gm-input { width:0; padding-left:8px; padding-right:3px; }
+    #gm-anim-studio :is(.gm-input.gm-st-bad, .gm-field:has(> .gm-st-bad)) { border-color:var(--gm-danger); }
+    #gm-anim-studio .gm-st-player { display:flex; align-items:center; gap:8px; margin-top:2px; }
+    #gm-anim-studio .gm-st-play { width:30px; height:30px; border-radius:50%; background:var(--gm-accent); color:var(--gm-on-accent); }
+    #gm-anim-studio .gm-st-play:hover { background:var(--gm-accent); color:var(--gm-on-accent); filter:brightness(1.08); }
+    #gm-anim-studio .gm-st-scrub { flex:1; min-width:0; margin:0; accent-color:var(--gm-accent); }
+    #gm-anim-studio .gm-st-clock { flex:none; min-width:58px; text-align:right; font-size:11.5px; color:var(--gm-text-3); font-variant-numeric:tabular-nums; }
   `);
   ctx.onTick(() => {
     if (showFlee && root?.isConnected) renderPlayers(root);
