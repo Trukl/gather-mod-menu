@@ -104,9 +104,9 @@
     });
   }
   function flash(button, text, ms = 1500) {
-    const previous = button.textContent;
+    const previous = button.innerHTML;
     button.textContent = text;
-    setTimeout(() => (button.textContent = previous), ms);
+    setTimeout(() => (button.innerHTML = previous), ms);
   }
   const formatTime = (iso) =>
     iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
@@ -122,8 +122,8 @@
   }
 
   // ===================
-  // Theme — follow Gather (light/dark) via the sidebar's text luminance and
-  // reuse its accent color; surfaces are translucent so both themes match.
+  // Theme — follow Gather (light/dark) via the sidebar's text luminance. The
+  // .gm root class carries the design tokens, .gm-dark switches them.
   // ===================
   function findSidebar() {
     const search = document.querySelector('input[data-testid="gather-chat-search-input"]');
@@ -142,17 +142,8 @@
     return 0.2126 * r + 0.7152 * g + 0.0722 * b > 140;
   }
   function applyTheme(el) {
-    const dark = isDarkTheme();
-    const s = el.style;
-    s.setProperty("--gm-fg", dark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.85)");
-    s.setProperty("--gm-muted", dark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.5)");
-    s.setProperty("--gm-surface", dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)");
-    s.setProperty("--gm-surface-hover", dark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.09)");
-    s.setProperty("--gm-input", dark ? "rgba(0,0,0,0.25)" : "rgba(0,0,0,0.05)");
-    s.setProperty("--gm-border", dark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)");
-    s.setProperty("--gm-bg", dark ? "#1f1f23" : "#ffffff");
-    s.setProperty("--gm-green", dark ? "#3ddc84" : "#1e8e4e");
-    s.setProperty("--gm-red", dark ? "#ff6b6b" : "#d93636");
+    el.classList.add("gm");
+    el.classList.toggle("gm-dark", isDarkTheme());
   }
 
   // ===================
@@ -176,8 +167,8 @@
     const modal = document.createElement("div");
     modal.id = "gather-mods-modal";
     modal.innerHTML = `
-      <div class="gm-modal ${modalClass}" role="dialog" aria-label="${escapeHtml(title)}">
-        <div class="gm-modal-head"><h3>${escapeHtml(title)}</h3>${locked ? "" : '<span class="gm-close" id="gm-modal-close">✕</span>'}</div>
+      <div class="gm-window gm-modal ${modalClass}" role="dialog" aria-label="${escapeHtml(title)}">
+        <div class="gm-window-head"><span class="gm-window-title">${escapeHtml(title)}</span>${locked ? "" : '<button class="gm-iconbtn" id="gm-modal-close" title="Close"><i class="gm-i" data-i="x"></i></button>'}</div>
         ${bodyHtml}
       </div>`;
     applyTheme(modal);
@@ -190,6 +181,21 @@
     });
     if (!locked) modal.querySelector("#gm-modal-close").onclick = closeModal;
     return modal;
+  }
+  // A message window: icon tile, title and text, actions at the bottom.
+  function openMessage({ icon, tone = "", title, html, actions, locked = false }) {
+    return openModal(
+      title,
+      `
+      <div class="gm-window-body">
+        <span class="gm-message-icon ${tone}"><i class="gm-i" data-i="${icon}"></i></span>
+        <div class="gm-message-title">${escapeHtml(title)}</div>
+        ${html}
+      </div>
+      <div class="gm-window-foot">${actions}</div>`,
+      "gm-modal-message",
+      locked,
+    );
   }
 
   // ===================
@@ -417,7 +423,7 @@
     }
     const style = document.createElement("style");
     style.id = STYLE_ID;
-    style.textContent = [CORE_CSS, ...state.styles].join("\n");
+    style.textContent = [CORE_CSS, ICON_CSS, ...state.styles].join("\n");
     document.head.appendChild(style);
     ensurePanel();
     initSeenNotices();
@@ -428,6 +434,7 @@
       ensurePanel();
       const panel = document.getElementById("gather-mods-panel");
       if (panel) applyTheme(panel);
+      renderSectionStatus();
       for (const fn of state.tickers) runSafely(fn);
       showAnnouncements(false);
     }, TICK_MS);
@@ -518,10 +525,12 @@
   const getCollapsed = () => readJson(SECTIONS_KEY, {}).collapsed ?? [];
   function setCollapsed(collapsed) {
     writeJson(SECTIONS_KEY, { ...readJson(SECTIONS_KEY, {}), collapsed });
-    document.querySelectorAll("#gather-mods-panel .gm-section").forEach((el) => {
-      el.classList.toggle("collapsed", collapsed.includes(el.dataset.section));
+    document.querySelectorAll("#gather-mods-panel .gm-sec").forEach((el) => {
+      el.classList.toggle("open", !collapsed.includes(el.dataset.section));
     });
+    renderSectionStatus();
   }
+  const moduleIcon = (id) => catalogModules().find((m) => m.id === id)?.icon ?? "puzzle";
 
   function ensurePanel() {
     if (!installed || document.getElementById("gather-mods-panel")) return;
@@ -532,30 +541,32 @@
     if (localStorage.getItem(PANEL_COLLAPSED_KEY) === "true") panel.classList.add("collapsed");
     const collapsed = getCollapsed();
     panel.innerHTML = `
-      <div class="gm-head" id="gm-head">
-        <h4>🛠️ Mods<span class="gm-update-dot" id="gm-update-dot" title="Updates or new modules available"></span></h4>
-        <span class="gm-head-actions"><span class="gm-cog" id="gm-settings-toggle" title="Settings">⚙</span><span class="gm-chevron">▾</span></span>
+      <div class="gm-panel-head" id="gm-head">
+        <span class="gm-panel-title">Mods<i class="gm-i xs" data-i="chevron-down"></i></span>
+        <span class="gm-dot" id="gm-update-dot" title="Updates or new modules available"></span>
+        <span class="gm-spacer"></span>
+        <button class="gm-iconbtn" id="gm-settings-toggle" title="Settings"><i class="gm-i" data-i="settings"></i></button>
       </div>
       <div class="gm-body">
         <div id="gm-announcements"></div>
         ${
           installed.required.length
-            ? `<button class="gm-btn gm-required" id="gm-required">⚠ Update required: ${escapeHtml(installed.required.map((r) => r.module.name).join(", "))}</button>`
+            ? `<div class="gm-news gm-alert" id="gm-required"><i class="gm-i" data-i="triangle-alert"></i><span class="gm-news-text">Update required: ${escapeHtml(installed.required.map((r) => r.module.name).join(", "))}</span><i class="gm-i sm" data-i="chevron-right"></i></div>`
             : ""
         }
         ${
           installed.sections
             .map(
               (s) => `
-          <section class="gm-section${collapsed.includes(s.id) ? " collapsed" : ""}" data-section="${s.id}">
-            <div class="gm-section-head"><div class="gm-label">${escapeHtml(s.title)}</div><span class="gm-chevron">▾</span></div>
-            <div class="gm-section-body">${s.html}</div>
+          <section class="gm-sec${collapsed.includes(s.id) ? "" : " open"}" data-section="${s.id}">
+            <div class="gm-sec-head"><i class="gm-i" data-i="${escapeHtml(moduleIcon(s.id))}"></i><span class="gm-sec-title">${escapeHtml(s.title)}</span><span class="gm-pill gm-new gm-sec-status"></span><i class="gm-i sm gm-chev" data-i="chevron-right"></i></div>
+            <div class="gm-sec-body">${s.html}</div>
           </section>`,
             )
             .join("") ||
           (installed.required.length
             ? ""
-            : '<div class="gm-empty">No module installed. Open ⚙ to choose modules.</div>')
+            : '<div class="gm-empty">No module installed: pick some in the settings.</div>')
         }
       </div>`;
     applyTheme(panel);
@@ -570,7 +581,7 @@
       e.stopPropagation();
       openSettingsModal();
     };
-    panel.querySelectorAll(".gm-section-head").forEach((head) => {
+    panel.querySelectorAll(".gm-sec-head").forEach((head) => {
       head.onclick = () => {
         const id = head.parentElement.dataset.section;
         const current = getCollapsed();
@@ -578,15 +589,26 @@
       };
     });
     for (const s of installed.sections) {
-      const body = panel.querySelector(`[data-section="${s.id}"] .gm-section-body`);
+      const body = panel.querySelector(`[data-section="${s.id}"] .gm-sec-body`);
       const hidden = hiddenParts(s.id);
       body.querySelectorAll("[data-part]").forEach((el) => {
         if (hidden.includes(el.dataset.part)) el.style.display = "none";
       });
       runSafely(() => s.mount?.(body));
     }
+    renderSectionStatus();
     renderUpdateDot();
     renderAnnouncements();
+  }
+
+  // A module's status() (“On”, “2 playing”…) shows on its folded section.
+  function renderSectionStatus() {
+    for (const s of installed?.sections ?? []) {
+      const pill = document.querySelector(
+        `#gather-mods-panel [data-section="${s.id}"] .gm-sec-status`,
+      );
+      if (pill && s.status) runSafely(() => (pill.textContent = s.status() || ""));
+    }
   }
 
   function renderUpdateDot() {
@@ -635,8 +657,28 @@
   }
   const noticeHtml = (entry) =>
     entry.notice
-      ? `<div class="gm-notice${entry.breaking ? " gm-breaking" : ""}">${entry.breaking ? "<b>Breaking change.</b> " : ""}${escapeHtml(entry.notice)}</div>`
+      ? `<div class="gm-notice${entry.breaking ? " gm-breaking" : ""}"><i class="gm-i sm" data-i="${entry.breaking ? "triangle-alert" : "info"}"></i><span>${entry.breaking ? "<b>Breaking change.</b> " : ""}${escapeHtml(entry.notice)}</span></div>`
       : "";
+  const changesHtml = (changes) =>
+    `<ul class="gm-changes">${(changes ?? []).map((c) => `<li class="${changeClass(c)}">${escapeHtml(c)}</li>`).join("")}</ul>`;
+  const formatDay = (date) =>
+    date
+      ? new Date(date.includes("T") ? date : `${date}T12:00`).toLocaleDateString([], {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "";
+  // One changelog entry of a module; `state` is [label, pill class].
+  const entryHtml = (module, entry, state) => `
+    <div class="gm-mod gm-entry">
+      <span class="gm-mod-icon"><i class="gm-i" data-i="${escapeHtml(module.icon ?? "puzzle")}"></i></span>
+      <div class="gm-mod-main">
+        <div class="gm-mod-name">${escapeHtml(module.name)} ${escapeHtml(entry.version)}${state ? `<span class="gm-pill ${state[1]}">${state[0]}</span>` : ""}<span class="gm-spacer"></span><span class="gm-mod-version">${formatDay(entry.date)}</span></div>
+        ${noticeHtml(entry)}
+        ${changesHtml(entry.changes)}
+      </div>
+    </div>`;
   function showNews() {
     if (document.getElementById("gather-mods-modal")) return;
     const seen = readJson(SEEN_NOTICES_KEY, []);
@@ -644,25 +686,22 @@
     if (!notices.length) return;
     writeJson(SEEN_NOTICES_KEY, [...seen, ...notices.map(noticeKey)]);
     const canReview = hasLauncher() && notices.some((n) => n.pending);
-    const modal = openModal(
-      "Mod news",
-      `
-      <div class="gm-news">${notices
-        .map(
-          ({ module, entry, pending }) => `
-        <div class="gm-changelog${pending ? " gm-fresh" : " gm-recent"}">
-          <div class="gm-changelog-head"><b>${escapeHtml(module.name)} v${escapeHtml(entry.version)}</b><span>${escapeHtml(entry.date ?? "")} · ${pending ? "update available" : "installed"}</span></div>
-          ${noticeHtml(entry)}
-          <ul>${(entry.changes ?? []).map((c) => `<li class="${changeClass(c)}">${escapeHtml(c)}</li>`).join("")}</ul>
-        </div>`,
+    const breaking = notices.some((n) => n.entry.breaking);
+    const modal = openMessage({
+      icon: breaking ? "triangle-alert" : "info",
+      tone: breaking ? "gm-warn" : "",
+      title: "Mod news",
+      html: `<div class="gm-entries">${notices
+        .map(({ module, entry, pending }) =>
+          entryHtml(
+            module,
+            entry,
+            pending ? ["Update available", "gm-up"] : ["Installed", "gm-new"],
+          ),
         )
-        .join("")}</div>
-      <div class="gm-row gm-settings-actions">
-        ${canReview ? '<button class="gm-btn" id="gm-news-review">Review & install</button>' : ""}
-        <button class="gm-btn active" id="gm-news-ok">Got it</button>
-      </div>`,
-      "gm-modal-news",
-    );
+        .join("")}</div>`,
+      actions: `${canReview ? '<button class="gm-btn gm-ghost" id="gm-news-review">Review & install</button>' : ""}<button class="gm-btn gm-primary" id="gm-news-ok">Got it</button>`,
+    });
     modal.querySelector("#gm-news-ok").onclick = closeModal;
     const review = modal.querySelector("#gm-news-review");
     if (review) review.onclick = openReviewModal;
@@ -740,38 +779,33 @@
       entries.map((entry) => noticeKey({ module, entry })),
     );
     writeJson(SEEN_NOTICES_KEY, [...new Set([...seen, ...shown])]);
-    const modal = openModal(
-      "Update required",
-      `
-      <p class="gm-hint">${
-        coreOutdated
-          ? "This version of the mod no longer works: the mod stays off until you update it."
-          : "Some of your modules no longer work in this version: they stay off until you update or disable them."
-      }</p>
-      <div class="gm-news">${required
-        .flatMap(({ module, version, entries }) =>
-          entries.map(
-            (entry) => `
-        <div class="gm-changelog gm-fresh">
-          <div class="gm-changelog-head"><b>${escapeHtml(module.name)} v${escapeHtml(entry.version)}</b><span>${escapeHtml(entry.date ?? "")} · you have v${escapeHtml(version)}</span></div>
-          ${noticeHtml(entry)}
-          <ul>${(entry.changes ?? []).map((c) => `<li class="${changeClass(c)}">${escapeHtml(c)}</li>`).join("")}</ul>
-        </div>`,
-          ),
-        )
-        .join("")}</div>
-      <p class="gm-hint" id="gm-required-message"></p>
-      <div class="gm-row gm-settings-actions">
-        ${
-          coreOutdated || toDisable.length
-            ? `<button class="gm-btn" id="gm-required-off">${coreOutdated ? "Turn off the mod" : `Disable ${escapeHtml(toDisable.map(nameOf).join(", "))}`}</button>`
-            : ""
-        }
-        <button class="gm-btn active" id="gm-required-update">${hasLauncher() ? "Update now" : "Get the new version"}</button>
-      </div>`,
-      "gm-modal-news",
-      true,
-    );
+    const modal = openMessage({
+      icon: "triangle-alert",
+      tone: "gm-warn",
+      title: coreOutdated
+        ? "Update required"
+        : `Update required: ${required.map((r) => r.module.name).join(", ")}`,
+      html: `
+        <div class="gm-message-text">${
+          coreOutdated
+            ? "This version of the mod no longer works: the mod stays off until you update it."
+            : "Some of your modules no longer work in this version: they stay off until you update or disable them."
+        }</div>
+        <div class="gm-entries">${required
+          .flatMap(({ module, version, entries }) =>
+            entries.map((entry) =>
+              entryHtml(module, entry, [`You have ${escapeHtml(version)}`, "gm-gone"]),
+            ),
+          )
+          .join("")}</div>
+        <div class="gm-note gm-err"><i class="gm-i sm" data-i="circle-alert"></i><span id="gm-required-message"></span></div>`,
+      actions: `${
+        coreOutdated || toDisable.length
+          ? `<button class="gm-btn gm-ghost" id="gm-required-off">${coreOutdated ? "Turn off the mod" : `Disable ${escapeHtml(toDisable.map(nameOf).join(", "))}`}</button>`
+          : ""
+      }<button class="gm-btn gm-primary" id="gm-required-update">${hasLauncher() ? "Update now" : "Get the new version"}</button>`,
+      locked: true,
+    });
     const off = modal.querySelector("#gm-required-off");
     if (off)
       off.onclick = () =>
@@ -834,13 +868,11 @@
   function renderAnnouncements() {
     const box = document.getElementById("gm-announcements");
     if (!box) return;
-    box.innerHTML = installed.announcements
-      .map(
-        (a) =>
-          `<button class="gm-btn gm-announce gm-${escapeHtml(a.level)}">📣 ${escapeHtml(a.title)}</button>`,
-      )
-      .join("");
-    box.querySelectorAll("button").forEach((b) => (b.onclick = () => showAnnouncements(true)));
+    const [latest, ...more] = installed.announcements;
+    box.innerHTML = latest
+      ? `<div class="gm-news${latest.level === "warning" ? " gm-warn" : ""}" title="Read the announcements"><i class="gm-i" data-i="megaphone"></i><span class="gm-news-text">${escapeHtml(latest.title)}</span>${more.length ? `<span class="gm-pill gm-new">+${more.length}</span>` : ""}<i class="gm-i sm" data-i="chevron-right"></i></div>`
+      : "";
+    if (latest) box.firstElementChild.onclick = () => showAnnouncements(true);
   }
   function showAnnouncements(all) {
     const seen = readJson(SEEN_ANNOUNCEMENTS_KEY, []);
@@ -852,67 +884,84 @@
       SEEN_ANNOUNCEMENTS_KEY,
       installed.announcements.map((a) => a.id),
     );
-    const modal = openModal(
-      list.length === 1 ? list[0].title : "Announcements",
-      `
-      <div class="gm-news">${list
-        .map(
-          (a) => `
-        <div class="gm-announcement gm-${escapeHtml(a.level)}">
-          ${list.length === 1 ? "" : `<b>${escapeHtml(a.title)}</b>`}
-          <p>${escapeHtml(a.message)}</p>
-          <span>${escapeHtml(new Date(a.createdAt).toLocaleString())}</span>
-        </div>`,
-        )
-        .join("")}</div>
-      <div class="gm-row gm-settings-actions">
-        <button class="gm-btn active" id="gm-announcements-ok">Got it</button>
-      </div>`,
-      "gm-modal-news",
-    );
-    modal.querySelector("#gm-announcements-ok").onclick = closeModal;
+    const show = (index) => {
+      const a = list[index];
+      const warning = a.level === "warning";
+      const modal = openMessage({
+        icon: warning ? "triangle-alert" : "megaphone",
+        tone: warning ? "gm-warn" : "",
+        title: a.title,
+        html: `
+          <div class="gm-message-text">${escapeHtml(a.message)}</div>
+          <div class="gm-message-meta">${list.length > 1 ? `<span class="gm-pill">${index + 1} of ${list.length}</span><span class="gm-link" id="gm-announcements-next">Next</span><span class="gm-spacer"></span>` : ""}<span>${escapeHtml(formatDate(a.createdAt))}</span></div>`,
+        actions: '<button class="gm-btn gm-primary" id="gm-announcements-ok">Got it</button>',
+      });
+      modal.querySelector("#gm-announcements-ok").onclick = closeModal;
+      const next = modal.querySelector("#gm-announcements-next");
+      if (next) next.onclick = () => show((index + 1) % list.length);
+    };
+    show(0);
   }
 
   // ===================
   // Settings
   // ===================
+  let settingsTab = "modules";
   function openSettingsModal() {
     if (installed?.required.length) return showUpdateRequired();
     const modal = openModal(
-      "Mod settings",
+      "Mods settings",
       `
-      <div class="gm-settings-body">
-        <section class="gm-settings-group">
-          <h4>Modules</h4>
-          <p class="gm-hint">Pick the features you want: only the code of installed modules runs in Gather and gets updated. Uninstalling a module keeps its data (presets, saved locations…). In the panel, click a section title to fold it.</p>
+      <div class="gm-tabs" role="tablist">
+        <button role="tab" data-tab="modules">Modules</button>
+        <button role="tab" data-tab="news">What's new<span class="gm-pill gm-new" id="gm-news-count"></span></button>
+        <button role="tab" data-tab="updates">Updates<span class="gm-pill gm-up" id="gm-updates-count"></span></button>
+      </div>
+      <div class="gm-tab-pane" data-pane="modules">
+        <div class="gm-window-body gm-modules-body">
+          <div class="gm-hint gm-modules-hint">Only the modules you turn on run in Gather. Turning one off keeps its data (presets, saved locations…).</div>
           <div id="gm-settings-modules"></div>
-          <div class="gm-row gm-settings-actions">
-            <button class="gm-btn" id="gm-expand-all">Unfold all</button>
-            <button class="gm-btn" id="gm-collapse-all">Fold all</button>
-          </div>
-          <p class="gm-hint" id="gm-modules-message"></p>
-        </section>
-        <section class="gm-settings-group">
-          <h4>What's new</h4>
-          <div id="gm-settings-changelog"></div>
-        </section>
-        <section class="gm-settings-group">
-          <h4>Updates</h4>
-          <p class="gm-hint">When Gather is opened with “Gather Mods.app”, the launcher checks every 15 minutes for new module versions, and only accepts code signed by the GitHub release workflow of the repo’s main branch.</p>
+        </div>
+        <div class="gm-window-foot">
+          <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-modules-message"></span></div>
+          <span class="gm-spacer"></span>
+          <button class="gm-btn gm-ghost gm-sm" id="gm-collapse-all" title="Fold every section of the panel">Fold all</button>
+          <button class="gm-btn gm-ghost gm-sm" id="gm-expand-all" title="Unfold every section of the panel">Unfold all</button>
+        </div>
+      </div>
+      <div class="gm-tab-pane" data-pane="news">
+        <div class="gm-window-body gm-news-body" id="gm-settings-changelog"></div>
+      </div>
+      <div class="gm-tab-pane" data-pane="updates">
+        <div class="gm-window-body">
           <div id="gm-update-info"></div>
-          <label class="gm-setting" id="gm-auto-update-row">
-            <span class="gm-setting-text">Automatic updates<span>Install new versions of your modules as soon as they are published, without restarting Gather. When off, updates are announced here and in the panel header (dot), and you review and install them yourself. New modules are never installed automatically.</span></span>
+          <label class="gm-toggle" id="gm-auto-update-row">
+            <span class="gm-toggle-text"><span class="gm-toggle-title">Install updates automatically</span><span class="gm-hint">As soon as they are published, without restarting Gather. Off: the dot in the panel tells you, and you review the code before installing. New modules are never installed automatically.</span></span>
             <input type="checkbox" class="gm-switch" id="gm-auto-update" />
           </label>
-          <div class="gm-row gm-settings-actions" id="gm-update-actions">
-            <button class="gm-btn" id="gm-check-update">Check now</button>
-            <button class="gm-btn" id="gm-review-update"></button>
-          </div>
-          <p class="gm-hint" id="gm-update-message"></p>
-        </section>
+          <div class="gm-list" id="gm-update-list"></div>
+          <div class="gm-note"><i class="gm-i sm" data-i="shield-check"></i><span>With Gather Mods.app, the launcher checks for new versions every 15 minutes and only accepts code signed by the release workflow of the repo's main branch.</span></div>
+        </div>
+        <div class="gm-window-foot" id="gm-update-actions">
+          <div class="gm-note"><span id="gm-update-message"></span></div>
+          <span class="gm-spacer"></span>
+          <button class="gm-btn gm-ghost" id="gm-check-update"><i class="gm-i" data-i="refresh-cw"></i>Check now</button>
+          <button class="gm-btn gm-primary" id="gm-review-update"></button>
+        </div>
       </div>`,
       "gm-modal-settings",
     );
+    const showTab = (tab) => {
+      settingsTab = tab;
+      modal
+        .querySelectorAll("[data-tab]")
+        .forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+      modal
+        .querySelectorAll("[data-pane]")
+        .forEach((p) => p.classList.toggle("on", p.dataset.pane === tab));
+    };
+    modal.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+    showTab(settingsTab);
     modal.querySelector("#gm-expand-all").onclick = () => setCollapsed([]);
     modal.querySelector("#gm-collapse-all").onclick = () =>
       setCollapsed(installed?.sections.map((s) => s.id) ?? []);
@@ -955,33 +1004,31 @@
     const removed = hasLauncher() ? (launcherState().removed ?? []) : [];
     const hiddenAll = readJson(HIDDEN_PARTS_KEY, {});
     const nameOf = (id) => catalogModules().find((m) => m.id === id)?.name ?? id;
-    const changesHtml = (changes) =>
-      `<ul>${(changes ?? []).map((c) => `<li class="${changeClass(c)}">${escapeHtml(c)}</li>`).join("")}</ul>`;
     const moduleHtml = (m) => {
       const id = escapeHtml(m.id);
       const version = installedVersion(m.id);
-      const badges = [
-        unseen.includes(m.id) ? '<span class="gm-badge">New</span>' : "",
+      const pills = [
+        unseen.includes(m.id) ? '<span class="gm-pill gm-new">New</span>' : "",
         pending.has(m.id)
-          ? `<span class="gm-badge">Update v${escapeHtml(pending.get(m.id).to)}</span>`
+          ? `<span class="gm-pill gm-up">Update ${escapeHtml(pending.get(m.id).to)}</span>`
           : "",
       ].join("");
       const parts = version ? (installed?.sections.find((s) => s.id === m.id)?.parts ?? []) : [];
       const hidden = hiddenAll[m.id] ?? [];
       const partsHtml = parts.length
-        ? `<span class="gm-parts">Show:${parts
-            .map(
-              (p) =>
-                `<span class="gm-part${hidden.includes(p.id) ? "" : " on"}" data-part-of="${id}" data-part="${escapeHtml(p.id)}" title="Click to ${hidden.includes(p.id) ? "show" : "hide and turn off"} ${escapeHtml(p.label)}">${escapeHtml(p.label)}</span>`,
-            )
-            .join("")}</span>`
+        ? `<div class="gm-mod-parts">${parts
+            .map((p) => {
+              const on = !hidden.includes(p.id);
+              return `<span class="gm-chip${on ? " on" : ""}" data-part-of="${id}" data-part="${escapeHtml(p.id)}" title="${on ? "Hide and turn off" : "Show"} ${escapeHtml(p.label)}">${on ? '<i class="gm-i xs" data-i="check"></i>' : ""}${escapeHtml(p.label)}</span>`;
+            })
+            .join("")}</div>`
         : "";
       const open = expandedChangelogs.has(m.id);
       const changelog = open
-        ? `<div class="gm-module-changelog">${(m.changelog ?? [])
+        ? `<div class="gm-mod-changelog">${(m.changelog ?? [])
             .map(
               (e) =>
-                `<div class="gm-changelog"><div class="gm-changelog-head"><b>v${escapeHtml(e.version)}</b><span>${escapeHtml(e.date ?? "")}${e.version === version ? " · installed" : ""}</span></div>${noticeHtml(e)}${changesHtml(e.changes)}</div>`,
+                `<div class="gm-release"><div class="gm-mod-name">${escapeHtml(e.version)}<span class="gm-mod-version">${formatDay(e.date)}${e.version === version ? " · installed" : ""}</span></div>${noticeHtml(e)}${changesHtml(e.changes)}</div>`,
             )
             .join("")}</div>`
         : "";
@@ -990,22 +1037,25 @@
       );
       const confirm =
         pendingInstall === m.id
-          ? `<div class="gm-install-confirm">
-          <div>Install <b>${escapeHtml(m.name)} v${escapeHtml(m.version)}</b>? Latest changes:</div>
+          ? `<div class="gm-card gm-install-confirm">
+          <span class="gm-confirm-text">Install <b>${escapeHtml(m.name)} ${escapeHtml(m.version)}</b>? Latest changes:</span>
           ${changesHtml(m.changelog?.[0]?.changes)}
-          ${libs.length ? `<div>Also installs: ${escapeHtml(libs.map(nameOf).join(", "))}.</div>` : ""}
-          <div class="gm-row gm-settings-actions"><button class="gm-btn" data-install-cancel>Cancel</button><button class="gm-btn active" data-install="${id}">Install v${escapeHtml(m.version)}</button></div>
+          ${libs.length ? `<span class="gm-hint">Also installs: ${escapeHtml(libs.map(nameOf).join(", "))}.</span>` : ""}
+          <div class="gm-btn-row"><button class="gm-btn gm-sm" data-install-cancel>Cancel</button><button class="gm-btn gm-sm gm-primary" data-install="${id}">Install ${escapeHtml(m.version)}</button></div>
         </div>`
           : "";
       return `
-      <div class="gm-module">
-        <label class="gm-setting${launcherLost ? " disabled" : ""}">
-          <span class="gm-setting-text"><span class="gm-setting-title">${escapeHtml(m.name)} <span class="gm-version">${version ? `v${escapeHtml(version)}` : `v${escapeHtml(m.version)} · not installed`}</span>${badges}</span><span>${escapeHtml(m.description)}</span></span>
-          <input type="checkbox" class="gm-switch" data-module="${id}" ${selected.includes(m.id) ? "checked" : ""} ${launcherLost ? "disabled" : ""} />
-        </label>
-        ${confirm}
-        <div class="gm-module-extra">${partsHtml}<span class="gm-link" data-changelog="${id}">${open ? "Hide changelog" : "Changelog"}</span></div>
-        ${changelog}
+      <div class="gm-mod${launcherLost ? " gm-disabled" : ""}">
+        <span class="gm-mod-icon"><i class="gm-i" data-i="${escapeHtml(m.icon ?? "puzzle")}"></i></span>
+        <div class="gm-mod-main">
+          <div class="gm-mod-name">${escapeHtml(m.name)}<span class="gm-mod-version">${version ? escapeHtml(version) : `${escapeHtml(m.version)} · not installed`}</span>${pills}</div>
+          <div class="gm-mod-desc">${escapeHtml(m.description)}</div>
+          ${partsHtml}${confirm}${changelog}
+        </div>
+        <div class="gm-mod-side">
+          <input type="checkbox" class="gm-switch" data-module="${id}" title="${selected.includes(m.id) ? "Uninstall" : "Install"} ${escapeHtml(m.name)}" ${selected.includes(m.id) ? "checked" : ""} ${launcherLost ? "disabled" : ""} />
+          <span class="gm-link" data-changelog="${id}">${open ? "Hide changelog" : "Changelog"}</span>
+        </div>
       </div>`;
     };
     list.innerHTML = modules.map(moduleHtml).join("");
@@ -1014,23 +1064,26 @@
       removed
         .map(
           (id) => `
-        <div class="gm-setting gm-removed">
-          <span class="gm-setting-text"><span class="gm-setting-title">${escapeHtml(id)}<span class="gm-badge gm-badge-removed">Removed</span></span><span>No longer published. Uninstall it if you don't need it anymore.</span></span>
-          <button class="gm-btn gm-btn-danger" data-uninstall="${escapeHtml(id)}" ${launcherLost ? "disabled" : ""}>Uninstall</button>
+        <div class="gm-mod gm-removed">
+          <span class="gm-mod-icon"><i class="gm-i" data-i="package-x"></i></span>
+          <div class="gm-mod-main">
+            <div class="gm-mod-name">${escapeHtml(id)}<span class="gm-pill gm-gone">Removed</span></div>
+            <div class="gm-mod-desc">No longer published. Uninstall it if you don't need it anymore.</div>
+          </div>
+          <div class="gm-mod-side"><button class="gm-btn gm-sm gm-danger" data-uninstall="${escapeHtml(id)}" ${launcherLost ? "disabled" : ""}>Uninstall</button></div>
         </div>`,
         )
         .join(""),
     );
-    if (launcherLost) {
-      const message = document.getElementById("gm-modules-message");
-      message.textContent =
-        "The launcher is not running: reopen Gather Mods.app to change modules.";
-      message.classList.add("gm-text-danger");
-    }
+    const message = document.getElementById("gm-modules-message");
+    const setMessage = (text, error) => {
+      message.textContent = text;
+      message.parentElement.classList.toggle("gm-err", error);
+    };
+    if (launcherLost)
+      setMessage("The launcher is not running: reopen Gather Mods.app to change modules.", true);
     const showModuleChange = (row, installing) => {
-      const message = document.getElementById("gm-modules-message");
-      message.textContent = installing ? "Installing…" : "Uninstalling…";
-      message.classList.toggle("gm-text-danger", !installing);
+      setMessage(installing ? "Installing…" : "Uninstalling…", !installing);
       row.classList.toggle("gm-uninstalling", !installing);
     };
     list.querySelectorAll("[data-module]").forEach((input) => {
@@ -1042,7 +1095,7 @@
           renderModuleList();
           return;
         }
-        showModuleChange(input.closest(".gm-setting"), input.checked);
+        showModuleChange(input.closest(".gm-mod"), input.checked);
         setModuleSelected(id, input.checked);
       };
     });
@@ -1050,7 +1103,7 @@
       btn.onclick = () => {
         btn.disabled = true;
         pendingInstall = null;
-        showModuleChange(btn.closest(".gm-module").querySelector(".gm-setting"), true);
+        showModuleChange(btn.closest(".gm-mod"), true);
         setModuleSelected(btn.dataset.install, true);
       };
     });
@@ -1074,7 +1127,7 @@
     list.querySelectorAll("[data-uninstall]").forEach((btn) => {
       btn.onclick = () => {
         btn.disabled = true;
-        showModuleChange(btn.closest(".gm-setting"), false);
+        showModuleChange(btn.closest(".gm-mod"), false);
         setModuleSelected(btn.dataset.uninstall, false);
       };
     });
@@ -1112,21 +1165,28 @@
       .filter((i) => i.highlighted)
       .sort((a, b) => (b.entry.date || "").localeCompare(a.entry.date || ""));
     const history = items.filter((i) => !i.highlighted);
-    const entryHtml = ({ module, entry, notInstalled, pending, recent }) => `
-        <div class="gm-changelog${notInstalled || pending ? " gm-fresh" : recent ? " gm-recent" : ""}">
-          <div class="gm-changelog-head"><b>${escapeHtml(module.name)} v${escapeHtml(entry.version)}</b><span>${escapeHtml(entry.date ?? "")}${notInstalled ? " · not installed" : pending ? " · update available" : recent ? " · installed" : ""}</span></div>
-          ${noticeHtml(entry)}
-          <ul>${(entry.changes ?? []).map((c) => `<li class="${changeClass(c)}">${escapeHtml(c)}</li>`).join("")}</ul>
-        </div>`;
+    const itemHtml = ({ module, entry, notInstalled, pending, recent }) =>
+      entryHtml(
+        module,
+        entry,
+        notInstalled
+          ? ["Not installed", ""]
+          : pending
+            ? ["Update available", "gm-up"]
+            : recent
+              ? ["Installed", "gm-new"]
+              : null,
+      );
     box.innerHTML = [
       highlighted.length
-        ? highlighted.map(entryHtml).join("")
-        : '<div class="gm-empty">Everything is up to date.</div>',
+        ? highlighted.map(itemHtml).join("")
+        : '<div class="gm-empty"><i class="gm-i sm" data-i="circle-check"></i>Everything is up to date</div>',
       history.length
-        ? `<div class="gm-changelog-more"><span class="gm-link" id="gm-changelog-toggle">${showChangelogHistory ? "Hide" : "Show"} full history</span></div>`
+        ? `<div class="gm-history-toggle"><span class="gm-link" id="gm-changelog-toggle">${showChangelogHistory ? "Hide" : "Show"} full history</span></div>`
         : "",
-      showChangelogHistory ? history.map(entryHtml).join("") : "",
+      showChangelogHistory ? history.map(itemHtml).join("") : "",
     ].join("");
+    document.getElementById("gm-news-count").textContent = highlighted.length || "";
     const toggle = document.getElementById("gm-changelog-toggle");
     if (toggle)
       toggle.onclick = () => {
@@ -1141,36 +1201,39 @@
     const state = launcherState();
     const connected = hasLauncher() && !launcherLost;
     const pending = pendingUpdates();
-    const row = (label, value, cls = "") =>
-      `<div class="gm-info-row"><span>${label}</span><span class="${cls}">${escapeHtml(value)}</span></div>`;
+    const note = (cls, icon, text) =>
+      `<div class="gm-note ${cls}"><i class="gm-i sm" data-i="${icon}"></i><span>${escapeHtml(text)}</span></div>`;
     info.innerHTML = [
       launcherLost
-        ? row("Launcher", "Not running: reopen Gather Mods.app", "gm-text-danger")
-        : row(
-            "Launcher",
-            connected ? "Connected" : "Not connected (mod pasted by hand, no updates)",
-          ),
-      row("Last check", hasLauncher() ? formatTime(state.checkedAt) : "—"),
-      row(
-        "Latest release",
-        hasLauncher() && state.catalog
-          ? `commit ${shortCommit(state.catalog.commit)} · ${formatDate(state.catalog.publishedAt)}`
-          : "—",
-      ),
-      row(
-        "Updates",
-        !connected
-          ? "—"
-          : pending.length
-            ? pending.map((p) => `${p.name} ${p.from} → ${p.to}`).join(", ")
-            : "Everything is up to date",
-      ),
-      ...(state?.error ? [row("Last error", state.error)] : []),
+        ? note("gm-err", "circle-alert", "The launcher is not running: reopen Gather Mods.app.")
+        : connected
+          ? note(
+              "gm-ok",
+              "circle-check",
+              `Launcher connected · checked at ${formatTime(state.checkedAt)}${state.catalog ? ` · release of ${formatDay(state.catalog.publishedAt)} (${shortCommit(state.catalog.commit)})` : ""}`,
+            )
+          : note(
+              "",
+              "info",
+              "Mod pasted by hand: no updates. Open Gather with Gather Mods.app to get them.",
+            ),
+      state?.error ? note("gm-err", "circle-alert", `Last error: ${state.error}`) : "",
     ].join("");
+    document.getElementById("gm-update-list").innerHTML = !connected
+      ? ""
+      : pending.length
+        ? pending
+            .map((p) => {
+              const m = catalogModules().find((x) => x.id === p.id);
+              const change = m?.changelog?.find((e) => e.version === p.to)?.changes?.[0] ?? "";
+              return `<div class="gm-item"><span class="gm-mod-icon gm-sm"><i class="gm-i sm" data-i="${escapeHtml(m?.icon ?? "puzzle")}"></i></span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(p.name)} ${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span><span class="gm-item-meta">${escapeHtml(change)}</span></div></div>`;
+            })
+            .join("")
+        : '<div class="gm-empty"><i class="gm-i sm" data-i="circle-check"></i>Everything is up to date</div>';
+    document.getElementById("gm-updates-count").textContent = pending.length || "";
     const auto = document.getElementById("gm-auto-update");
     auto.checked = hasLauncher() && state.autoUpdate;
     auto.disabled = !connected;
-    document.getElementById("gm-auto-update-row").classList.toggle("disabled", !connected);
     document.getElementById("gm-update-actions").style.display = connected ? "" : "none";
     const review = document.getElementById("gm-review-update");
     review.style.display = pending.length ? "" : "none";
@@ -1184,11 +1247,13 @@
     const modal = openModal(
       "Review updates",
       `
-      <p class="gm-hint">The launcher only accepts code signed by the GitHub release workflow on main. The changelog is written by the author; the diff below is the exact code that will run.</p>
-      <div class="gm-diff" id="gm-diff"><div>Loading…</div></div>
-      <div class="gm-row gm-settings-actions">
-        <button class="gm-btn" id="gm-review-cancel">Cancel</button>
-        <button class="gm-btn active" id="gm-review-install">Install ${pending.length} update${pending.length > 1 ? "s" : ""}</button>
+      <div class="gm-window-body">
+        <div class="gm-note"><i class="gm-i sm" data-i="shield-check"></i><span>The launcher only accepts code signed by the GitHub release workflow on main. The changelog is written by the author; the diff below is the exact code that will run.</span></div>
+        <div class="gm-diff" id="gm-diff"><div>Loading…</div></div>
+      </div>
+      <div class="gm-window-foot">
+        <button class="gm-btn gm-ghost" id="gm-review-cancel">Cancel</button>
+        <button class="gm-btn gm-primary" id="gm-review-install">Install ${pending.length} update${pending.length > 1 ? "s" : ""}</button>
       </div>`,
       "gm-modal-review",
     );
@@ -1220,143 +1285,356 @@
   }
 
   const CORE_CSS = `
-    #gather-mods-panel { padding: 8px 14px 12px; font-family: inherit; color: var(--gm-fg); border-bottom: 1px solid var(--gm-border); }
-    #gather-mods-panel .gm-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:4px 0; }
-    #gather-mods-panel .gm-head h4 { margin:0; font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--gm-muted); }
-    #gather-mods-panel .gm-head-actions { display:flex; align-items:center; gap:8px; }
-    #gather-mods-panel .gm-cog { color:var(--gm-muted); font-size:13px; line-height:1; }
-    #gather-mods-panel .gm-cog:hover { color:var(--theme-color-accent,#6c5ce7); }
-    #gather-mods-panel .gm-update-dot { display:none; width:6px; height:6px; margin-left:6px; border-radius:50%; background:var(--theme-color-accent,#6c5ce7); vertical-align:middle; }
-    #gather-mods-panel .gm-update-dot.visible { display:inline-block; }
-    #gather-mods-panel .gm-chevron { color:var(--gm-muted); font-size:11px; transition:transform .15s; }
+    .gm { color-scheme:light; --gm-text:rgba(0,0,0,.88); --gm-text-2:rgba(0,0,0,.6); --gm-text-3:rgba(0,0,0,.42);
+      --gm-fill:rgba(0,0,0,.04); --gm-fill-2:rgba(0,0,0,.075); --gm-line:rgba(0,0,0,.08); --gm-surface:#fff; --gm-raised:#fff;
+      --gm-accent:var(--theme-color-accent,#4257da); --gm-on-accent:#fff;
+      --gm-accent-soft:color-mix(in srgb, var(--gm-accent) 11%, transparent); --gm-accent-text:color-mix(in srgb, var(--gm-accent) 88%, black);
+      --gm-danger:#d0342c; --gm-danger-soft:rgba(208,52,44,.09); --gm-success:#1c8a4a; --gm-success-soft:rgba(28,138,74,.1);
+      --gm-warning:#a8650a; --gm-warning-soft:rgba(245,165,36,.16); --gm-ring:0 0 0 3px color-mix(in srgb, var(--gm-accent) 22%, transparent);
+      --gm-shadow-pop:0 16px 40px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.06); --gm-shadow-knob:0 1px 2px rgba(0,0,0,.18), 0 0 0 .5px rgba(0,0,0,.06);
+      font:400 13px/1.4 InterVariable, Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; font-feature-settings:"cv11", "ss01";
+      color:var(--gm-text); -webkit-font-smoothing:antialiased; }
+    .gm.gm-dark { color-scheme:dark; --gm-text:rgba(255,255,255,.92); --gm-text-2:rgba(255,255,255,.6); --gm-text-3:rgba(255,255,255,.4);
+      --gm-fill:rgba(255,255,255,.06); --gm-fill-2:rgba(255,255,255,.1); --gm-line:rgba(255,255,255,.09); --gm-surface:#1c1c1f; --gm-raised:#2a2a2e;
+      --gm-accent-soft:color-mix(in srgb, var(--gm-accent) 22%, transparent); --gm-accent-text:color-mix(in srgb, var(--gm-accent) 55%, white);
+      --gm-danger:#ff6b63; --gm-danger-soft:rgba(255,107,99,.13); --gm-success:#43d17f; --gm-success-soft:rgba(67,209,127,.13);
+      --gm-warning:#f5b544; --gm-warning-soft:rgba(245,181,68,.15); --gm-shadow-pop:0 16px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06); }
+    .gm *, .gm *::before, .gm *::after { box-sizing:border-box; }
+    :where(.gm) :where(button, input, select, textarea) { font:inherit; color:inherit; }
+    .gm ::-webkit-scrollbar { width:6px; height:6px; }
+    .gm ::-webkit-scrollbar-thumb { background:var(--gm-fill-2); border-radius:3px; }
+    .gm ::-webkit-scrollbar-track { background:transparent; }
+
+    .gm-i { display:inline-block; flex:none; width:16px; height:16px; vertical-align:-3px; background:currentColor;
+      -webkit-mask:var(--gm-i) center / contain no-repeat; mask:var(--gm-i) center / contain no-repeat; }
+    .gm-i.sm { width:14px; height:14px; vertical-align:-2px; }
+    .gm-i.xs { width:12px; height:12px; vertical-align:-1px; }
+    .gm-spacer { flex:1; }
+
+    #gather-mods-panel { padding:6px 14px 10px; border-bottom:1px solid var(--gm-line); }
+    #gather-mods-panel .gm-panel-head { display:flex; align-items:center; gap:4px; height:28px; padding-left:2px; cursor:pointer; user-select:none; }
+    #gather-mods-panel .gm-panel-title { display:flex; align-items:center; gap:4px; font-size:12px; font-weight:500; color:var(--gm-text-2); }
+    #gather-mods-panel .gm-panel-title .gm-i { transition:transform .15s; }
+    #gather-mods-panel.collapsed .gm-panel-title .gm-i { transform:rotate(-90deg); }
+    #gather-mods-panel .gm-dot { display:none; width:6px; height:6px; margin-left:2px; border-radius:50%; background:var(--gm-accent); }
+    #gather-mods-panel .gm-dot.visible { display:block; }
+    #gather-mods-panel .gm-body { display:flex; flex-direction:column; gap:2px; max-height:60vh; overflow-y:auto; overscroll-behavior:contain; margin:2px -6px 0; padding:0 6px; }
     #gather-mods-panel.collapsed .gm-body { display:none; }
-    #gather-mods-panel.collapsed > .gm-head .gm-chevron { transform:rotate(-90deg); }
-    #gather-mods-panel .gm-body { max-height:60vh; overflow-y:auto; overscroll-behavior:contain; margin-right:-6px; padding-right:6px; }
-    #gather-mods-panel .gm-body::-webkit-scrollbar { width:5px; }
-    #gather-mods-panel .gm-body::-webkit-scrollbar-thumb { background:var(--gm-border); border-radius:3px; }
-    #gather-mods-panel .gm-section-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; }
-    #gather-mods-panel .gm-section-head:hover .gm-label { color:var(--gm-fg); }
-    #gather-mods-panel .gm-section.collapsed .gm-section-body { display:none; }
-    #gather-mods-panel .gm-section.collapsed .gm-chevron { transform:rotate(-90deg); }
-    #gather-mods-panel .gm-sublabel { font-size:11px; color:var(--gm-muted); margin:8px 2px 2px; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-label { font-size:10px; font-weight:600; text-transform:uppercase; color:var(--gm-muted); margin:9px 0 4px; }
-    :is(#gather-mods-panel, #gather-mods-modal) button.gm-btn { display:block; width:100%; text-align:left; padding:7px 10px; margin:3px 0; font-size:13px;
-      background:var(--gm-surface); border:1px solid transparent; border-radius:8px; color:var(--gm-fg); cursor:pointer; transition:background .12s; }
-    :is(#gather-mods-panel, #gather-mods-modal) button.gm-btn:hover { background:var(--gm-surface-hover); }
-    :is(#gather-mods-panel, #gather-mods-modal) button.gm-btn.active { background:var(--theme-color-accent,#6c5ce7); color:#fff; border-color:transparent; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-input { width:100%; box-sizing:border-box; padding:7px 10px; margin:3px 0; font-size:13px;
-      background:var(--gm-input); border:1px solid var(--gm-border); border-radius:8px; color:var(--gm-fg); outline:none; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-input:focus { border-color:var(--theme-color-accent,#6c5ce7); }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-input::placeholder { color:var(--gm-muted); }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-list { max-height:160px; overflow-y:auto; }
-    :is(#gather-mods-panel, #gather-mods-modal) :is(.gm-list, .gm-grid)::-webkit-scrollbar { width:5px; }
-    :is(#gather-mods-panel, #gather-mods-modal) :is(.gm-list, .gm-grid)::-webkit-scrollbar-thumb { background:var(--gm-border); border-radius:3px; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-item { display:flex; align-items:center; justify-content:space-between; gap:6px;
-      padding:6px 10px; margin:2px 0; font-size:13px; background:var(--gm-surface); border-radius:8px; cursor:pointer; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-item:hover { background:var(--gm-surface-hover); }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-item .gm-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-item.active { background:var(--theme-color-accent,#6c5ce7); color:#fff; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-del { color:var(--gm-muted); font-size:13px; flex-shrink:0; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-del:hover { color:#ff6b6b; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-empty { color:var(--gm-muted); font-size:12px; padding:4px 2px; }
-    #gather-mods-panel button.gm-btn.gm-required { color:var(--gm-red); font-weight:600; margin-bottom:6px; }
-    #gather-mods-panel button.gm-btn.gm-announce { font-weight:600; margin-bottom:6px; }
-    #gather-mods-panel button.gm-btn.gm-announce.gm-warning { color:#c77c00; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-row { display:flex; gap:6px; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-row .gm-input { flex:1; margin:3px 0; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-row button.gm-btn { width:auto; flex-shrink:0; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-status { display:flex; justify-content:space-between; gap:6px; font-size:12px; color:var(--gm-muted); padding:2px 2px 4px; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-link { cursor:pointer; text-decoration:underline; flex-shrink:0; }
-    :is(#gather-mods-panel, #gather-mods-modal) .gm-actions { display:flex; gap:8px; flex-shrink:0; }
-    #gather-mods-panel .gm-pub { color:var(--gm-muted); font-size:13px; flex-shrink:0; }
-    #gather-mods-panel .gm-pub:hover { color:var(--theme-color-accent,#6c5ce7); }
-    #gather-mods-modal { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center;
-      background:rgba(0,0,0,.45); font-family:inherit; color:var(--gm-fg); }
-    #gather-mods-modal .gm-modal { width:min(860px, 92vw); height:min(640px, 86vh); display:flex; flex-direction:column; gap:10px; padding:16px;
-      box-sizing:border-box; background:var(--gm-bg); border:1px solid var(--gm-border); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
-    #gather-mods-modal .gm-modal-head { display:flex; align-items:center; justify-content:space-between; }
-    #gather-mods-modal .gm-modal-head h3 { margin:0; font-size:15px; font-weight:700; }
-    #gather-mods-modal .gm-close { cursor:pointer; color:var(--gm-muted); font-size:16px; }
-    #gather-mods-modal .gm-close:hover { color:var(--gm-fg); }
-    #gather-mods-modal .gm-modal-settings { width:min(560px, 92vw); height:auto; max-height:86vh; }
-    #gather-mods-modal .gm-settings-body { overflow-y:auto; display:flex; flex-direction:column; gap:18px; padding-right:4px; }
-    #gather-mods-modal .gm-settings-body::-webkit-scrollbar { width:5px; }
-    #gather-mods-modal .gm-settings-body::-webkit-scrollbar-thumb { background:var(--gm-border); border-radius:3px; }
-    #gather-mods-modal .gm-settings-group h4 { margin:0 0 4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--gm-muted); }
-    #gather-mods-modal .gm-hint { margin:0 0 8px; font-size:12px; line-height:1.45; color:var(--gm-muted); }
-    #gather-mods-modal .gm-hint:empty { display:none; }
-    #gather-mods-modal .gm-setting { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px; margin:4px 0;
-      border-radius:8px; background:var(--gm-surface); cursor:pointer; }
-    #gather-mods-modal .gm-setting.disabled { opacity:.5; cursor:not-allowed; }
-    #gather-mods-modal .gm-module { margin:4px 0; border-radius:8px; background:var(--gm-surface); }
-    #gather-mods-modal .gm-module > .gm-setting { margin:0; background:transparent; }
-    #gather-mods-modal .gm-module-extra { display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding:0 10px 8px; font-size:11px; color:var(--gm-muted); }
-    #gather-mods-modal .gm-module-extra .gm-link { margin-left:auto; }
-    #gather-mods-modal .gm-parts { display:flex; flex-wrap:wrap; align-items:center; gap:5px; }
-    #gather-mods-modal .gm-part { padding:1px 7px; border-radius:6px; border:1px solid var(--gm-border); cursor:pointer; text-decoration:line-through; }
-    #gather-mods-modal .gm-part.on { text-decoration:none; color:var(--gm-fg); background:var(--gm-surface-hover); }
-    #gather-mods-modal .gm-module-changelog { padding:0 10px 8px; }
-    #gather-mods-modal .gm-install-confirm { margin:0 10px 8px; padding:8px 10px; border-radius:8px; font-size:12px; line-height:1.45;
-      background:rgba(39,174,96,.10); box-shadow:inset 3px 0 0 var(--gm-green); }
-    #gather-mods-modal .gm-install-confirm ul { margin:4px 0 6px; padding-left:18px; }
-    #gather-mods-modal .gm-setting-text { display:flex; flex-direction:column; gap:2px; font-size:13px; font-weight:600; }
-    #gather-mods-modal .gm-setting-text > span:not(.gm-setting-title) { font-size:12px; font-weight:400; color:var(--gm-muted); line-height:1.4; }
-    #gather-mods-modal .gm-version { font-size:11px; font-weight:400; color:var(--gm-muted); margin-left:4px; }
-    #gather-mods-modal .gm-badge { font-size:10px; font-weight:700; margin-left:6px; padding:1px 6px; border-radius:6px; color:#fff; background:var(--gm-green); }
-    #gather-mods-modal .gm-badge-removed { background:var(--gm-red); }
-    #gather-mods-modal .gm-setting:is(.gm-removed, .gm-uninstalling) { background:rgba(229,72,77,.12); box-shadow:inset 3px 0 0 var(--gm-red); }
-    #gather-mods-modal .gm-removed { cursor:default; }
-    #gather-mods-modal .gm-setting button.gm-btn-danger { width:auto; flex-shrink:0; margin:0; color:var(--gm-red); border-color:var(--gm-red); background:transparent; }
-    #gather-mods-modal .gm-setting button.gm-btn-danger:hover { background:rgba(229,72,77,.15); }
-    #gather-mods-modal .gm-setting button.gm-btn-danger:disabled { opacity:.5; cursor:default; }
-    #gather-mods-modal .gm-text-danger { color:var(--gm-red); }
-    #gather-mods-modal .gm-switch { appearance:none; flex-shrink:0; width:34px; height:20px; margin:0; border-radius:10px; position:relative; cursor:pointer;
-      background:var(--gm-surface-hover); border:1px solid var(--gm-border); transition:background .15s; }
-    #gather-mods-modal .gm-switch::after { content:""; position:absolute; top:1px; left:1px; width:16px; height:16px; border-radius:50%;
-      background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.3); transition:transform .15s; }
-    #gather-mods-modal .gm-switch:checked { background:var(--theme-color-accent,#6c5ce7); }
-    #gather-mods-modal .gm-switch:checked::after { transform:translateX(14px); }
-    #gather-mods-modal .gm-switch:disabled { cursor:not-allowed; }
-    #gather-mods-modal .gm-changelog { padding:6px 2px; border-bottom:1px solid var(--gm-border); font-size:12px; }
-    #gather-mods-modal .gm-changelog:is(.gm-fresh, .gm-recent) { padding-left:9px; }
-    #gather-mods-modal .gm-changelog.gm-fresh { background:rgba(39,174,96,.10); box-shadow:inset 3px 0 0 var(--gm-green); }
-    #gather-mods-modal .gm-changelog.gm-recent { background:rgba(108,92,231,.10); box-shadow:inset 3px 0 0 var(--theme-color-accent,#6c5ce7); }
-    #gather-mods-modal .gm-changelog-head { display:flex; justify-content:space-between; gap:8px; }
-    #gather-mods-modal .gm-changelog-head span { color:var(--gm-muted); }
-    #gather-mods-modal .gm-changelog-more { padding:8px 2px; font-size:12px; color:var(--gm-muted); }
-    #gather-mods-modal .gm-fresh .gm-changelog-head span { color:var(--gm-green); font-weight:600; }
-    #gather-mods-modal .gm-recent .gm-changelog-head span { color:var(--theme-color-accent,#6c5ce7); font-weight:600; }
-    #gather-mods-modal .gm-changelog ul { margin:4px 0 0; padding-left:18px; color:var(--gm-muted); line-height:1.45; }
-    #gather-mods-modal .gm-changelog:is(.gm-fresh, .gm-recent) ul { color:var(--gm-fg); }
-    #gather-mods-modal :is(.gm-changelog li, .gm-diff .gm-diff-note).gm-change-removed { color:var(--gm-red); }
-    #gather-mods-modal .gm-info-row { display:flex; justify-content:space-between; gap:12px; padding:5px 2px; font-size:13px; border-bottom:1px solid var(--gm-border); }
-    #gather-mods-modal .gm-info-row span:first-child { color:var(--gm-muted); }
-    #gather-mods-modal .gm-info-row span:last-child { text-align:right; word-break:break-word; }
-    #gather-mods-modal .gm-settings-actions { margin-top:6px; }
-    #gather-mods-modal .gm-settings-actions button.gm-btn { flex:1; text-align:center; margin:0; }
+    #gm-announcements:empty { display:none; }
+    .gm-news { display:flex; align-items:center; gap:8px; padding:8px 10px; margin:2px 0 4px; border-radius:10px; background:var(--gm-accent-soft);
+      color:var(--gm-accent-text); font-size:12.5px; font-weight:500; cursor:pointer; }
+    .gm-news-text { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .gm-news.gm-warn { background:var(--gm-warning-soft); color:var(--gm-warning); }
+    .gm-news.gm-alert { background:var(--gm-danger-soft); color:var(--gm-danger); }
+    .gm-sec-head { display:flex; align-items:center; gap:10px; height:32px; padding:0 8px; border-radius:8px; cursor:pointer; user-select:none; }
+    .gm-sec-head:hover { background:var(--gm-fill); }
+    .gm-sec-head > .gm-i:first-child { color:var(--gm-text-2); }
+    .gm-sec-title { flex:1; min-width:0; font-size:13px; font-weight:500; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .gm-sec-head .gm-chev { color:var(--gm-text-3); transition:transform .15s; }
+    .gm-sec.open .gm-chev { transform:rotate(90deg); }
+    .gm-sec.open .gm-sec-status { display:none; }
+    .gm-sec-body { display:none; flex-direction:column; gap:8px; padding:4px 0 12px; }
+    .gm-sec.open .gm-sec-body { display:flex; }
+    .gm-sec-body > div[data-part]:not([class]) { display:flex; flex-direction:column; gap:8px; }
+    .gm-sec + .gm-sec.open, .gm-sec.open + .gm-sec { border-top:1px solid var(--gm-line); padding-top:2px; }
+    .gm-sub { display:flex; align-items:center; gap:6px; margin:6px 2px -2px; font-size:11.5px; font-weight:500; color:var(--gm-text-2); }
+    .gm-sub .gm-spacer + * { margin-right:-2px; }
+
+    .gm-btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; max-width:100%; height:32px; padding:0 12px; border:0;
+      border-radius:8px; background:var(--gm-fill); color:var(--gm-text); font-size:12.5px; font-weight:500; white-space:nowrap; cursor:pointer;
+      transition:background .12s, filter .12s; }
+    .gm-btn > span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+    .gm-btn:hover { background:var(--gm-fill-2); }
+    .gm-btn .gm-i { color:var(--gm-text-2); }
+    .gm-btn.gm-block { width:100%; justify-content:flex-start; }
+    .gm-btn.gm-primary { background:var(--gm-accent); color:var(--gm-on-accent); }
+    .gm-btn.gm-primary:hover { filter:brightness(1.08); }
+    .gm-btn.gm-ghost { background:transparent; color:var(--gm-text-2); }
+    .gm-btn.gm-ghost:hover { background:var(--gm-fill); color:var(--gm-text); }
+    .gm-btn.gm-danger, .gm-btn.gm-danger:hover { color:var(--gm-danger); }
+    .gm-btn.gm-danger:hover { background:var(--gm-danger-soft); }
+    .gm-btn.gm-danger.gm-solid { background:var(--gm-danger); color:#fff; }
+    .gm-btn.gm-danger.gm-solid:hover { filter:brightness(1.08); }
+    .gm-btn.is-on { background:var(--gm-accent-soft); color:var(--gm-accent-text); }
+    .gm-btn:is(.gm-primary, .gm-danger, .is-on) .gm-i { color:inherit; }
+    .gm-btn.gm-sm { height:26px; padding:0 9px; gap:5px; border-radius:7px; font-size:12px; }
+    .gm-btn:disabled { opacity:.4; pointer-events:none; }
+    .gm-btn-row { display:flex; gap:6px; }
+    .gm-btn-row > .gm-btn { flex:1; min-width:0; }
+    .gm-iconbtn { display:inline-grid; place-items:center; width:26px; height:26px; flex:none; padding:0; border:0; border-radius:7px;
+      background:transparent; color:var(--gm-text-2); cursor:pointer; }
+    .gm-iconbtn:hover { background:var(--gm-fill-2); color:var(--gm-text); }
+    .gm-iconbtn.gm-danger:hover { background:var(--gm-danger-soft); color:var(--gm-danger); }
+    .gm-iconbtn.on { background:var(--gm-accent-soft); color:var(--gm-accent-text); }
+    .gm-iconbtn:disabled { opacity:.4; pointer-events:none; }
+
+    .gm-toggle { display:flex; align-items:center; gap:10px; min-height:40px; padding:6px 8px; border-radius:8px; cursor:pointer; }
+    .gm-toggle:hover { background:var(--gm-fill); }
+    .gm-toggle:has(.gm-switch:disabled) { opacity:.5; cursor:not-allowed; }
+    .gm-toggle-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+    .gm-toggle-title { font-size:13px; font-weight:500; }
+    .gm-hint { font-size:11.5px; line-height:1.35; color:var(--gm-text-2); }
+    .gm-switch { appearance:none; position:relative; width:30px; height:18px; flex:none; margin:0; border:0; border-radius:9px;
+      background:var(--gm-fill-2); cursor:pointer; transition:background .15s; }
+    .gm-switch::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff;
+      box-shadow:var(--gm-shadow-knob); transition:transform .15s; }
+    .gm-switch:checked { background:var(--gm-accent); }
+    .gm-switch:checked::after { transform:translateX(12px); }
+    .gm-switch:disabled { cursor:not-allowed; }
+    .gm-switch:focus-visible { box-shadow:var(--gm-ring); }
+
+    .gm-input, .gm-select { width:100%; height:32px; padding:0 10px; border:1px solid transparent; border-radius:8px; background-color:var(--gm-fill);
+      font-size:12.5px; outline:none; transition:background-color .12s, border-color .12s, box-shadow .12s; }
+    .gm-input::placeholder { color:var(--gm-text-3); }
+    .gm-input:hover, .gm-select:hover { background-color:var(--gm-fill-2); }
+    .gm-input:focus { background-color:var(--gm-surface); border-color:color-mix(in srgb, var(--gm-accent) 55%, transparent); box-shadow:var(--gm-ring); }
+    .gm-input::-webkit-inner-spin-button, .gm-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+    .gm-select { appearance:none; padding-right:26px; cursor:pointer; background-repeat:no-repeat; background-size:4px 4px;
+      background-image:linear-gradient(45deg, transparent 50%, var(--gm-text-2) 50%), linear-gradient(135deg, var(--gm-text-2) 50%, transparent 50%);
+      background-position:calc(100% - 13px) 14px, calc(100% - 9px) 14px; }
+    .gm-field { position:relative; display:flex; align-items:center; min-width:0; }
+    .gm-field > .gm-i { position:absolute; left:10px; color:var(--gm-text-3); pointer-events:none; }
+    .gm-field > .gm-i + .gm-input { padding-left:32px; }
+    .gm-field:has(> .gm-unit) { height:32px; padding-right:9px; border:1px solid transparent; border-radius:8px; background-color:var(--gm-fill); cursor:text;
+      transition:background-color .12s, border-color .12s, box-shadow .12s; }
+    .gm-field:has(> .gm-unit):hover { background-color:var(--gm-fill-2); }
+    .gm-field:has(> .gm-unit):focus-within { background-color:var(--gm-surface); border-color:color-mix(in srgb, var(--gm-accent) 55%, transparent); box-shadow:var(--gm-ring); }
+    .gm-field:has(> .gm-unit) > .gm-input { flex:1; min-width:0; height:100%; padding-right:6px; border:0; background:none; box-shadow:none; }
+    .gm-field > .gm-unit { flex:none; font-size:12px; color:var(--gm-text-3); pointer-events:none; }
+    .gm-field > .gm-btn { position:absolute; right:3px; }
+    .gm-field > .gm-input:has(~ .gm-btn) { padding-right:64px; }
+    .gm-prop { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:32px; padding:0 2px 0 8px; }
+    .gm-prop > span:first-child { font-size:12.5px; color:var(--gm-text-2); }
+    .gm-prop > :is(.gm-field, .gm-select, .gm-seg, .gm-input) { width:132px; flex:none; }
+    .gm-seg { display:flex; gap:2px; padding:2px; border-radius:9px; background:var(--gm-fill); }
+    .gm-seg > button { flex:1 1 auto; display:inline-flex; align-items:center; justify-content:center; gap:4px; min-width:0; height:26px; padding:0 7px;
+      border:0; border-radius:7px; background:transparent; font-size:12px; font-weight:500; color:var(--gm-text-2); white-space:nowrap; cursor:pointer; }
+    .gm-seg > button:hover { color:var(--gm-text); }
+    .gm-seg > button.on { background:var(--gm-raised); color:var(--gm-text); box-shadow:0 1px 2px rgba(0,0,0,.1), 0 0 0 .5px rgba(0,0,0,.05); }
+    .gm-dark .gm-seg > button.on { background:rgba(255,255,255,.14); }
+    .gm-seg > button:disabled { opacity:.4; pointer-events:none; }
+
+    .gm-list { display:flex; flex-direction:column; gap:1px; }
+    .gm-item { display:flex; align-items:center; gap:9px; min-height:32px; padding:4px 6px 4px 8px; border-radius:8px; cursor:pointer; }
+    .gm-item:hover { background:var(--gm-fill); }
+    .gm-item > .gm-i:first-child { color:var(--gm-text-3); }
+    .gm-item-text { flex:1; min-width:0; display:flex; flex-direction:column; }
+    .gm-item-title { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .gm-item-meta { font-size:11.5px; color:var(--gm-text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .gm-tail { font-size:11.5px; color:var(--gm-text-3); white-space:nowrap; }
+    .gm-actions { display:none; gap:1px; margin:-2px -2px -2px 0; }
+    .gm-item:hover .gm-actions, .gm-item.show-actions .gm-actions { display:flex; }
+    .gm-item:hover .gm-tail.hide-on-hover { display:none; }
+    .gm-item.is-on { background:var(--gm-accent-soft); }
+    .gm-item.is-on :is(.gm-item-title, .gm-tail), .gm-item.is-on > .gm-i:first-child { color:var(--gm-accent-text); }
+    .gm-item.is-muted .gm-item-title { color:var(--gm-text-3); text-decoration:line-through; }
+    .gm-avatar { display:grid; place-items:center; width:22px; height:22px; flex:none; border-radius:50%; font-size:10px; font-weight:600; color:#fff; }
+    .gm-thumb { width:22px; height:22px; flex:none; border-radius:5px; background:var(--gm-fill) center / contain no-repeat; image-rendering:pixelated; }
+    .gm-playing { display:inline-flex; align-items:flex-end; gap:1.5px; height:10px; }
+    .gm-playing i { width:2px; border-radius:1px; background:currentColor; }
+    .gm-empty { display:flex; align-items:center; gap:8px; padding:6px 8px; font-size:12px; color:var(--gm-text-3); }
+
+    .gm-note { display:flex; align-items:flex-start; gap:6px; padding:0 2px; font-size:11.5px; line-height:1.4; color:var(--gm-text-2); }
+    .gm-note > .gm-i { margin-top:1px; }
+    .gm-note:has(> span:last-child:empty) { display:none; }
+    .gm-note.gm-ok > .gm-i { color:var(--gm-success); }
+    .gm-note.gm-err { color:var(--gm-danger); }
+    .gm-link { color:var(--gm-accent-text); font-weight:500; cursor:pointer; }
+    .gm-link:hover { text-decoration:underline; }
+    .gm-link.gm-danger { color:var(--gm-danger); }
+    .gm-pill { display:inline-flex; align-items:center; height:18px; padding:0 6px; border-radius:5px; font-size:10.5px; font-weight:600;
+      white-space:nowrap; background:var(--gm-fill-2); color:var(--gm-text-2); }
+    .gm-pill:empty { display:none; }
+    .gm-pill.gm-new { background:var(--gm-accent-soft); color:var(--gm-accent-text); }
+    .gm-pill.gm-up { background:var(--gm-success-soft); color:var(--gm-success); }
+    .gm-pill.gm-gone { background:var(--gm-danger-soft); color:var(--gm-danger); }
+    .gm-card { display:flex; flex-direction:column; gap:8px; padding:10px; border-radius:12px; background:var(--gm-fill); }
+    .gm-card.gm-confirm { background:var(--gm-danger-soft); }
+    .gm-confirm-text { font-size:12.5px; color:var(--gm-text); }
+    .gm-tip { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; background:rgba(17,17,20,.92); color:#fff;
+      font-size:12px; font-weight:500; white-space:nowrap; }
+    .gm-kbd { padding:0 4px; border-radius:4px; background:rgba(255,255,255,.16); font-size:11px; }
+
+    .gm-window { display:flex; flex-direction:column; border-radius:16px; background:var(--gm-surface); box-shadow:var(--gm-shadow-pop); overflow:hidden; }
+    .gm-window-head { display:flex; align-items:center; gap:8px; flex:none; height:48px; padding:0 10px 0 16px; border-bottom:1px solid var(--gm-line); }
+    .gm-window-head > .gm-i { color:var(--gm-text-2); }
+    .gm-window-title { flex:1; min-width:0; font-size:14px; font-weight:600; letter-spacing:-.01em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .gm-window-body { display:flex; flex-direction:column; gap:10px; flex:1 1 auto; min-height:0; padding:14px 16px; overflow-y:auto; overscroll-behavior:contain; }
+    .gm-window-foot { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex:none; padding:12px 16px; border-top:1px solid var(--gm-line); }
+    .gm-label { font-size:11.5px; font-weight:500; color:var(--gm-text-2); }
+    .gm-tabs { display:flex; gap:18px; flex:none; padding:0 20px; border-bottom:1px solid var(--gm-line); }
+    .gm-tabs > button { position:relative; display:inline-flex; align-items:center; gap:6px; height:40px; padding:0; border:0; background:none;
+      font-size:13px; font-weight:500; color:var(--gm-text-2); cursor:pointer; }
+    .gm-tabs > button:is(:hover, .on) { color:var(--gm-text); }
+    .gm-tabs > button.on::after { content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; border-radius:1px; background:var(--gm-accent); }
+    .gm-mod { display:flex; gap:12px; padding:12px; }
+    .gm-mod + .gm-mod { border-top:1px solid var(--gm-line); }
+    .gm-mod-icon { display:grid; place-items:center; width:32px; height:32px; flex:none; border-radius:9px; background:var(--gm-fill); color:var(--gm-text-2); }
+    .gm-mod-icon.gm-sm { width:28px; height:28px; border-radius:8px; }
+    .gm-mod-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+    .gm-mod-name { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:13px; font-weight:600; }
+    .gm-mod-version { font-size:11.5px; font-weight:400; color:var(--gm-text-3); }
+    .gm-mod-desc { font-size:12px; line-height:1.45; color:var(--gm-text-2); }
+    .gm-mod-parts { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+    .gm-mod-side { display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex:none; }
+    .gm-mod-side .gm-link { font-size:11.5px; }
+    .gm-mod.gm-disabled { opacity:.5; pointer-events:none; }
+    .gm-mod:is(.gm-uninstalling, .gm-removed) { border-radius:12px; background:var(--gm-danger-soft); }
+    .gm-mod-changelog { display:flex; flex-direction:column; gap:10px; margin-top:8px; padding-top:8px; border-top:1px solid var(--gm-line); }
+    .gm-mod-changelog .gm-mod-name { font-size:12.5px; }
+    .gm-install-confirm { margin-top:8px; background:var(--gm-accent-soft); }
+    .gm-chip { display:inline-flex; align-items:center; gap:4px; height:22px; padding:0 8px; border:1px solid var(--gm-line); border-radius:11px;
+      font-size:11.5px; color:var(--gm-text-2); cursor:pointer; user-select:none; }
+    .gm-chip:hover { color:var(--gm-text); }
+    .gm-chip.on { border-color:transparent; background:var(--gm-fill-2); color:var(--gm-text); }
+    .gm-chip.on .gm-i { color:var(--gm-success); }
+    .gm-changes { margin:2px 0 0; padding-left:16px; list-style:disc; font-size:12px; line-height:1.5; color:var(--gm-text-2); }
+    .gm-changes .gm-change-removed { color:var(--gm-danger); }
+    .gm-notice { display:flex; align-items:flex-start; gap:6px; margin:2px 0; padding:8px 10px; border-radius:8px; font-size:12.5px; line-height:1.45;
+      background:var(--gm-warning-soft); color:var(--gm-text); }
+    .gm-notice > .gm-i { margin-top:2px; color:var(--gm-warning); }
+    .gm-notice.gm-breaking { background:var(--gm-danger-soft); }
+    .gm-notice.gm-breaking > .gm-i { color:var(--gm-danger); }
+
+    #gather-mods-modal { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.32); }
+    #gather-mods-modal .gm-modal { position:relative; width:min(560px, 92vw); max-height:86vh; }
+    #gather-mods-modal .gm-modal-settings { width:min(600px, 92vw); height:min(680px, 86vh); }
     #gather-mods-modal .gm-modal-review { width:min(960px, 94vw); height:min(760px, 88vh); }
-    #gather-mods-modal .gm-modal-news { width:min(560px, 92vw); height:auto; max-height:80vh; }
-    #gather-mods-modal .gm-news { overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
-    #gather-mods-modal .gm-notice { margin:6px 0 2px; padding:6px 9px; border-radius:6px; font-size:13px; font-weight:600; line-height:1.45;
-      color:var(--gm-fg); background:rgba(245,166,35,.16); box-shadow:inset 3px 0 0 #f5a623; }
-    #gather-mods-modal .gm-notice.gm-breaking { background:rgba(255,59,48,.14); box-shadow:inset 3px 0 0 var(--gm-red); }
-    #gather-mods-modal .gm-announcement { padding:8px 10px; border-radius:6px; font-size:13px; line-height:1.45;
-      background:var(--gm-surface); box-shadow:inset 3px 0 0 var(--theme-color-accent,#6c5ce7); }
-    #gather-mods-modal .gm-announcement.gm-warning { background:rgba(245,166,35,.16); box-shadow:inset 3px 0 0 #f5a623; }
-    #gather-mods-modal .gm-announcement p { margin:4px 0; white-space:pre-line; }
-    #gather-mods-modal .gm-announcement span { color:var(--gm-muted); font-size:12px; }
-    #gather-mods-modal .gm-diff { flex:1; overflow:auto; margin:0; padding:8px 0; border-radius:8px; background:var(--gm-input);
-      font:11px/1.45 ui-monospace, Menlo, monospace; white-space:pre; }
-    #gather-mods-modal .gm-diff div { padding:0 10px; min-width:max-content; }
-    #gather-mods-modal .gm-diff .gm-diff-module { font:600 13px/1.6 inherit; font-family:inherit; padding-top:10px; color:var(--gm-green); }
-    #gather-mods-modal .gm-diff .gm-diff-note { font-family:inherit; color:var(--gm-green); white-space:normal; }
-    #gather-mods-modal .gm-diff .gm-add { background:rgba(46,204,113,.18); }
-    #gather-mods-modal .gm-diff .gm-rem { background:rgba(255,59,48,.18); }
-    #gather-mods-modal .gm-diff .gm-hunk { color:var(--gm-muted); padding-top:6px; }
+    #gather-mods-modal .gm-modal-review > .gm-window-body { overflow:hidden; }
+    #gather-mods-modal .gm-modal-message { width:min(460px, 92vw); }
+    .gm-modal-message > .gm-window-head { position:absolute; top:10px; right:10px; height:auto; padding:0; border:0; }
+    .gm-modal-message .gm-window-title { display:none; }
+    .gm-modal-message > .gm-window-body { gap:12px; padding:22px 22px 8px; }
+    .gm-modal-message > .gm-window-foot { padding:12px 22px 18px; border:0; }
+    .gm-message-icon { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:12px; background:var(--gm-accent-soft); color:var(--gm-accent-text); }
+    .gm-message-icon.gm-warn { background:var(--gm-warning-soft); color:var(--gm-warning); }
+    .gm-message-title { padding-right:24px; font-size:16px; font-weight:600; letter-spacing:-.01em; }
+    .gm-message-text { font-size:13px; line-height:1.5; color:var(--gm-text-2); white-space:pre-line; overflow-wrap:anywhere; }
+    .gm-message-meta { display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--gm-text-3); }
+    .gm-entries { display:flex; flex-direction:column; }
+    .gm-entries .gm-mod { padding:10px 0; }
+    .gm-tab-pane { display:none; flex:1; min-height:0; flex-direction:column; }
+    .gm-tab-pane.on { display:flex; }
+    .gm-modules-body, .gm-news-body { gap:0; padding:4px 8px 8px; }
+    .gm-modules-hint { padding:10px 12px 2px; }
+    .gm-history-toggle { padding:10px 12px; font-size:12px; }
+    #gm-update-list .gm-item { cursor:default; }
+    #gm-update-list .gm-item:hover { background:none; }
+    .gm-diff { flex:1; min-height:0; overflow:auto; padding:8px 0; border-radius:10px; background:var(--gm-fill); font:11px/1.45 ui-monospace, Menlo, monospace; white-space:pre; }
+    .gm-diff div { min-width:max-content; padding:0 12px; }
+    .gm-diff .gm-diff-module { padding-top:10px; font:600 13px/1.6 InterVariable, Inter, sans-serif; color:var(--gm-text); }
+    .gm-diff .gm-diff-note { font:12px/1.5 InterVariable, Inter, sans-serif; color:var(--gm-text-2); white-space:normal; }
+    .gm-diff .gm-diff-note.gm-change-removed { color:var(--gm-danger); }
+    .gm-diff .gm-add { background:var(--gm-success-soft); }
+    .gm-diff .gm-rem { background:var(--gm-danger-soft); }
+    .gm-diff .gm-hunk { padding-top:6px; color:var(--gm-text-3); }
   `;
+
+  // Lucide icons (lucide.dev, ISC license) drawn as CSS masks, so markup only
+  // needs <i class="gm-i" data-i="name"></i>.
+  const ICONS = {
+    armchair:
+      '<path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3"/><path d="M3 16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z"/><path d="M5 18v2"/><path d="M19 18v2"/>',
+    "arrow-down": '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+    "arrow-up": '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+    ban: '<circle cx="12" cy="12" r="10"/><path d="M4.929 4.929 19.07 19.071"/>',
+    boxes:
+      '<path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"/><path d="m7 16.5-4.74-2.85"/><path d="m7 16.5 5-3"/><path d="M7 16.5v5.17"/><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"/><path d="m17 16.5-5-3"/><path d="m17 16.5 4.74-2.85"/><path d="M17 16.5v5.17"/><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"/><path d="M12 8 7.26 5.15"/><path d="m12 8 4.74-2.85"/><path d="M12 13.5V8"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+    "chevron-right": '<path d="m9 18 6-6-6-6"/>',
+    "circle-alert":
+      '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+    "circle-check": '<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>',
+    "clipboard-paste":
+      '<path d="M11 14h10"/><path d="M16 4h2a2 2 0 0 1 2 2v1.344"/><path d="m17 18 4-4-4-4"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113"/><rect x="8" y="2" width="8" height="4" rx="1"/>',
+    copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+    download:
+      '<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>',
+    eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+    "eye-off":
+      '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+    "file-up":
+      '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/>',
+    footprints:
+      '<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>',
+    ghost:
+      '<path d="M15 10v1"/><path d="M7.528 20.472a1.6 1.6 0 012.277 0l1.057 1.056a1.6 1.6 0 002.276 0l1.057-1.056a1.6 1.6 0 012.277 0l1.114 1.114a1.4 1.4 0 002.414-1V10a8 8 0 00-16 0v10.586a1.4 1.4 0 002.414 1z"/><path d="M9 10v1"/>',
+    globe:
+      '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+    hammer:
+      '<path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/>',
+    history:
+      '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+    image:
+      '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+    "image-plus":
+      '<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
+    info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+    "lamp-desk":
+      '<path d="M10.293 2.293a1 1 0 0 1 1.414 0l2.5 2.5 5.994 1.227a1 1 0 0 1 .506 1.687l-7 7a1 1 0 0 1-1.687-.506l-1.227-5.994-2.5-2.5a1 1 0 0 1 0-1.414z"/><path d="m14.207 4.793-3.414 3.414"/><path d="M3 20a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="m9.086 6.5-4.793 4.793a1 1 0 0 0-.18 1.17L7 18"/>',
+    layers:
+      '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>',
+    "link-2":
+      '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
+    "map-pin":
+      '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+    megaphone:
+      '<path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/>',
+    moon: '<path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>',
+    "mouse-pointer-click":
+      '<path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/>',
+    move: '<path d="M12 2v20"/><path d="m15 19-3 3-3-3"/><path d="m19 9 3 3-3 3"/><path d="M2 12h20"/><path d="m5 9-3 3 3 3"/><path d="m9 5 3-3 3 3"/>',
+    navigation: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+    "package-x":
+      '<path d="M12 22V12"/><path d="m16.5 14.5 5 5"/><path d="m16.5 19.5 5-5"/><path d="M21 10.5V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.729l7 4a2 2 0 0 0 2 .001l.13-.074"/><path d="M3.29 7 12 12l8.71-5"/><path d="m7.5 4.27 8.997 5.148"/>',
+    paintbrush:
+      '<path d="m14.622 17.897-10.68-2.913"/><path d="M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z"/><path d="M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15"/>',
+    pause:
+      '<rect x="14" y="3" width="5" height="18" rx="1"/><rect x="5" y="3" width="5" height="18" rx="1"/>',
+    pencil:
+      '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+    play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
+    plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+    puzzle:
+      '<path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/>',
+    "refresh-cw":
+      '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+    "rotate-ccw":
+      '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+    search: '<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+    settings:
+      '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>',
+    "share-2":
+      '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>',
+    "shield-check":
+      '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+    shirt:
+      '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>',
+    sparkles:
+      '<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/>',
+    "trash-2":
+      '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    "triangle-alert":
+      '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    "undo-2":
+      '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/>',
+    upload:
+      '<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>',
+    "wand-sparkles":
+      '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>',
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    zap: '<path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/>',
+  };
+  const ICON_CSS = Object.entries(ICONS)
+    .map(([name, body]) => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+      return `.gm-i[data-i="${name}"] { --gm-i: url("data:image/svg+xml,${encodeURIComponent(svg)}"); }`;
+    })
+    .join("\n");
 })();
 
-window.__gatherMods.bundleCatalog = {"modules":[{"id":"core","kind":"core","name":"Core","description":"Mods panel, settings, module manager and launcher bridge. Always installed.","version":"1.5.0","requires":{},"changelog":[{"version":"1.5.0","date":"2026-10-14","changes":["Announcements: messages from the mod author (maintenance, incident…) open a window once, then stay at the top of the Mods panel until they expire. The core checks for them every 10 minutes."]},{"version":"1.4.0","date":"2026-10-13","notice":"Animations, placed objects and desk objects now survive a new version of the map. Those made on lemlist before its map was republished on Oct 13 were lost: please recreate your animations.","changes":["Mod news: important changes (breaking changes, things to redo) open a “Mod news” window once, when you open Gather or when an update brings them; they also stand out in the changelogs.","Required updates: when a module no longer works without its new version (breaking change), an “Update required” window asks you to update it or disable it, and the module stays off until then. If the core itself is outdated, the whole mod stays off until you update it or turn it off."]},{"version":"1.3.0","date":"2026-10-13","changes":["On first install and after each update, tells the community hub which module versions this install runs, with your Gather account, so the author knows how many installs run which version."]},{"version":"1.2.0","date":"2026-10-09","changes":["Every module has a “Changelog” link in Settings, installed or not.","Turning on a module you don't have asks first: it shows the version, its latest changes and the libraries it brings, then “Install”.","Modules with several features list them under their row: click one to hide it from the panel and turn it off (e.g. Flee mode)."]},{"version":"1.1.2","date":"2026-10-09","changes":["What's new only shows updates to install and the last update you installed; “Show full history” unfolds the rest."]},{"version":"1.1.1","date":"2026-10-09","changes":["Settings tell you in red when the launcher is no longer running, instead of showing stale information and settings that do nothing.","What's new highlights the changes of the last update you installed, until the module's next update."]},{"version":"1.1.0","date":"2026-10-09","changes":["What's new and Review updates highlight what you haven't installed yet in green.","“New” and “Update” badges are green; a module being uninstalled or no longer published is shown in red.","A module that is no longer published gets an “Uninstall” button instead of a note pointing to the launcher settings file.","Changelog lines starting with “Removed:” are shown in red."]},{"version":"1.0.0","date":"2026-10-08","changes":["The mod is split into modules: pick the features you want in ⚙ Settings, only their code runs and gets updated.","New modules show up in Settings with a “New” badge and are never installed automatically.","“What's new” lists the changelog of your modules; “Review updates” shows it next to the exact code diff."]}]},{"id":"map","kind":"lib","name":"Map helpers","description":"Shared map object helpers.","version":"1.3.0","requires":{},"changelog":[{"version":"1.3.0","date":"2026-10-15","changes":["Virtual objects: images drawn by a module (Custom objects) can be found, referenced and named like map objects."]},{"version":"1.2.0","date":"2026-10-13","changes":["Stable references to objects (Gather's hashIdentifier, plus type and position), so what the mod tracks survives a new version of the map."]},{"version":"1.1.0","date":"2026-10-08","changes":["Can force Gather to redraw the map, which it otherwise only does when something changes.","Box selection toggles objects, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"map-pick","kind":"lib","name":"Map picking","description":"Shared object selection on the map (click, box, scroll to cycle).","version":"1.2.0","requires":{"map":"1.3.0"},"changelog":[{"version":"1.2.0","date":"2026-10-15","changes":["A selection can include custom objects (animations, bulk delete), picked by their visible pixels and stacked by their plane."]},{"version":"1.1.0","date":"2026-10-14","changes":["A selection session can name the hovered object its own way and draw more than outlines (lines between objects)."]},{"version":"1.0.1","date":"2026-10-08","changes":["Selection outlines show up and go away immediately, even when started or stopped from the panel.","The yellow hover outline follows the object named in the tooltip, even between close objects."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"previews","kind":"lib","name":"Previews","description":"Shared outfit and object previews.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"placements","kind":"lib","name":"Placements journal","description":"Shared journal of the objects placed with the mod.","version":"1.1.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.1.0","date":"2026-10-13","changes":["Placements are kept per floor with stable references, so they survive a new version of the map."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"jobs","kind":"lib","name":"Job queue","description":"Shared queue that runs map edits one after the other, in click order.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"motion","kind":"lib","name":"Motion","description":"Shared math of path animations: steps, shapes, easings, formulas, block or per-object movement.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-15","changes":["Initial version."]}]},{"id":"hub-api","kind":"lib","name":"Hub API","description":"Shared requests to the community hub, signed in with your Gather account.","version":"1.3.0","requires":{},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["Tells the hub which module versions are running, so it can ask for a required update."]},{"version":"1.2.0","date":"2026-10-13","changes":["Uses the core's hub address and Gather sign-in, shared with install reports."]},{"version":"1.1.0","date":"2026-10-12","changes":["Signs in to the hub with your Gather account: what you publish belongs to the account, from the app and the browser alike. Only the Gather account id is kept by the hub."]},{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"teleport","kind":"module","name":"Teleport","description":"Teleport mode (every “Go to” and double-click teleports), TP to your desk, TP to players and saved locations.","version":"1.2.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Saved locations follow the map when an admin publishes a new version that shifts it (locations saved before this version don't move)."]},{"version":"1.1.0","date":"2026-10-09","changes":["Teleport mode, TP to my desk, Players and Saved locations can each be hidden in Settings (a hidden Teleport mode is off)."]},{"version":"1.0.0","date":"2026-10-08","changes":["Teleport mode, TP to desk, TP to players and saved locations, now in one module."]}]},{"id":"fun","kind":"module","name":"Fun","description":"Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects follow a path of steps (lines, waves, arcs, orbits, formulas) with easings, pauses and turns, seen by everyone with this module.","version":"1.8.0","requires":{"map":"1.3.0","map-pick":"1.2.0","hub-api":"1.1.0","motion":"1.0.0"},"changelog":[{"version":"1.8.0","date":"2026-10-16","changes":["Studio steps: ↑ ↓ change the order the points are reached in, ⧉ duplicates a step (the copy makes the same move again from where it ends).","The others' animations on the map are listed under yours, with their author: “Hide” stops showing one on your screen only (“Show” brings it back)."]},{"version":"1.7.1","date":"2026-10-16","changes":["Saving (or closing the studio) while adding points or selecting objects no longer leaves the studio stuck on “Saving…”: the animation was saved, the window just did not close."]},{"version":"1.7.0","date":"2026-10-15","changes":["Animation studio: a floating window where an animation is a path of steps, drawn on the map with numbered points to drag. Each step has its shape (line, wave, arc, orbit, or your own x(t) and y(t) formulas), easing (smooth, overshoot, bounce, elastic, or your own f(t)), duration, pause and turn.","The selection moves as one block (it turns as one piece, around its center) or each object on its own, one after the other with a stagger (selection order, left to right, top to bottom or random). At the end, the path loops, plays back (ping-pong) or stops.","Preview with play, pause and a timeline. What sits on an object moves and turns with it.","Earlier animations keep playing; ✎ opens them in the studio and saves them as paths. Mods before Fun 1.7.0 don't show path animations."]},{"version":"1.6.0","date":"2026-10-15","changes":["Animate custom objects: select them like other objects (alone or with real objects) in New animation or ✎."]},{"version":"1.5.0","date":"2026-10-14","changes":["Edit your animations (✎): objects, movement, point, speed and name. The preview replaces the animation until you save, then it restarts for everyone."]},{"version":"1.4.0","date":"2026-10-13","changes":["Animations survive a new version of the map: they belong to the floor and find their objects again, even if the map moved. Existing animations are converted the first time someone with this version opens their map."]},{"version":"1.3.0","date":"2026-10-12","changes":["Your animations belong to your Gather account: start, stop or delete them from the app or the browser. Those you created before are moved to your account when you open their map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Flee mode and Animations can each be hidden in Settings; a hidden one is turned off (hidden animations are no longer fetched nor played).","The animation list only shows yours; the others' still play on the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Animations: select objects, make them orbit around a point or move back and forth in a straight line or along a wave, with a live preview, then save.","Everyone on the map who has this module sees your animations, in sync; only you can start, stop or delete yours.","Nothing is sent to Gather's server: objects only move on screen, and the map is redrawn at 30 fps at most while an animation runs."]},{"version":"1.0.0","date":"2026-10-08","changes":["Flee mode moves here from the player list."]}]},{"id":"build","kind":"module","name":"Build","description":"Free placement in the build tool, “Place on…” to put objects on any other object, and bulk delete (click or drag a box to select).","version":"1.5.0","requires":{"map":"1.3.0","map-pick":"1.2.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.5.0","date":"2026-10-15","changes":["Bulk delete also selects and deletes custom objects."]},{"version":"1.4.0","date":"2026-10-14","changes":["Show linked objects…: outlines what sits on what (Place on…, tables, shelves), supports in green and objects on them in cyan, each joined to its support; hover tells what an object is on, click an object to see only its group."]},{"version":"1.3.0","date":"2026-10-09","changes":["Free placement, Place on… and Bulk delete can each be hidden in Settings (a hidden Free placement is off)."]},{"version":"1.2.0","date":"2026-10-09","changes":["Place on… and bulk delete no longer wait for the previous one to finish: start the next one right away, it is queued."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects moved with Place on… are listed in Placed objects.","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Free placement, Place on… and bulk delete, now in one module."]}]},{"id":"outfits","kind":"module","name":"Outfits","description":"Save and apply outfits, including “No outfit” and “Invisible”.","version":"1.0.0","requires":{"previews":"1.0.0"},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Outfit presets as a module."]}]},{"id":"desks","kind":"module","name":"Desks","description":"Save and swap your desk decoration, and pick which objects belong to your desk.","version":"1.3.0","requires":{"map":"1.2.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["The objects picked for your desk survive a new version of the map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Picking another desk while one is being applied stops it and applies the new one; “↩ Previous desk” still brings back the desk you had before the first one."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects added by a desk preset are listed in Placed objects.","Dragging a box over desk objects already picked removes them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Desk presets as a module."]}]},{"id":"constructions","kind":"module","name":"Constructions","description":"Save a group of objects and place it anywhere on the map in one click.","version":"1.2.0","requires":{"map":"1.1.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-09","changes":["Place several constructions and click “↶ Delete last” several times without waiting: each action is queued and runs in order."]},{"version":"1.1.0","date":"2026-10-08","changes":["“↶ Undo” becomes “↶ Delete last”, using the shared journal of placed objects (keeps your history).","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Constructions as a module."]}]},{"id":"placed","kind":"module","name":"Placed objects","description":"Everything you placed with the mod on this map (constructions, desk presets, Place on…): delete the last one, any of them, or all.","version":"1.2.0","requires":{"map":"1.2.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.2.0","date":"2026-10-13","changes":["Placed objects are listed per floor and survive a new version of the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Deletions no longer wait for the previous one: click several ✕ or “↶ Delete last” in a row, they are queued and run in order."]},{"version":"1.0.0","date":"2026-10-08","changes":["New module: list what the mod placed on this map, hover to see it, delete the last placement, any of them, or all (everything is outlined in red before you confirm)."]}]},{"id":"share","kind":"module","name":"Share presets","description":"Export and import the presets of your installed modules as JSON.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-08","changes":["Export and import only cover the preset modules you have installed."]}]},{"id":"hub","kind":"module","name":"Community hub","description":"Browse, preview, add and publish presets shared by others.","version":"1.1.0","requires":{"previews":"1.0.0","hub-api":"1.1.0"},"changelog":[{"version":"1.1.0","date":"2026-10-12","changes":["Your published presets belong to your Gather account: delete them from the app or the browser. Those you published before are moved to your account the next time you open the hub."]},{"version":"1.0.1","date":"2026-10-09","changes":["Hub requests go through the shared hub library, also used by animations."]},{"version":"1.0.0","date":"2026-10-08","changes":["Hub tabs follow your installed preset modules."]}]},{"id":"custom","kind":"module","name":"Custom objects","description":"Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.","version":"1.6.0","requires":{"map":"1.3.0","map-pick":"1.2.0","hub-api":"1.3.0"},"changelog":[{"version":"1.6.0","date":"2026-10-16","changes":["Images and restyles are hidden in Gather's simplified view (zoomed out), like the map's own objects, and come back with the full view."]},{"version":"1.5.0","date":"2026-10-16","changes":["Hover one of your images in the list to see it outlined in red on the map, even while an animation moves it."]},{"version":"1.4.0","date":"2026-10-15","changes":["Images and restyles turn with Fun 1.7.0 animations, around the middle of their base line (images) or with the object they restyle."]},{"version":"1.3.0","date":"2026-10-15","changes":["Animated GIFs (and animated WebP or PNG) play on the map, for images and restyles, in sync for everyone. Very long or very large animations (over 300 frames or 16 million pixels in all) stay still on their first frame."]},{"version":"1.2.0","date":"2026-10-15","changes":["Place copies (＋): images follow the pointer and every click places one more, like a Gather object; for a restyle, every clicked object gets the same image. Esc to stop.","Placed images behave like map objects: Fun animates them and Bulk delete deletes them."]},{"version":"1.1.0","date":"2026-10-15","changes":["Plane: “▼ Back” and “▲ Front” move an image or a restyle behind or in front of the objects it overlaps, one at a time; the object it is set against is outlined in green, “Reset” goes back to the default plane. Seen the same way by everyone."]},{"version":"1.0.0","date":"2026-10-14","changes":["New module: images on the map for everyone who has it, since Gather V2 cannot add your own objects. “New image…” places an image anywhere with its size, layer (floor, sorted like objects, above everything), base line and collision; “Restyle an object…” draws an image over a real object, which keeps its collision and seats. Images come from an https URL or are uploaded to the community hub (512 KB max)."]}]},{"id":"auto-away","kind":"module","name":"Auto away","description":"Sets you Away (or Busy, your choice) after a few minutes without keyboard or mouse on your computer, and back to your status on your next input. The same status set by hand stays. Gather desktop app only.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-16","changes":["New module: after 5 minutes (1 to 120) without keyboard or mouse anywhere on your computer, your status goes to Away (or Busy, your choice), and back to what it was as soon as you use the computer again. Away or Busy set by hand is never changed. Needs the Gather desktop app, which knows the computer's idle time; in a browser tab it stays off."]}]}]};
+window.__gatherMods.bundleCatalog = {"modules":[{"id":"core","kind":"core","name":"Core","description":"Mods panel, settings, module manager and launcher bridge. Always installed.","icon":"puzzle","version":"1.6.0","requires":{},"changelog":[{"version":"1.6.0","date":"2026-10-17","changes":["New look that matches Gather: the Mods panel lists your modules with their icon, a badge on a folded section tells what is running (“On”, “2 playing”…), and announcements fit in one card.","Settings in three tabs (Modules, What's new, Updates); each module shows its icon, version, features and a switch.","Announcements, mod news and required updates open in a cleaner window; several announcements are read one after the other with “Next”."]},{"version":"1.5.0","date":"2026-10-14","changes":["Announcements: messages from the mod author (maintenance, incident…) open a window once, then stay at the top of the Mods panel until they expire. The core checks for them every 10 minutes."]},{"version":"1.4.0","date":"2026-10-13","notice":"Animations, placed objects and desk objects now survive a new version of the map. Those made on lemlist before its map was republished on Oct 13 were lost: please recreate your animations.","changes":["Mod news: important changes (breaking changes, things to redo) open a “Mod news” window once, when you open Gather or when an update brings them; they also stand out in the changelogs.","Required updates: when a module no longer works without its new version (breaking change), an “Update required” window asks you to update it or disable it, and the module stays off until then. If the core itself is outdated, the whole mod stays off until you update it or turn it off."]},{"version":"1.3.0","date":"2026-10-13","changes":["On first install and after each update, tells the community hub which module versions this install runs, with your Gather account, so the author knows how many installs run which version."]},{"version":"1.2.0","date":"2026-10-09","changes":["Every module has a “Changelog” link in Settings, installed or not.","Turning on a module you don't have asks first: it shows the version, its latest changes and the libraries it brings, then “Install”.","Modules with several features list them under their row: click one to hide it from the panel and turn it off (e.g. Flee mode)."]},{"version":"1.1.2","date":"2026-10-09","changes":["What's new only shows updates to install and the last update you installed; “Show full history” unfolds the rest."]},{"version":"1.1.1","date":"2026-10-09","changes":["Settings tell you in red when the launcher is no longer running, instead of showing stale information and settings that do nothing.","What's new highlights the changes of the last update you installed, until the module's next update."]},{"version":"1.1.0","date":"2026-10-09","changes":["What's new and Review updates highlight what you haven't installed yet in green.","“New” and “Update” badges are green; a module being uninstalled or no longer published is shown in red.","A module that is no longer published gets an “Uninstall” button instead of a note pointing to the launcher settings file.","Changelog lines starting with “Removed:” are shown in red."]},{"version":"1.0.0","date":"2026-10-08","changes":["The mod is split into modules: pick the features you want in ⚙ Settings, only their code runs and gets updated.","New modules show up in Settings with a “New” badge and are never installed automatically.","“What's new” lists the changelog of your modules; “Review updates” shows it next to the exact code diff."]}]},{"id":"map","kind":"lib","name":"Map helpers","description":"Shared map object helpers.","version":"1.3.0","requires":{},"changelog":[{"version":"1.3.0","date":"2026-10-15","changes":["Virtual objects: images drawn by a module (Custom objects) can be found, referenced and named like map objects."]},{"version":"1.2.0","date":"2026-10-13","changes":["Stable references to objects (Gather's hashIdentifier, plus type and position), so what the mod tracks survives a new version of the map."]},{"version":"1.1.0","date":"2026-10-08","changes":["Can force Gather to redraw the map, which it otherwise only does when something changes.","Box selection toggles objects, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"map-pick","kind":"lib","name":"Map picking","description":"Shared object selection on the map (click, box, scroll to cycle).","version":"1.3.0","requires":{"map":"1.3.0"},"changelog":[{"version":"1.3.0","date":"2026-10-17","changes":["Map tooltips look like Gather's (dark, with a 2/3 counter) and the box selection uses the space's accent color."]},{"version":"1.2.0","date":"2026-10-15","changes":["A selection can include custom objects (animations, bulk delete), picked by their visible pixels and stacked by their plane."]},{"version":"1.1.0","date":"2026-10-14","changes":["A selection session can name the hovered object its own way and draw more than outlines (lines between objects)."]},{"version":"1.0.1","date":"2026-10-08","changes":["Selection outlines show up and go away immediately, even when started or stopped from the panel.","The yellow hover outline follows the object named in the tooltip, even between close objects."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"previews","kind":"lib","name":"Previews","description":"Shared outfit and object previews.","version":"1.1.0","requires":{},"changelog":[{"version":"1.1.0","date":"2026-10-17","changes":["Hover previews are a floating card that follows Gather's light or dark theme."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"placements","kind":"lib","name":"Placements journal","description":"Shared journal of the objects placed with the mod.","version":"1.1.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.1.0","date":"2026-10-13","changes":["Placements are kept per floor with stable references, so they survive a new version of the map."]},{"version":"1.0.0","date":"2026-10-08","changes":["Initial version."]}]},{"id":"jobs","kind":"lib","name":"Job queue","description":"Shared queue that runs map edits one after the other, in click order.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"motion","kind":"lib","name":"Motion","description":"Shared math of path animations: steps, shapes, easings, formulas, block or per-object movement.","version":"1.0.0","requires":{},"changelog":[{"version":"1.0.0","date":"2026-10-15","changes":["Initial version."]}]},{"id":"hub-api","kind":"lib","name":"Hub API","description":"Shared requests to the community hub, signed in with your Gather account.","version":"1.3.0","requires":{},"changelog":[{"version":"1.3.0","date":"2026-10-13","changes":["Tells the hub which module versions are running, so it can ask for a required update."]},{"version":"1.2.0","date":"2026-10-13","changes":["Uses the core's hub address and Gather sign-in, shared with install reports."]},{"version":"1.1.0","date":"2026-10-12","changes":["Signs in to the hub with your Gather account: what you publish belongs to the account, from the app and the browser alike. Only the Gather account id is kept by the hub."]},{"version":"1.0.0","date":"2026-10-09","changes":["Initial version."]}]},{"id":"teleport","kind":"module","name":"Teleport","description":"Teleport mode (every “Go to” and double-click teleports), TP to your desk, TP to players and saved locations.","icon":"zap","version":"1.3.0","requires":{"map":"1.2.0"},"changelog":[{"version":"1.3.0","date":"2026-10-17","changes":["New look that matches Gather: Teleport mode is a switch, players have avatars, teleport and delete buttons appear on hover, and “On” shows on the folded section."]},{"version":"1.2.0","date":"2026-10-13","changes":["Saved locations follow the map when an admin publishes a new version that shifts it (locations saved before this version don't move)."]},{"version":"1.1.0","date":"2026-10-09","changes":["Teleport mode, TP to my desk, Players and Saved locations can each be hidden in Settings (a hidden Teleport mode is off)."]},{"version":"1.0.0","date":"2026-10-08","changes":["Teleport mode, TP to desk, TP to players and saved locations, now in one module."]}]},{"id":"fun","kind":"module","name":"Fun","description":"Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects follow a path of steps (lines, waves, arcs, orbits, formulas) with easings, pauses and turns, seen by everyone with this module.","icon":"sparkles","version":"1.9.0","requires":{"map":"1.3.0","map-pick":"1.2.0","hub-api":"1.1.0","motion":"1.0.0"},"changelog":[{"version":"1.9.0","date":"2026-10-17","changes":["New look that matches Gather: avatars and a footprints button to flee, play/pause icons on your animations with edit and delete on hover, and an eye to hide or show the others' animations.","Cleaner animation studio: segmented choices, fields with units, step actions as icons, a round play button and Save at the bottom.","The folded section shows “Fleeing” or how many of your animations are playing."]},{"version":"1.8.0","date":"2026-10-16","changes":["Studio steps: ↑ ↓ change the order the points are reached in, ⧉ duplicates a step (the copy makes the same move again from where it ends).","The others' animations on the map are listed under yours, with their author: “Hide” stops showing one on your screen only (“Show” brings it back)."]},{"version":"1.7.1","date":"2026-10-16","changes":["Saving (or closing the studio) while adding points or selecting objects no longer leaves the studio stuck on “Saving…”: the animation was saved, the window just did not close."]},{"version":"1.7.0","date":"2026-10-15","changes":["Animation studio: a floating window where an animation is a path of steps, drawn on the map with numbered points to drag. Each step has its shape (line, wave, arc, orbit, or your own x(t) and y(t) formulas), easing (smooth, overshoot, bounce, elastic, or your own f(t)), duration, pause and turn.","The selection moves as one block (it turns as one piece, around its center) or each object on its own, one after the other with a stagger (selection order, left to right, top to bottom or random). At the end, the path loops, plays back (ping-pong) or stops.","Preview with play, pause and a timeline. What sits on an object moves and turns with it.","Earlier animations keep playing; ✎ opens them in the studio and saves them as paths. Mods before Fun 1.7.0 don't show path animations."]},{"version":"1.6.0","date":"2026-10-15","changes":["Animate custom objects: select them like other objects (alone or with real objects) in New animation or ✎."]},{"version":"1.5.0","date":"2026-10-14","changes":["Edit your animations (✎): objects, movement, point, speed and name. The preview replaces the animation until you save, then it restarts for everyone."]},{"version":"1.4.0","date":"2026-10-13","changes":["Animations survive a new version of the map: they belong to the floor and find their objects again, even if the map moved. Existing animations are converted the first time someone with this version opens their map."]},{"version":"1.3.0","date":"2026-10-12","changes":["Your animations belong to your Gather account: start, stop or delete them from the app or the browser. Those you created before are moved to your account when you open their map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Flee mode and Animations can each be hidden in Settings; a hidden one is turned off (hidden animations are no longer fetched nor played).","The animation list only shows yours; the others' still play on the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Animations: select objects, make them orbit around a point or move back and forth in a straight line or along a wave, with a live preview, then save.","Everyone on the map who has this module sees your animations, in sync; only you can start, stop or delete yours.","Nothing is sent to Gather's server: objects only move on screen, and the map is redrawn at 30 fps at most while an animation runs."]},{"version":"1.0.0","date":"2026-10-08","changes":["Flee mode moves here from the player list."]}]},{"id":"build","kind":"module","name":"Build","description":"Free placement in the build tool, “Place on…” to put objects on any other object, and bulk delete (click or drag a box to select).","icon":"hammer","version":"1.6.0","requires":{"map":"1.3.0","map-pick":"1.2.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.6.0","date":"2026-10-17","changes":["New look that matches Gather: Free placement is a switch; Place on…, Show linked objects and Bulk delete… light up while active, with their status and Cancel right under them."]},{"version":"1.5.0","date":"2026-10-15","changes":["Bulk delete also selects and deletes custom objects."]},{"version":"1.4.0","date":"2026-10-14","changes":["Show linked objects…: outlines what sits on what (Place on…, tables, shelves), supports in green and objects on them in cyan, each joined to its support; hover tells what an object is on, click an object to see only its group."]},{"version":"1.3.0","date":"2026-10-09","changes":["Free placement, Place on… and Bulk delete can each be hidden in Settings (a hidden Free placement is off)."]},{"version":"1.2.0","date":"2026-10-09","changes":["Place on… and bulk delete no longer wait for the previous one to finish: start the next one right away, it is queued."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects moved with Place on… are listed in Placed objects.","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Free placement, Place on… and bulk delete, now in one module."]}]},{"id":"outfits","kind":"module","name":"Outfits","description":"Save and apply outfits, including “No outfit” and “Invisible”.","icon":"shirt","version":"1.1.0","requires":{"previews":"1.0.0"},"changelog":[{"version":"1.1.0","date":"2026-10-17","changes":["New look that matches Gather: name and Save in one field, icons for No outfit, Invisible and your outfits, publish and delete on hover."]},{"version":"1.0.0","date":"2026-10-08","changes":["Outfit presets as a module."]}]},{"id":"desks","kind":"module","name":"Desks","description":"Save and swap your desk decoration, and pick which objects belong to your desk.","icon":"lamp-desk","version":"1.4.0","requires":{"map":"1.2.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.4.0","date":"2026-10-17","changes":["New look that matches Gather: picking desk objects is a switch that shows how many objects your desk has, with Reset next to it; publish and delete appear on hover."]},{"version":"1.3.0","date":"2026-10-13","changes":["The objects picked for your desk survive a new version of the map."]},{"version":"1.2.0","date":"2026-10-09","changes":["Picking another desk while one is being applied stops it and applies the new one; “↩ Previous desk” still brings back the desk you had before the first one."]},{"version":"1.1.0","date":"2026-10-08","changes":["Objects added by a desk preset are listed in Placed objects.","Dragging a box over desk objects already picked removes them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Desk presets as a module."]}]},{"id":"constructions","kind":"module","name":"Constructions","description":"Save a group of objects and place it anywhere on the map in one click.","icon":"boxes","version":"1.3.0","requires":{"map":"1.1.0","map-pick":"1.0.0","previews":"1.0.0","placements":"1.0.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-17","changes":["New look that matches Gather: New and Remove last side by side, the object count of each construction, publish and delete on hover."]},{"version":"1.2.0","date":"2026-10-09","changes":["Place several constructions and click “↶ Delete last” several times without waiting: each action is queued and runs in order."]},{"version":"1.1.0","date":"2026-10-08","changes":["“↶ Undo” becomes “↶ Delete last”, using the shared journal of placed objects (keeps your history).","Dragging a box over already selected objects deselects them, like a click."]},{"version":"1.0.0","date":"2026-10-08","changes":["Constructions as a module."]}]},{"id":"placed","kind":"module","name":"Placed objects","description":"Everything you placed with the mod on this map (constructions, desk presets, Place on…): delete the last one, any of them, or all.","icon":"history","version":"1.3.0","requires":{"map":"1.2.0","placements":"1.1.0","jobs":"1.0.0"},"changelog":[{"version":"1.3.0","date":"2026-10-17","changes":["New look that matches Gather: a Remove last button, Delete all asks in a red card with the count, and each placement shows its kind, size and date."]},{"version":"1.2.0","date":"2026-10-13","changes":["Placed objects are listed per floor and survive a new version of the map."]},{"version":"1.1.0","date":"2026-10-09","changes":["Deletions no longer wait for the previous one: click several ✕ or “↶ Delete last” in a row, they are queued and run in order."]},{"version":"1.0.0","date":"2026-10-08","changes":["New module: list what the mod placed on this map, hover to see it, delete the last placement, any of them, or all (everything is outlined in red before you confirm)."]}]},{"id":"share","kind":"module","name":"Share presets","description":"Export and import the presets of your installed modules as JSON.","icon":"share-2","version":"1.1.0","requires":{},"changelog":[{"version":"1.1.0","date":"2026-10-17","changes":["New look that matches Gather: Export, Import and Paste buttons with icons, and a clear success or error message."]},{"version":"1.0.0","date":"2026-10-08","changes":["Export and import only cover the preset modules you have installed."]}]},{"id":"hub","kind":"module","name":"Community hub","description":"Browse, preview, add and publish presets shared by others.","icon":"globe","version":"1.2.0","requires":{"previews":"1.0.0","hub-api":"1.1.0"},"changelog":[{"version":"1.2.0","date":"2026-10-17","changes":["New look that matches Gather: a larger browse window with search, a type switch, refresh, and preset cards with Add."]},{"version":"1.1.0","date":"2026-10-12","changes":["Your published presets belong to your Gather account: delete them from the app or the browser. Those you published before are moved to your account the next time you open the hub."]},{"version":"1.0.1","date":"2026-10-09","changes":["Hub requests go through the shared hub library, also used by animations."]},{"version":"1.0.0","date":"2026-10-08","changes":["Hub tabs follow your installed preset modules."]}]},{"id":"custom","kind":"module","name":"Custom objects","description":"Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.","icon":"image","version":"1.7.0","requires":{"map":"1.3.0","map-pick":"1.2.0","hub-api":"1.3.0"},"changelog":[{"version":"1.7.0","date":"2026-10-17","changes":["New look that matches Gather: an editor card with property rows, a Collision switch and a Back/Front control, image thumbnails in the list and icon actions on hover."]},{"version":"1.6.0","date":"2026-10-16","changes":["Images and restyles are hidden in Gather's simplified view (zoomed out), like the map's own objects, and come back with the full view."]},{"version":"1.5.0","date":"2026-10-16","changes":["Hover one of your images in the list to see it outlined in red on the map, even while an animation moves it."]},{"version":"1.4.0","date":"2026-10-15","changes":["Images and restyles turn with Fun 1.7.0 animations, around the middle of their base line (images) or with the object they restyle."]},{"version":"1.3.0","date":"2026-10-15","changes":["Animated GIFs (and animated WebP or PNG) play on the map, for images and restyles, in sync for everyone. Very long or very large animations (over 300 frames or 16 million pixels in all) stay still on their first frame."]},{"version":"1.2.0","date":"2026-10-15","changes":["Place copies (＋): images follow the pointer and every click places one more, like a Gather object; for a restyle, every clicked object gets the same image. Esc to stop.","Placed images behave like map objects: Fun animates them and Bulk delete deletes them."]},{"version":"1.1.0","date":"2026-10-15","changes":["Plane: “▼ Back” and “▲ Front” move an image or a restyle behind or in front of the objects it overlaps, one at a time; the object it is set against is outlined in green, “Reset” goes back to the default plane. Seen the same way by everyone."]},{"version":"1.0.0","date":"2026-10-14","changes":["New module: images on the map for everyone who has it, since Gather V2 cannot add your own objects. “New image…” places an image anywhere with its size, layer (floor, sorted like objects, above everything), base line and collision; “Restyle an object…” draws an image over a real object, which keeps its collision and seats. Images come from an https URL or are uploaded to the community hub (512 KB max)."]}]},{"id":"auto-away","kind":"module","name":"Auto away","description":"Sets you Away (or Busy, your choice) after a few minutes without keyboard or mouse on your computer, and back to your status on your next input. The same status set by hand stays. Gather desktop app only.","icon":"moon","version":"1.1.0","requires":{},"changelog":[{"version":"1.1.0","date":"2026-10-17","changes":["New look that matches Gather: a switch, Away/Busy as a segmented choice, a minutes field, and your current status on the folded section."]},{"version":"1.0.0","date":"2026-10-16","changes":["New module: after 5 minutes (1 to 120) without keyboard or mouse anywhere on your computer, your status goes to Away (or Busy, your choice), and back to what it was as soon as you use the computer again. Away or Busy set by hand is never changed. Needs the Gather desktop app, which knows the computer's idle time; in a browser tab it stays off."]}]}]};
 // Map library: object helpers, snapshots, stable object references and
 // screen/world geometry shared by the modules that work on the map.
 window.__gatherMods.define("map", (ctx) => {
@@ -1733,10 +2011,11 @@ window.__gatherMods.define("map-pick", (ctx) => {
     if (!box) {
       box = document.createElement("div");
       box.id = "gather-mods-marquee";
+      ctx.applyTheme(box);
       document.body.appendChild(box);
       clearHoverHighlight();
     }
-    box.classList.toggle("gm-danger", !!state.session?.danger);
+    box.classList.toggle("is-danger", !!state.session?.danger);
     Object.assign(box.style, {
       left: Math.min(drag.x, e.clientX) + "px",
       top: Math.min(drag.y, e.clientY) + "px",
@@ -1786,6 +2065,7 @@ window.__gatherMods.define("map-pick", (ctx) => {
     }
   }
 
+  // Re-themed on every update: the theme can change while it is shown.
   function hoverTip() {
     let tip = document.getElementById("gather-mods-hover-tip");
     if (!tip) {
@@ -1793,6 +2073,7 @@ window.__gatherMods.define("map-pick", (ctx) => {
       tip.id = "gather-mods-hover-tip";
       document.body.appendChild(tip);
     }
+    ctx.applyTheme(tip);
     return tip;
   }
   function clearHoverHighlight() {
@@ -1829,9 +2110,8 @@ window.__gatherMods.define("map-pick", (ctx) => {
       map.requestRender();
     }
     const tip = hoverTip();
-    tip.textContent =
-      (state.session.label?.(target) ?? map.objectName(target)) +
-      (total > 1 ? ` (${index + 1}/${total}, scroll to cycle)` : "");
+    const name = ctx.escapeHtml(state.session.label?.(target) ?? map.objectName(target));
+    tip.innerHTML = `<span class="gm-tip">${name}${total > 1 ? ` <span class="gm-kbd">${index + 1}/${total}</span> scroll to cycle` : ""}</span>`;
     tip.style.left = e.clientX + 14 + "px";
     tip.style.top = e.clientY + 14 + "px";
   }
@@ -1893,10 +2173,9 @@ window.__gatherMods.define("map-pick", (ctx) => {
   ctx.onCleanup(() => stop());
   ctx.style(`
     #gather-mods-marquee { position:fixed; z-index:2147482500; pointer-events:none; box-sizing:border-box;
-      border:1px dashed var(--theme-color-accent,#6c5ce7); background:rgba(108,92,231,.12); }
-    #gather-mods-marquee.gm-danger { border-color:#ff3b30; background:rgba(255,59,48,.12); }
-    #gather-mods-hover-tip { position:fixed; z-index:2147483001; pointer-events:none; padding:3px 7px; border-radius:6px;
-      background:rgba(0,0,0,.82); color:#fff; font-size:12px; font-family:inherit; white-space:nowrap; }
+      border:1px dashed var(--gm-accent); background:var(--gm-accent-soft); }
+    #gather-mods-marquee.is-danger { border-color:var(--gm-danger); background:var(--gm-danger-soft); }
+    #gather-mods-hover-tip { position:fixed; z-index:2147483001; pointer-events:none; white-space:nowrap; }
   `);
 
   return {
@@ -2108,20 +2387,23 @@ window.__gatherMods.define("previews", (ctx) => {
     row.addEventListener("mouseleave", hidePopover);
   }
   ctx.onCleanup(hidePopover);
+  ctx.onTick(() => {
+    const pop = document.getElementById("gather-mods-popover");
+    if (pop) ctx.applyTheme(pop);
+  });
 
   ctx.style(`
     :is(#gather-mods-modal, #gather-mods-popover) .gm-preview { height:${PREVIEW_BOX_H}px; display:flex; align-items:center; justify-content:center; overflow:hidden;
-      border-radius:8px; background:var(--gm-input); }
+      border-radius:10px; background:var(--gm-fill); }
     :is(#gather-mods-modal, #gather-mods-popover) .gm-preview img { image-rendering:pixelated; }
     :is(#gather-mods-modal, #gather-mods-popover) .gm-outfit-crop { position:relative; overflow:hidden; width:${PREVIEW_W}px; height:${PREVIEW_H}px; }
     :is(#gather-mods-modal, #gather-mods-popover) .gm-outfit-img { position:absolute; visibility:hidden; }
     :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-preview { position:relative; flex-shrink:0; }
     :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-preview img { position:absolute; }
-    :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-floor { position:absolute; background:var(--gm-surface-hover); }
-    :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-zone { position:absolute; box-sizing:border-box; border:1px dashed var(--theme-color-accent,#6c5ce7); pointer-events:none; }
-    #gather-mods-popover { position:fixed; z-index:2147483000; width:${PREVIEW_W + 26}px; padding:6px; box-sizing:border-box; pointer-events:none;
-      background:var(--gm-bg); border:1px solid var(--gm-border); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.25); font-family:inherit; }
-    #gather-mods-popover .gm-empty { color:var(--gm-muted); font-size:12px; }
+    :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-floor { position:absolute; border-radius:2px; background:var(--gm-fill-2); }
+    :is(#gather-mods-modal, #gather-mods-popover) .gm-layout-zone { position:absolute; box-sizing:border-box; border:1px dashed var(--gm-accent); border-radius:2px; pointer-events:none; }
+    #gather-mods-popover { position:fixed; z-index:2147483000; width:${PREVIEW_W + 26}px; padding:8px; box-sizing:border-box; pointer-events:none;
+      background:var(--gm-surface); border-radius:14px; box-shadow:var(--gm-shadow-pop); }
   `);
 
   return {
@@ -2746,6 +3028,20 @@ window.__gatherMods.define("teleport", (ctx) => {
 
   const getLocations = () => readJson(LOCATIONS_KEY, []);
 
+  const initials = (name) =>
+    (name || "?")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => [...w][0])
+      .join("")
+      .toUpperCase() || "?";
+  const avatarColor = (id) => {
+    let hue = 0;
+    for (const c of String(id)) hue = (hue * 31 + c.charCodeAt(0)) % 360;
+    return `hsl(${hue} 55% 55%)`;
+  };
+
   function renderPlayers(root) {
     const list = root.querySelector("#gm-players");
     const search = root.querySelector("#gm-player-search").value.toLowerCase();
@@ -2758,7 +3054,7 @@ window.__gatherMods.define("teleport", (ctx) => {
       ? players
           .map(
             (p) =>
-              `<div class="gm-item" data-pid="${escapeHtml(p.id)}"><span class="gm-name">${escapeHtml((p.name || "?").slice(0, 24))}</span></div>`,
+              `<div class="gm-item" data-pid="${escapeHtml(p.id)}"><span class="gm-avatar" style="background:${avatarColor(p.id)}">${escapeHtml(initials(p.name))}</span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml((p.name || "?").slice(0, 24))}</span></div><div class="gm-actions"><button class="gm-iconbtn" title="Teleport to them"><i class="gm-i" data-i="navigation"></i></button></div></div>`,
           )
           .join("")
       : '<div class="gm-empty">No players</div>';
@@ -2780,7 +3076,7 @@ window.__gatherMods.define("teleport", (ctx) => {
       ? locations
           .map(
             (loc, i) =>
-              `<div class="gm-item" data-idx="${i}" title="(${loc.x}, ${loc.y})"><span class="gm-name">${escapeHtml(loc.name)}</span><span class="gm-del" data-del="${i}">✕</span></div>`,
+              `<div class="gm-item" data-idx="${i}" title="(${loc.x}, ${loc.y})"><i class="gm-i" data-i="map-pin"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(loc.name)}</span></div><div class="gm-actions"><button class="gm-iconbtn gm-danger" data-del="${i}" title="Delete"><i class="gm-i" data-i="trash-2"></i></button></div></div>`,
           )
           .join("")
       : '<div class="gm-empty">No saved locations</div>';
@@ -2792,7 +3088,7 @@ window.__gatherMods.define("teleport", (ctx) => {
         tpTo(x, y, floorId);
       };
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll("[data-del]").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const l = getLocations();
@@ -2829,6 +3125,7 @@ window.__gatherMods.define("teleport", (ctx) => {
   let root = null;
   ctx.section({
     title: "Teleport",
+    status: () => (tpMode ? "On" : null),
     parts: [
       { id: "mode", label: "Teleport mode" },
       { id: "desk", label: "TP to my desk" },
@@ -2836,33 +3133,28 @@ window.__gatherMods.define("teleport", (ctx) => {
       { id: "locations", label: "Saved locations" },
     ],
     html: `
-      <button class="gm-btn" id="gm-tp-mode" data-part="mode">Teleport mode: OFF</button>
-      <button class="gm-btn" id="gm-tp-desk" data-part="desk">TP to my desk</button>
+      <label class="gm-toggle" data-part="mode">
+        <span class="gm-toggle-text"><span class="gm-toggle-title">Teleport mode</span><span class="gm-hint">“Go to” and double-click teleport instead of walking</span></span>
+        <input type="checkbox" class="gm-switch" id="gm-tp-mode" />
+      </label>
+      <button class="gm-btn gm-block" id="gm-tp-desk" data-part="desk"><i class="gm-i" data-i="armchair"></i>Teleport to my desk</button>
       <div data-part="players">
-        <div class="gm-sublabel">Players</div>
-        <input class="gm-input" id="gm-player-search" placeholder="Search player..." />
+        <div class="gm-sub">Players</div>
+        <div class="gm-field"><i class="gm-i" data-i="search"></i><input class="gm-input" id="gm-player-search" placeholder="Search players" /></div>
         <div class="gm-list" id="gm-players"></div>
       </div>
       <div data-part="locations">
-        <div class="gm-sublabel">Saved locations</div>
-        <div class="gm-row">
-          <input class="gm-input" id="gm-loc-name" placeholder="Name this spot..." />
-          <button class="gm-btn" id="gm-loc-save">Save</button>
-        </div>
+        <div class="gm-sub">Saved locations</div>
+        <div class="gm-field"><input class="gm-input" id="gm-loc-name" placeholder="Name this spot" /><button class="gm-btn gm-primary gm-sm" id="gm-loc-save">Save</button></div>
         <div class="gm-list" id="gm-locations"></div>
       </div>`,
     mount(el) {
       root = el;
-      const tpBtn = el.querySelector("#gm-tp-mode");
-      const syncTpBtn = () => {
-        tpBtn.textContent = "Teleport mode: " + (tpMode ? "ON" : "OFF");
-        tpBtn.classList.toggle("active", tpMode);
-      };
-      tpBtn.onclick = () => {
-        tpMode = !tpMode;
-        syncTpBtn();
-      };
-      syncTpBtn();
+      const tpSwitch = el.querySelector("#gm-tp-mode");
+      tpSwitch.checked = tpMode;
+      tpSwitch.addEventListener("change", () => {
+        tpMode = tpSwitch.checked;
+      });
       const deskBtn = el.querySelector("#gm-tp-desk");
       deskBtn.onclick = () => {
         if (!tpToDesk()) flash(deskBtn, "No desk assigned");
@@ -2941,6 +3233,25 @@ window.__gatherMods.define("fun", (ctx) => {
     ctx.onCleanup(() => clearInterval(fleeTimer));
   }
 
+  const initials = (name) =>
+    (name || "?")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => [...w][0])
+      .join("")
+      .toUpperCase() || "?";
+  const avatarColor = (id) => {
+    let hue = 0;
+    for (const c of String(id)) hue = (hue * 31 + c.charCodeAt(0)) % 360;
+    return `hsl(${hue} 55% 55%)`;
+  };
+  function playerRow(p) {
+    const on = fleeTargetId === p.id;
+    const name = (p.name || "?").slice(0, 24);
+    const button = `<button class="gm-iconbtn${on ? " on" : ""}" title="${on ? "Stop fleeing" : "Flee from them"}"><i class="gm-i" data-i="footprints"></i></button>`;
+    return `<div class="gm-item${on ? " is-on" : ""}" data-pid="${escapeHtml(p.id)}" title="${on ? "Stop fleeing" : "Flee from this player"}"><span class="gm-avatar" style="background:${avatarColor(p.id)}">${escapeHtml(initials(name))}</span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(name)}</span></div>${on ? `<span class="gm-tail gm-fun-fleeing">Fleeing</span>${button}` : `<div class="gm-actions">${button}</div>`}</div>`;
+  }
   function renderPlayers(root) {
     const list = root.querySelector("#gm-flee-players");
     const search = root.querySelector("#gm-flee-search").value.toLowerCase();
@@ -2950,12 +3261,7 @@ window.__gatherMods.define("fun", (ctx) => {
         p.id !== myId && p.connected && !p.isBot && (p.name || "").toLowerCase().includes(search),
     );
     const html = players.length
-      ? players
-          .map(
-            (p) =>
-              `<div class="gm-item${fleeTargetId === p.id ? " active" : ""}" data-pid="${escapeHtml(p.id)}" title="Flee from this player"><span class="gm-name">${escapeHtml((p.name || "?").slice(0, 24))}</span><span>🏃</span></div>`,
-          )
-          .join("")
+      ? players.map(playerRow).join("")
       : '<div class="gm-empty">No players</div>';
     if (list.__html === html) return;
     list.__html = html;
@@ -3495,60 +3801,67 @@ window.__gatherMods.define("fun", (ctx) => {
   let studio = null;
   const option = (value, label) => `<option value="${value}">${label}</option>`;
   const options = (entries) => entries.map(([v, l]) => option(v, l)).join("");
-  const field = (label, input, attrs = "") =>
-    `<label class="gm-st-field"${attrs}>${label}${input}</label>`;
+  const prop = (label, control, attrs = "") =>
+    `<div class="gm-prop"${attrs}><span>${label}</span>${control}</div>`;
+  const unitField = (input, unit, title) =>
+    `<label class="gm-field"${title ? ` title="${title}"` : ""}>${input}${unit ? `<span class="gm-unit">${unit}</span>` : ""}</label>`;
   const number = (key, min, max, step) =>
-    `<input type="number" data-f="${key}" min="${min}" max="${max}" step="${step}" />`;
+    `<input class="gm-input" type="number" data-f="${key}" min="${min}" max="${max}" step="${step}" />`;
+  const formula = (key, placeholder) =>
+    `<input class="gm-input" data-f="${key}" data-expr placeholder="${placeholder}" />`;
+  const note = (text, attrs) =>
+    `<div class="gm-note"${attrs}><i class="gm-i sm" data-i="info"></i><span>${text}</span></div>`;
   const STUDIO_HTML = `
-    <div class="gm-st-head"><span>Animation studio</span><span class="gm-st-close" title="Close without saving">✕</span></div>
-    <div class="gm-st-body">
-      <input data-k="name" maxlength="${MAX_NAME}" placeholder="Name this animation..." />
-      <div class="gm-st-row"><span class="gm-st-label">Objects</span><span class="gm-st-grow" data-k="count"></span><button data-k="select"></button></div>
-      <div class="gm-st-row"><span class="gm-st-label">Move</span><div class="gm-st-seg" data-k="mode"><button data-v="block" title="The selection moves and turns as one piece, around its center">As one block</button><button data-v="each" title="Every object follows the path from its own place and turns on itself">Each on its own</button></div></div>
-      <div class="gm-st-row" data-k="stagger"><span class="gm-st-label">Stagger</span><input type="number" data-k="delay" min="0" max="60" step="0.05" title="Seconds between two objects" /><span>s</span><select class="gm-st-grow" data-k="order">${options(Object.entries(ORDERS))}</select></div>
-      <div class="gm-st-row"><span class="gm-st-label">At the end</span><div class="gm-st-seg" data-k="end"><button data-v="loop" title="Start again from the beginning">Loop</button><button data-v="pingpong" title="Go back along the path, then again">Ping-pong</button><button data-v="once" title="Stay at the last point">Once</button></div></div>
-      <div class="gm-st-label">Steps</div>
-      <div class="gm-st-steps" data-k="steps"></div>
-      <button data-k="add"></button>
-      <div class="gm-st-card" data-k="step">
-        <div class="gm-st-label" data-k="step-title"></div>
-        <div class="gm-st-cols">
-          ${field("Shape", `<select data-f="shape">${options(Object.entries(motion.SHAPES))}</select>`)}
-          ${field("Easing", `<select data-f="easing">${options(Object.entries(motion.EASINGS).map(([v, e]) => [v, e.label]))}</select>`)}
-        </div>
-        ${field("Easing f(t)", '<input data-f="easingExpr" data-expr placeholder="t^2" />', ' data-k="easing-expr"')}
-        <div class="gm-st-cols">
-          ${field("Duration (s)", number("duration", 0.05, 600, 0.1))}
-          ${field("Pause after (s)", number("pause", 0, 600, 0.1))}
-          ${field("Turn (°)", number("rotate", -36000, 36000, 15), ' title="Degrees turned during the step: the block around its center, or each object on itself"')}
-        </div>
-        <div class="gm-st-cols" data-shape="wave">
-          ${field("Height (tiles)", number("amplitude", 0, 50, 0.25))}
-          ${field("Waves", number("waves", 0.5, 50, 0.5))}
-          <label class="gm-st-field gm-st-check"><input type="checkbox" data-f="invert" />Other side</label>
-        </div>
-        <div class="gm-st-cols" data-shape="arc">${field("Bend (tiles, negative for the other side)", number("bend", -50, 50, 0.5))}</div>
-        <div class="gm-st-cols" data-shape="orbit">
-          ${field("Turns", number("turns", 0.05, 100, 0.25))}
-          ${field("Direction", `<select data-f="direction">${option(1, "Clockwise")}${option(-1, "Counter-clockwise")}</select>`)}
-        </div>
-        <div class="gm-st-cols" data-shape="custom">
-          ${field("x(t) (tiles)", '<input data-f="x" data-expr placeholder="0" />')}
-          ${field("y(t) (tiles)", '<input data-f="y" data-expr placeholder="-sin(pi*t)" />')}
-        </div>
-        <div class="gm-st-hint" data-shape="orbit">Its numbered point on the map is the center: drag it.</div>
-        <div class="gm-st-hint" data-shape="custom">Added to the straight line to the point.</div>
-        <div class="gm-st-hint" data-k="syntax">Formulas of t, from 0 to 1: numbers, t, pi, + - * / ^, parentheses, sin cos tan abs sqrt exp floor round sign min max.</div>
+    <div class="gm-window-head" data-k="head"><i class="gm-i" data-i="wand-sparkles"></i><span class="gm-window-title">Animation studio</span><button class="gm-iconbtn" data-k="close" title="Close without saving"><i class="gm-i" data-i="x"></i></button></div>
+    <div class="gm-window-body">
+      <input class="gm-input" data-k="name" maxlength="${MAX_NAME}" placeholder="Name this animation" />
+      ${prop("Objects", '<span class="gm-st-objects"><span data-k="count"></span><button class="gm-btn gm-sm" data-k="select"></button></span>')}
+      ${prop("Move", '<div class="gm-seg" data-k="mode"><button data-v="block" title="The selection moves and turns as one piece, around its center">As one block</button><button data-v="each" title="Every object follows the path from its own place and turns on itself">Each</button></div>')}
+      <div class="gm-st-contents" data-k="stagger">
+        ${prop("Stagger", unitField('<input class="gm-input" type="number" data-k="delay" min="0" max="60" step="0.05" />', "s", "Seconds between two objects"))}
+        ${prop("Order", `<select class="gm-select" data-k="order">${options(Object.entries(ORDERS))}</select>`)}
       </div>
-      <div class="gm-st-row"><button data-k="play"></button><input class="gm-st-grow" type="range" data-k="scrub" min="0" step="0.01" /><span class="gm-st-clock" data-k="clock"></span></div>
-      <div class="gm-st-status" data-k="status"></div>
-      <button class="gm-st-primary" data-k="save"></button>
-    </div>`;
+      ${prop("At the end", '<div class="gm-seg" data-k="end"><button data-v="loop" title="Start again from the beginning">Loop</button><button data-v="pingpong" title="Go back along the path, then again">Ping-pong</button><button data-v="once" title="Stay at the last point">Once</button></div>')}
+      <div class="gm-sub">Steps<span class="gm-spacer"></span><button class="gm-btn gm-ghost gm-sm" data-k="add"></button></div>
+      <div class="gm-list gm-st-steps" data-k="steps"></div>
+      <div class="gm-card gm-st-card" data-k="step">
+        <div class="gm-st-cols">
+          <select class="gm-select" data-f="shape" title="Shape">${options(Object.entries(motion.SHAPES))}</select>
+          <select class="gm-select" data-f="easing" title="Easing">${options(Object.entries(motion.EASINGS).map(([v, e]) => [v, e.label]))}</select>
+        </div>
+        ${prop("Easing f(t)", unitField(formula("easingExpr", "t^2")), ' data-k="easing-expr"')}
+        <div class="gm-st-cols">
+          ${unitField(number("duration", 0.05, 600, 0.1), "s", "Duration in seconds")}
+          ${unitField(number("pause", 0, 600, 0.1), "pause", "Pause after the step, in seconds")}
+          ${unitField(number("rotate", -36000, 36000, 15), "°", "Degrees turned during the step: the block around its center, or each object on itself")}
+        </div>
+        <div class="gm-st-contents" data-shape="wave">
+          ${prop("Height", unitField(number("amplitude", 0, 50, 0.25), "tiles"))}
+          ${prop("Waves", unitField(number("waves", 0.5, 50, 0.5)))}
+          ${prop("Other side", '<input type="checkbox" class="gm-switch" data-f="invert" />')}
+        </div>
+        <div class="gm-st-contents" data-shape="arc">${prop("Bend", unitField(number("bend", -50, 50, 0.5), "tiles", "Negative for the other side"))}</div>
+        <div class="gm-st-contents" data-shape="orbit">
+          ${prop("Turns", unitField(number("turns", 0.05, 100, 0.25)))}
+          ${prop("Direction", `<select class="gm-select" data-f="direction">${option(1, "Clockwise")}${option(-1, "Counter-clockwise")}</select>`)}
+        </div>
+        <div class="gm-st-contents" data-shape="custom">
+          ${prop("x(t)", unitField(formula("x", "0"), "tiles"))}
+          ${prop("y(t)", unitField(formula("y", "-sin(pi*t)"), "tiles"))}
+        </div>
+        ${note("Its numbered point on the map is the center: drag it.", ' data-shape="orbit"')}
+        ${note("Added to the straight line to the point.", ' data-shape="custom"')}
+        ${note("Formulas of t, from 0 to 1: numbers, t, pi, + - * / ^, parentheses, sin cos tan abs sqrt exp floor round sign min max.", ' data-k="syntax"')}
+      </div>
+      <div class="gm-st-player"><button class="gm-iconbtn gm-st-play" data-k="play"></button><input class="gm-st-scrub" type="range" data-k="scrub" min="0" step="0.01" /><span class="gm-st-clock" data-k="clock"></span></div>
+    </div>
+    <div class="gm-window-foot"><div class="gm-note"><i class="gm-i sm" data-i="info"></i><span data-k="status"></span></div><button class="gm-btn gm-primary" data-k="save"></button></div>`;
 
   function openStudio() {
     if (!studio) {
       const win = document.createElement("div");
       win.id = "gm-anim-studio";
+      win.className = "gm-window";
       win.innerHTML = STUDIO_HTML;
       document.body.appendChild(win);
       studio = { win, $: (k) => win.querySelector(`[data-k="${k}"]`) };
@@ -3574,7 +3887,7 @@ window.__gatherMods.define("fun", (ctx) => {
     win.style.top = Math.round(y) + "px";
   }
   function dragStudio(e) {
-    if (e.button !== 0 || e.target.closest(".gm-st-close")) return;
+    if (e.button !== 0 || e.target.closest('[data-k="close"]')) return;
     const win = studio.win;
     const start = { x: e.clientX, y: e.clientY, left: win.offsetLeft, top: win.offsetTop };
     const move = (m) =>
@@ -3591,8 +3904,8 @@ window.__gatherMods.define("fun", (ctx) => {
     const $ = (k) => win.querySelector(`[data-k="${k}"]`);
     for (const type of ["keydown", "keyup", "keypress"])
       win.addEventListener(type, (e) => e.stopPropagation());
-    win.querySelector(".gm-st-head").onpointerdown = dragStudio;
-    win.querySelector(".gm-st-close").onclick = closeDraft;
+    $("head").onpointerdown = dragStudio;
+    $("close").onclick = closeDraft;
     $("select").onclick = () => {
       if (pick.current() !== "anim-select") return pick.start(selectSession);
       pick.stop("anim-select");
@@ -3608,9 +3921,9 @@ window.__gatherMods.define("fun", (ctx) => {
         changed();
       };
     $("steps").onclick = (e) => {
-      const row = e.target.closest("[data-i]");
+      const row = e.target.closest("[data-step]");
       if (!row) return;
-      const i = Number(row.dataset.i);
+      const i = Number(row.dataset.step);
       const action = e.target.closest("[data-act]")?.dataset.act;
       if (action === "del") deleteStep(i);
       else if (action === "up" || action === "down") moveStep(i, action === "up" ? -1 : 1);
@@ -3714,10 +4027,10 @@ window.__gatherMods.define("fun", (ctx) => {
     selectStep(i + 1);
   }
   const seconds = (n) => `${+n.toFixed(2)} s`;
-  const stepAction = (action, label, title, shown) =>
-    `<span class="gm-st-act${shown ? "" : " gm-st-off"}" data-act="${action}" title="${title}">${label}</span>`;
+  const stepAction = (action, title, icon) =>
+    `<button class="gm-iconbtn${action === "del" ? " gm-danger" : ""}" data-act="${action}" title="${title}">${icon}</button>`;
   const stepRow = (s, i, steps) =>
-    `<div class="gm-st-step${i === draft.selected ? " gm-st-sel" : ""}" data-i="${i}"><span class="gm-st-num">${i + 1}</span><span class="gm-st-grow">${SHAPE_LABELS[s.shape]} · ${seconds(s.duration)}${s.pause ? ` + ${seconds(s.pause)} pause` : ""}${s.rotate ? ` · ${+s.rotate.toFixed(1)}°` : ""}</span>${stepAction("up", "↑", "Move up: reached earlier", i > 0)}${stepAction("down", "↓", "Move down: reached later", i < steps.length - 1)}${stepAction("copy", "⧉", "Duplicate: the same move again from where this step ends", steps.length < MAX_STEPS)}<span class="gm-st-del" data-act="del" title="Delete this step">✕</span></div>`;
+    `<div class="gm-item${i === draft.selected ? " is-on show-actions" : ""}" data-step="${i}"><span class="gm-avatar gm-st-num">${i + 1}</span><div class="gm-item-text"><span class="gm-item-title">${SHAPE_LABELS[s.shape]} · ${seconds(s.duration)}${s.pause ? ` + ${seconds(s.pause)} pause` : ""}${s.rotate ? ` · ${+s.rotate.toFixed(1)}°` : ""}</span></div><div class="gm-actions">${i > 0 ? stepAction("up", "Move up: reached earlier", '<i class="gm-i sm" data-i="arrow-up"></i>') : ""}${i < steps.length - 1 ? stepAction("down", "Move down: reached later", '<i class="gm-i sm" data-i="arrow-down"></i>') : ""}${steps.length < MAX_STEPS ? stepAction("copy", "Duplicate: the same move again from where this step ends", '<i class="gm-i sm" data-i="copy"></i>') : ""}${stepAction("del", "Delete this step", '<i class="gm-i sm" data-i="trash-2"></i>')}</div></div>`;
   function studioStatus(session) {
     if (draft.status) return draft.status;
     if (session === "anim-select")
@@ -3736,31 +4049,35 @@ window.__gatherMods.define("fun", (ctx) => {
     const session = pick.current();
     const { steps } = draft;
     const step = steps[draft.selected];
-    $("count").textContent = `${draft.ids.length} object${draft.ids.length === 1 ? "" : "s"}`;
+    $("count").textContent = `${draft.ids.length} selected`;
     $("select").textContent =
       session === "anim-select" ? "Done" : draft.ids.length ? "Change" : "Select";
-    $("select").classList.toggle("active", session === "anim-select");
+    $("select").classList.toggle("gm-primary", session === "anim-select");
     for (const k of ["mode", "end"])
-      for (const b of $(k).children) b.classList.toggle("active", b.dataset.v === draft[k]);
+      for (const b of $(k).children) b.classList.toggle("on", b.dataset.v === draft[k]);
     $("stagger").style.display = draft.mode === "each" ? "" : "none";
     $("steps").innerHTML = steps.length
       ? steps.map(stepRow).join("")
-      : '<div class="gm-st-hint">No steps yet</div>';
-    $("add").textContent =
-      session === "anim-point" ? "Done adding points" : "＋ Add points on the map";
-    $("add").classList.toggle("active", session === "anim-point");
-    $("add").disabled =
-      session !== "anim-point" && (!draft.ids.length || steps.length >= MAX_STEPS);
+      : '<div class="gm-empty">No steps yet</div>';
+    const adding = session === "anim-point";
+    $("add").innerHTML = adding
+      ? '<i class="gm-i sm" data-i="check"></i>Done'
+      : '<i class="gm-i sm" data-i="plus"></i>Add points';
+    $("add").title = adding ? "Stop adding points" : "Click the map to add points";
+    $("add").classList.toggle("gm-primary", adding);
+    $("add").classList.toggle("gm-ghost", !adding);
+    $("add").disabled = !adding && (!draft.ids.length || steps.length >= MAX_STEPS);
     $("step").style.display = step ? "" : "none";
     if (step) {
-      $("step-title").textContent = `Step ${draft.selected + 1}`;
       for (const el of studio.win.querySelectorAll("[data-shape]"))
         el.style.display = el.dataset.shape === step.shape ? "" : "none";
       $("easing-expr").style.display = step.easing === "custom" ? "" : "none";
       $("syntax").style.display = step.easing === "custom" || step.shape === "custom" ? "" : "none";
     }
     $("play").disabled = $("scrub").disabled = !steps.length;
-    $("status").textContent = studioStatus(session);
+    const status = studioStatus(session);
+    $("status").textContent = status;
+    $("status").parentElement.classList.toggle("gm-err", /^(Save failed|Step \d+:)/.test(status));
     $("save").disabled = !canSave();
     $("save").textContent = draft.editId ? "Save changes" : "Save";
     updateClock();
@@ -3786,8 +4103,10 @@ window.__gatherMods.define("fun", (ctx) => {
     studio.$("scrub").max = span;
     studio.$("scrub").value = t;
     studio.$("clock").textContent = `${t.toFixed(1)} / ${span.toFixed(1)} s`;
-    studio.$("play").textContent = ended ? "↺" : draft.paused ? "▶" : "⏸";
-    studio.$("play").title = ended ? "Play again" : draft.paused ? "Play" : "Pause";
+    const play = studio.$("play");
+    const icon = `<i class="gm-i sm" data-i="${ended ? "rotate-ccw" : draft.paused ? "play" : "pause"}"></i>`;
+    if (play.innerHTML !== icon) play.innerHTML = icon;
+    play.title = ended ? "Play again" : draft.paused ? "Play" : "Pause";
   }
   function togglePlay() {
     const span = timelineSpan();
@@ -4005,20 +4324,23 @@ window.__gatherMods.define("fun", (ctx) => {
   function renderAnimations() {
     if (!root?.isConnected) return;
     const button = root.querySelector("#gm-anim-new");
-    button.textContent = !draft
-      ? "New animation…"
+    button.innerHTML = draft
+      ? '<i class="gm-i sm" data-i="x"></i>Cancel'
+      : '<i class="gm-i sm" data-i="plus"></i>New';
+    button.title = !draft
+      ? "Opens the animation studio: select objects, add points on the map, adjust each step, save."
       : draft.editId
         ? "Cancel editing"
-        : "Cancel new animation";
-    button.classList.toggle("active", !!draft);
+        : "Cancel the new animation";
+    button.classList.toggle("gm-primary", !draft);
     const list = root.querySelector("#gm-anims");
     const own = shared.items.filter((a) => a.mine);
     list.innerHTML = own.length
       ? own
-          .map(
-            (a) =>
-              `<div class="gm-item${a.running ? " active" : ""}${a.id === draft?.editId ? " gm-editing" : ""}" data-id="${escapeHtml(a.id)}" title="${a.running ? "Click to stop it for everyone" : "Click to start it for everyone"}"><span class="gm-name">${a.running ? "⏸" : "▶"} ${escapeHtml(a.name)}</span><span class="gm-actions"><span class="gm-anim-type">${escapeHtml(typeLabel(a))}</span><span class="gm-edit" data-edit="${escapeHtml(a.id)}" title="Edit this animation in the studio">✎</span><span class="gm-del" data-del="${escapeHtml(a.id)}" title="Delete this animation for everyone">✕</span></span></div>`,
-          )
+          .map((a) => {
+            const editing = a.id === draft?.editId;
+            return `<div class="gm-item${a.running ? " is-on" : ""}${editing ? " gm-fun-editing" : ""}" data-id="${escapeHtml(a.id)}" title="${a.running ? "Click to stop it for everyone" : "Click to start it for everyone"}"><i class="gm-i" data-i="${a.running ? "pause" : "play"}"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(a.name)}</span></div><span class="gm-tail hide-on-hover">${editing ? "Editing" : escapeHtml(typeLabel(a))}</span><div class="gm-actions"><button class="gm-iconbtn" data-edit="${escapeHtml(a.id)}" title="Edit in the studio"><i class="gm-i" data-i="pencil"></i></button><button class="gm-iconbtn gm-danger" data-del="${escapeHtml(a.id)}" title="Delete for everyone"><i class="gm-i" data-i="trash-2"></i></button></div></div>`;
+          })
           .join("")
       : '<div class="gm-empty">You have no animations on this map</div>';
     root.querySelector("#gm-anims-status").textContent = shared.status;
@@ -4029,14 +4351,14 @@ window.__gatherMods.define("fun", (ctx) => {
         if (a) setRunning(a, !a.running);
       };
     });
-    list.querySelectorAll(".gm-edit").forEach((d) => {
+    list.querySelectorAll("[data-edit]").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const a = find(d.dataset.edit);
         if (a) startEdit(a);
       };
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll("[data-del]").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const a = find(d.dataset.del);
@@ -4051,7 +4373,7 @@ window.__gatherMods.define("fun", (ctx) => {
       ? others
           .map((a) => {
             const hidden = hiddenIds.has(a.id);
-            return `<div class="gm-item${hidden ? " gm-anim-hidden" : ""}"><span class="gm-name">${escapeHtml(a.name)}</span><span class="gm-actions"><span class="gm-anim-type">${escapeHtml(a.author || "?")} · ${escapeHtml(typeLabel(a))}${a.running ? "" : " · stopped"}</span><span class="gm-edit" data-hide="${escapeHtml(a.id)}" title="${hidden ? "Play it again on your screen" : "Hide it on your screen only"}">${hidden ? "Show" : "Hide"}</span></span></div>`;
+            return `<div class="gm-item${hidden ? " is-muted" : ""}"><i class="gm-i" data-i="sparkles"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(a.name)}</span><span class="gm-item-meta">${escapeHtml(a.author || "?")} · ${hidden ? "hidden for you" : escapeHtml(typeLabel(a)) + (a.running ? "" : " · stopped")}</span></div><button class="gm-iconbtn" data-hide="${escapeHtml(a.id)}" title="${hidden ? "Show again on your screen" : "Hide on your screen only"}"><i class="gm-i" data-i="${hidden ? "eye-off" : "eye"}"></i></button></div>`;
           })
           .join("")
       : '<div class="gm-empty">No one else has animations on this map</div>';
@@ -4071,19 +4393,23 @@ window.__gatherMods.define("fun", (ctx) => {
       { id: "flee", label: "Flee mode" },
       { id: "animations", label: "Animations" },
     ],
+    status: () => {
+      if (fleeTargetId) return "Fleeing";
+      const playing = shared.items.filter((a) => a.mine && a.running).length;
+      return playing ? `${playing} playing` : null;
+    },
     html: `
       <div data-part="flee">
-        <div class="gm-sublabel">Flee mode: click a player to keep your distance (click again to stop)</div>
-        <input class="gm-input" id="gm-flee-search" placeholder="Search player..." />
+        <div class="gm-sub">Flee mode</div>
+        <div class="gm-field"><i class="gm-i" data-i="search"></i><input class="gm-input" id="gm-flee-search" placeholder="Search players" /></div>
         <div class="gm-list" id="gm-flee-players"></div>
       </div>
       <div data-part="animations">
-      <div class="gm-sublabel">Your animations, seen by everyone with this module: click one to start or stop it</div>
-      <button class="gm-btn" id="gm-anim-new" title="Opens the animation studio: select objects, add points on the map, adjust each step, save.">New animation…</button>
-      <div class="gm-list" id="gm-anims"></div>
-      <div class="gm-status"><span id="gm-anims-status"></span></div>
-      <div class="gm-sublabel">Others' animations: hide one on your screen only</div>
-      <div class="gm-list" id="gm-anims-others"></div>
+        <div class="gm-sub">Your animations<span class="gm-spacer"></span><button class="gm-btn gm-primary gm-sm" id="gm-anim-new"></button></div>
+        <div class="gm-list" id="gm-anims"></div>
+        <div class="gm-note gm-err"><i class="gm-i sm" data-i="circle-alert"></i><span id="gm-anims-status"></span></div>
+        <div class="gm-sub">On this map</div>
+        <div class="gm-list" id="gm-anims-others"></div>
       </div>`,
     mount(el) {
       root = el;
@@ -4096,62 +4422,33 @@ window.__gatherMods.define("fun", (ctx) => {
     },
   });
   ctx.style(`
-    #gather-mods-panel .gm-anim-type { font-size:11px; color:var(--gm-muted); }
-    #gather-mods-panel .gm-item.active .gm-anim-type { color:inherit; }
-    #gather-mods-panel .gm-edit { color:var(--gm-muted); font-size:13px; flex-shrink:0; }
-    #gather-mods-panel .gm-edit:hover { color:var(--gm-fg); }
-    #gather-mods-panel .gm-item.active .gm-edit { color:inherit; }
-    #gather-mods-panel .gm-item.gm-editing { box-shadow:inset 0 0 0 1px var(--theme-color-accent,#6c5ce7); }
-    #gather-mods-panel .gm-item.gm-anim-hidden .gm-name { opacity:.45; text-decoration:line-through; }
-    #gm-anim-studio { position:fixed; z-index:2147482400; width:300px; max-height:calc(100vh - 24px); display:flex; flex-direction:column;
-      background:var(--gm-bg); color:var(--gm-fg); border:1px solid var(--gm-border); border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.35); font-size:13px; }
-    #gm-anim-studio .gm-st-head { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; cursor:move; font-weight:600;
-      border-bottom:1px solid var(--gm-border); user-select:none; }
-    #gm-anim-studio .gm-st-close { cursor:pointer; color:var(--gm-muted); padding:0 2px; }
-    #gm-anim-studio .gm-st-close:hover { color:var(--gm-fg); }
-    #gm-anim-studio .gm-st-body { padding:8px 12px 12px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
-    #gm-anim-studio :is(input, select) { box-sizing:border-box; min-width:0; padding:5px 7px; font-size:12px; font-family:inherit; color:var(--gm-fg);
-      background:var(--gm-input); border:1px solid var(--gm-border); border-radius:6px; outline:none; }
-    #gm-anim-studio :is(input, select):focus { border-color:var(--theme-color-accent,#6c5ce7); }
-    #gm-anim-studio input.gm-st-bad { border-color:var(--gm-red); }
-    #gm-anim-studio input[type=number] { width:100%; }
-    #gm-anim-studio input[type=range] { padding:0; border:none; background:none; accent-color:var(--theme-color-accent,#6c5ce7); }
-    #gm-anim-studio input[type=checkbox] { width:auto; accent-color:var(--theme-color-accent,#6c5ce7); }
-    #gm-anim-studio option { background:var(--gm-bg); }
-    #gm-anim-studio button { padding:5px 9px; font-size:12px; font-family:inherit; color:var(--gm-fg); background:var(--gm-surface);
-      border:1px solid transparent; border-radius:6px; cursor:pointer; white-space:nowrap; }
-    #gm-anim-studio button:hover { background:var(--gm-surface-hover); }
-    #gm-anim-studio button:is(.active, .gm-st-primary) { background:var(--theme-color-accent,#6c5ce7); color:#fff; }
-    #gm-anim-studio button:disabled { opacity:.45; cursor:default; }
-    #gm-anim-studio .gm-st-row { display:flex; align-items:center; gap:6px; }
-    #gm-anim-studio .gm-st-row input[type=number] { width:62px; }
-    #gm-anim-studio .gm-st-grow { flex:1; min-width:0; }
-    #gm-anim-studio .gm-st-label { flex:none; width:68px; font-size:10px; font-weight:600; text-transform:uppercase; color:var(--gm-muted); }
-    #gm-anim-studio .gm-st-seg { flex:1; display:flex; gap:2px; padding:2px; background:var(--gm-surface); border-radius:7px; }
-    #gm-anim-studio .gm-st-seg button { flex:1; padding:4px 5px; background:transparent; }
-    #gm-anim-studio .gm-st-seg button.active { background:var(--theme-color-accent,#6c5ce7); }
-    #gm-anim-studio .gm-st-steps { display:flex; flex-direction:column; gap:2px; max-height:150px; overflow-y:auto; }
-    #gm-anim-studio .gm-st-step { display:flex; align-items:center; gap:7px; padding:4px 8px; font-size:12px; background:var(--gm-surface); border-radius:6px; cursor:pointer; }
-    #gm-anim-studio .gm-st-step:hover { background:var(--gm-surface-hover); }
-    #gm-anim-studio .gm-st-step .gm-st-grow { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #gm-anim-studio .gm-st-sel { box-shadow:inset 0 0 0 1px #ffd400; }
-    #gm-anim-studio .gm-st-num { flex:none; width:18px; height:18px; display:flex; align-items:center; justify-content:center; border-radius:50%;
-      background:#6c5ce7; color:#fff; font-size:10px; font-weight:700; }
-    #gm-anim-studio .gm-st-sel .gm-st-num { background:#ffd400; color:#1f1f23; }
-    #gm-anim-studio .gm-st-del { color:var(--gm-muted); }
-    #gm-anim-studio .gm-st-del:hover { color:var(--gm-red); }
-    #gm-anim-studio .gm-st-act { color:var(--gm-muted); padding:0 1px; }
-    #gm-anim-studio .gm-st-act:hover { color:var(--gm-fg); }
-    #gm-anim-studio .gm-st-off { visibility:hidden; }
-    #gm-anim-studio .gm-st-card { display:flex; flex-direction:column; gap:6px; padding:8px; border:1px solid var(--gm-border); border-radius:8px; }
-    #gm-anim-studio .gm-st-card .gm-st-label { width:auto; }
+    #gather-mods-panel .gm-fun-fleeing { color:var(--gm-accent-text); }
+    #gather-mods-panel .gm-item.gm-fun-editing { box-shadow:inset 0 0 0 1.5px var(--gm-accent); }
+    #gm-anim-studio { position:fixed; z-index:2147482400; width:296px; max-height:calc(100vh - 24px); }
+    #gm-anim-studio .gm-window-head { height:44px; padding:0 8px 0 14px; cursor:move; user-select:none; }
+    #gm-anim-studio .gm-window-head > .gm-i { color:var(--gm-text-2); }
+    #gm-anim-studio .gm-window-body { flex:1; min-height:0; overflow-y:auto; gap:8px; padding:12px 12px 10px; }
+    #gm-anim-studio .gm-window-foot { justify-content:space-between; padding:10px 12px; }
+    #gm-anim-studio .gm-window-foot > .gm-note { flex:1; min-width:0; padding:0; }
+    #gm-anim-studio .gm-st-contents { display:contents; }
+    #gm-anim-studio .gm-prop > :is(.gm-field, .gm-select, .gm-seg) { width:180px; }
+    #gm-anim-studio .gm-st-objects { display:flex; align-items:center; gap:6px; }
+    #gm-anim-studio .gm-st-steps { max-height:150px; overflow-y:auto; }
+    #gm-anim-studio .gm-st-steps .gm-item { min-height:30px; }
+    #gm-anim-studio .gm-st-steps .gm-item-title { font-size:12.5px; }
+    #gm-anim-studio .gm-st-num { width:18px; height:18px; background:#6c5ce7; }
+    #gm-anim-studio .gm-item.is-on .gm-st-num { background:#ffd400; color:#1f1f23; }
+    #gm-anim-studio .gm-st-card { gap:6px; padding:8px; }
     #gm-anim-studio .gm-st-cols { display:flex; gap:6px; }
     #gm-anim-studio .gm-st-cols > * { flex:1; min-width:0; }
-    #gm-anim-studio .gm-st-field { display:flex; flex-direction:column; gap:2px; font-size:11px; color:var(--gm-muted); }
-    #gm-anim-studio .gm-st-field select { width:100%; }
-    #gm-anim-studio .gm-st-check { flex-direction:row; align-items:center; gap:5px; align-self:flex-end; padding-bottom:6px; }
-    #gm-anim-studio .gm-st-hint, #gm-anim-studio .gm-st-status { font-size:11px; color:var(--gm-muted); }
-    #gm-anim-studio .gm-st-clock { flex:none; width:76px; text-align:right; font-size:11px; color:var(--gm-muted); font-variant-numeric:tabular-nums; }
+    #gm-anim-studio .gm-st-cols > .gm-field:has(> .gm-unit) { flex:1 1 auto; padding-right:8px; }
+    #gm-anim-studio .gm-st-cols > .gm-field:has(> .gm-unit) > .gm-input { width:0; padding-left:8px; padding-right:3px; }
+    #gm-anim-studio :is(.gm-input.gm-st-bad, .gm-field:has(> .gm-st-bad)) { border-color:var(--gm-danger); }
+    #gm-anim-studio .gm-st-player { display:flex; align-items:center; gap:8px; margin-top:2px; }
+    #gm-anim-studio .gm-st-play { width:30px; height:30px; border-radius:50%; background:var(--gm-accent); color:var(--gm-on-accent); }
+    #gm-anim-studio .gm-st-play:hover { background:var(--gm-accent); color:var(--gm-on-accent); filter:brightness(1.08); }
+    #gm-anim-studio .gm-st-scrub { flex:1; min-width:0; margin:0; accent-color:var(--gm-accent); }
+    #gm-anim-studio .gm-st-clock { flex:none; min-width:58px; text-align:right; font-size:11.5px; color:var(--gm-text-3); font-variant-numeric:tabular-nums; }
   `);
   ctx.onTick(() => {
     if (showFlee && root?.isConnected) renderPlayers(root);
@@ -4406,52 +4703,64 @@ window.__gatherMods.define("build", (ctx) => {
   function render() {
     if (!root?.isConnected) return;
     const $ = (sel) => root.querySelector(sel);
-    const freeBtn = $("#gm-free-placement");
-    freeBtn.textContent = "Free placement: " + (freePlacement ? "ON (Cmd to snap)" : "OFF");
-    freeBtn.classList.toggle("active", freePlacement);
+    // A note shows while it has text or a visible link.
+    const showNote = (sel, text, links) => {
+      const status = $(sel);
+      status.textContent = text;
+      for (const [link, shown] of links) link.style.display = shown ? "" : "none";
+      status.closest(".gm-note").style.display =
+        text || links.some(([, shown]) => shown) ? "" : "none";
+    };
+    $("#gm-free-placement").checked = freePlacement;
 
     const placing = pick.current() === "place";
-    $("#gm-place-on").textContent = placing ? "Cancel place on…" : "Place on…";
-    $("#gm-place-on").classList.toggle("active", placing);
-    const status = $("#gm-place-status");
+    $("#gm-place-on").classList.toggle("is-on", placing);
     const action = $("#gm-place-action");
     const support = place.supportId && GD().Repos.MapObject.get(place.supportId);
+    let placeText;
     if (placing && place.step === "objects") {
-      status.textContent = `${place.selected.length} selected, click or drag on the map`;
+      placeText = `${place.selected.length} selected, click or drag on the map`;
       action.textContent = "Next: pick support";
-      action.style.display = place.selected.length ? "" : "none";
     } else if (placing) {
-      status.textContent = support
+      placeText = support
         ? `Support: ${map.objectName(support)}`
         : "Click the object to put them on";
       action.textContent = "Place here";
-      action.style.display = support ? "" : "none";
     } else {
-      status.textContent = jobs.busy("place-on")
-        ? "Placing…" + jobs.queuedSuffix("place-on")
-        : place.status;
-      action.style.display = "none";
+      placeText = jobs.busy("place-on") ? "Placing…" + jobs.queuedSuffix("place-on") : place.status;
     }
+    showNote("#gm-place-status", placeText, [
+      [action, placing && (place.step === "objects" ? place.selected.length : support)],
+      [$("#gm-place-cancel"), placing],
+    ]);
+
     const showingLinks = pick.current() === "links";
-    $("#gm-links").textContent = showingLinks ? "Hide linked objects" : "Show linked objects…";
-    $("#gm-links").classList.toggle("active", showingLinks);
-    $("#gm-links-status").textContent = showingLinks ? linksStatus() : "";
+    $("#gm-links").classList.toggle("is-on", showingLinks);
+    showNote("#gm-links-status", showingLinks ? linksStatus() : "", [
+      [$("#gm-links-cancel"), showingLinks],
+    ]);
 
     const deleting = pick.current() === "bulk-delete";
     const count = deleting ? map.liveObjects(bulk.selected).length : 0;
-    $("#gm-bulk-delete").textContent = deleting ? "Cancel bulk delete" : "Bulk delete…";
-    $("#gm-bulk-delete").classList.toggle("active", deleting);
-    $("#gm-bulk-status").textContent = deleting
-      ? `${count} selected, click or drag on the map${jobs.queuedSuffix("bulk-delete")}`
-      : jobs.busy("bulk-delete")
-        ? "Deleting…" + jobs.queuedSuffix("bulk-delete")
-        : bulk.status;
+    $("#gm-bulk-delete").classList.toggle("is-on", deleting);
     $("#gm-bulk-action").textContent = `Delete ${count}`;
-    $("#gm-bulk-action").style.display = deleting && count ? "" : "none";
+    showNote(
+      "#gm-bulk-status",
+      deleting
+        ? `${count} selected, click or drag on the map${jobs.queuedSuffix("bulk-delete")}`
+        : jobs.busy("bulk-delete")
+          ? "Deleting…" + jobs.queuedSuffix("bulk-delete")
+          : bulk.status,
+      [
+        [$("#gm-bulk-action"), deleting && count],
+        [$("#gm-bulk-cancel"), deleting],
+      ],
+    );
   }
   pick.onChange(render);
   jobs.onChange(render);
 
+  const TOOL_STATUS = { place: "Place on", links: "Links", "bulk-delete": "Bulk delete" };
   ctx.section({
     title: "Build",
     parts: [
@@ -4459,36 +4768,47 @@ window.__gatherMods.define("build", (ctx) => {
       { id: "place-on", label: "Place on…" },
       { id: "bulk-delete", label: "Bulk delete" },
     ],
+    status: () => TOOL_STATUS[pick.current()] ?? (freePlacement ? "On" : null),
     html: `
-      <button class="gm-btn" id="gm-free-placement" data-part="free" title="Build tool: objects no longer snap to tiles. Hold Cmd to snap.">Free placement: OFF</button>
+      <label class="gm-toggle" data-part="free" title="Build tool: objects no longer snap to tiles. Hold Cmd to snap.">
+        <span class="gm-toggle-text"><span class="gm-toggle-title">Free placement</span><span class="gm-hint">Nothing snaps to tiles · hold ⌘ to snap</span></span>
+        <input type="checkbox" class="gm-switch" id="gm-free-placement" />
+      </label>
       <div data-part="place-on">
-        <button class="gm-btn" id="gm-place-on" title="Select objects (click, or drag a box), then the object to put them on (works on any object). Esc to cancel.">Place on…</button>
-        <div class="gm-status"><span id="gm-place-status"></span><span class="gm-link" id="gm-place-action"></span></div>
-        <button class="gm-btn" id="gm-links" title="Outline what sits on what (Place on…, tables, shelves): supports in green, objects on them in cyan. Click an object to see only its group. Esc to close.">Show linked objects…</button>
-        <div class="gm-status"><span id="gm-links-status"></span></div>
+        <button class="gm-btn gm-block" id="gm-place-on" title="Select objects (click, or drag a box), then the object to put them on (works on any object). Esc to cancel."><i class="gm-i" data-i="layers"></i>Place on…</button>
+        <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span class="gm-build-msg"><span id="gm-place-status"></span><span class="gm-link" id="gm-place-action"></span><span class="gm-link" id="gm-place-cancel">Cancel</span></span></div>
+        <button class="gm-btn gm-block" id="gm-links" title="Outline what sits on what (Place on…, tables, shelves): supports in green, objects on them in cyan. Click an object to see only its group. Esc to close."><i class="gm-i" data-i="link-2"></i>Show linked objects</button>
+        <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span class="gm-build-msg"><span id="gm-links-status"></span><span class="gm-link" id="gm-links-cancel">Hide</span></span></div>
       </div>
       <div data-part="bulk-delete">
-        <button class="gm-btn" id="gm-bulk-delete" title="Select objects (click, or drag a box), then delete them all. Esc to cancel.">Bulk delete…</button>
-        <div class="gm-status"><span id="gm-bulk-status"></span><span class="gm-link" id="gm-bulk-action"></span></div>
+        <button class="gm-btn gm-block" id="gm-bulk-delete" title="Select objects (click, or drag a box), then delete them all. Esc to cancel."><i class="gm-i" data-i="trash-2"></i>Bulk delete…</button>
+        <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span class="gm-build-msg"><span id="gm-bulk-status"></span><span class="gm-link gm-danger" id="gm-bulk-action"></span><span class="gm-link" id="gm-bulk-cancel">Cancel</span></span></div>
       </div>`,
     mount(el) {
       root = el;
-      el.querySelector("#gm-free-placement").onclick = () => {
-        freePlacement = !freePlacement;
+      el.querySelector("#gm-free-placement").onchange = (e) => {
+        freePlacement = e.target.checked;
         localStorage.setItem(FREE_PLACEMENT_KEY, freePlacement);
         render();
       };
       el.querySelector("#gm-place-on").onclick = () =>
         pick.current() === "place" ? pick.stop("place") : pick.start(placeSession);
       el.querySelector("#gm-place-action").onclick = advancePlaceOn;
+      el.querySelector("#gm-place-cancel").onclick = () => pick.stop("place");
       el.querySelector("#gm-links").onclick = () =>
         pick.current() === "links" ? pick.stop("links") : pick.start(linksSession);
+      el.querySelector("#gm-links-cancel").onclick = () => pick.stop("links");
       el.querySelector("#gm-bulk-delete").onclick = () =>
         pick.current() === "bulk-delete" ? pick.stop("bulk-delete") : pick.start(bulkSession);
       el.querySelector("#gm-bulk-action").onclick = deleteBulkSelection;
+      el.querySelector("#gm-bulk-cancel").onclick = () => pick.stop("bulk-delete");
       render();
     },
   });
+  ctx.style(`
+    #gather-mods-panel .gm-build-msg { display:flex; flex-wrap:wrap; column-gap:6px; }
+    #gather-mods-panel .gm-build-msg > :empty { display:none; }
+  `);
 
   return { freePlacement: () => freePlacement };
 });
@@ -4501,8 +4821,8 @@ window.__gatherMods.define("outfits", (ctx) => {
   const OUTFITS_KEY = "gathermodv2:outfits";
   const BOWTIE_ID = "9bdd32b6-afa0-4325-ad5b-8702c9ac2eb3";
   const BUILTIN_OUTFITS = [
-    { name: "No outfit", summary: "Empty, shows after reload", outfit: {} },
-    { name: "Invisible", summary: "Bowtie", outfit: { other: BOWTIE_ID } },
+    { name: "No outfit", summary: "Empty, shows after reload", outfit: {}, icon: "ban" },
+    { name: "Invisible", summary: "Bowtie", outfit: { other: BOWTIE_ID }, icon: "ghost" },
   ];
 
   const getOutfits = () => readJson(OUTFITS_KEY, []);
@@ -4544,11 +4864,11 @@ window.__gatherMods.define("outfits", (ctx) => {
     const hub = ctx.use("hub");
     const builtinRows = BUILTIN_OUTFITS.map(
       (p, i) =>
-        `<div class="gm-item" data-builtin="${i}" title="${escapeHtml(p.summary)}"><span class="gm-name">${escapeHtml(p.name)}</span></div>`,
+        `<div class="gm-item" data-builtin="${i}" title="${escapeHtml(p.summary)}"><i class="gm-i" data-i="${p.icon}"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(p.name)}</span></div></div>`,
     );
     const savedRows = getOutfits().map(
       (p, i) =>
-        `<div class="gm-item" data-idx="${i}" title="${escapeHtml(p.summary || "")}"><span class="gm-name">${escapeHtml(p.name)}</span><span class="gm-actions">${hub ? `<span class="gm-pub" data-pub="${i}" title="Publish to the community hub">⇪</span>` : ""}<span class="gm-del" data-del="${i}">✕</span></span></div>`,
+        `<div class="gm-item" data-idx="${i}" title="${escapeHtml(p.summary || "")}"><i class="gm-i" data-i="shirt"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(p.name)}</span></div><div class="gm-actions">${hub ? `<button class="gm-iconbtn" data-pub="${i}" title="Publish to the community hub"><i class="gm-i" data-i="upload"></i></button>` : ""}<button class="gm-iconbtn gm-danger" data-del="${i}" title="Delete"><i class="gm-i" data-i="trash-2"></i></button></div></div>`,
     );
     previews.hidePopover();
     list.innerHTML = [...builtinRows, ...savedRows].join("");
@@ -4564,7 +4884,7 @@ window.__gatherMods.define("outfits", (ctx) => {
         if (preset) applyOutfit(preset);
       };
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll("[data-del]").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const l = getOutfits();
@@ -4573,7 +4893,7 @@ window.__gatherMods.define("outfits", (ctx) => {
         renderList();
       };
     });
-    list.querySelectorAll(".gm-pub").forEach((b) => {
+    list.querySelectorAll("[data-pub]").forEach((b) => {
       b.onclick = (e) => {
         e.stopPropagation();
         hub?.publish("outfit", getOutfits()[+b.dataset.pub]);
@@ -4596,9 +4916,9 @@ window.__gatherMods.define("outfits", (ctx) => {
   ctx.section({
     title: "Outfits",
     html: `
-      <div class="gm-row">
-        <input class="gm-input" id="gm-outfit-name" placeholder="Name this outfit..." />
-        <button class="gm-btn" id="gm-outfit-save">Save</button>
+      <div class="gm-field">
+        <input class="gm-input" id="gm-outfit-name" placeholder="Name this outfit" />
+        <button class="gm-btn gm-primary gm-sm" id="gm-outfit-save">Save</button>
       </div>
       <div class="gm-list" id="gm-outfits"></div>`,
     mount(el) {
@@ -4622,7 +4942,7 @@ window.__gatherMods.define("outfits", (ctx) => {
 });
 
 // Desks: save and swap your desk decoration (only differing objects change),
-// pick which objects belong to your desk, automatic "↩ Previous desk" backup.
+// pick which objects belong to your desk, automatic "Previous desk" backup.
 window.__gatherMods.define("desks", (ctx) => {
   const { GD, me, escapeHtml, readJson, writeJson, onEnter, flash } = ctx;
   const map = ctx.use("map");
@@ -4708,7 +5028,7 @@ window.__gatherMods.define("desks", (ctx) => {
   }
 
   // Picking another desk stops the one being applied. The backup is only
-  // taken before the first one, so "↩ Previous desk" never holds a half-applied desk.
+  // taken before the first one, so "Previous desk" never holds a half-applied desk.
   function applyPreset(preset) {
     desk.status = `Applying "${preset.name}"…`;
     renderStatus();
@@ -4723,7 +5043,7 @@ window.__gatherMods.define("desks", (ctx) => {
     const extra = [];
     const created = [];
     try {
-      if (!desk.keepBackup) writeJson(BACKUP_KEY, snapshotDesk("↩ Previous desk"));
+      if (!desk.keepBackup) writeJson(BACKUP_KEY, snapshotDesk("Previous desk"));
       desk.keepBackup = false;
       const missing = [...preset.items];
       for (const o of topLevelDeskObjects()) {
@@ -4804,21 +5124,20 @@ window.__gatherMods.define("desks", (ctx) => {
   let root = null;
   function renderStatus() {
     if (!root?.isConnected) return;
-    const el = root.querySelector("#gm-desk-status");
-    if (desk.status) el.textContent = desk.status;
-    else if (!deskArea()) el.textContent = "No desk";
+    const note = root.querySelector("#gm-desk-status");
+    note.textContent = desk.status;
+    note.parentElement.classList.toggle("gm-err", desk.status.startsWith("Failed"));
+    const count = root.querySelector("#gm-desk-count");
+    if (!deskArea()) count.textContent = "No desk";
     else {
       const objects = getDeskObjects();
-      el.textContent = objects.length + " desk objects";
-      el.title = objects.map(map.objectName).join(", ");
+      count.textContent = objects.length + " objects on your desk";
+      count.title = objects.map(map.objectName).join(", ");
     }
   }
   function renderPickButton() {
     if (!root?.isConnected) return;
-    const btn = root.querySelector("#gm-desk-pick");
-    const on = pick.current() === "desk";
-    btn.textContent = "Pick desk objects: " + (on ? "ON" : "OFF");
-    btn.classList.toggle("active", on);
+    root.querySelector("#gm-desk-pick").checked = pick.current() === "desk";
   }
   function renderList() {
     if (!root?.isConnected) return;
@@ -4827,11 +5146,11 @@ window.__gatherMods.define("desks", (ctx) => {
     const backup = readJson(BACKUP_KEY, null);
     const summary = (p) => escapeHtml(p.items.map((i) => i.name).join(", "));
     const backupRow = backup
-      ? `<div class="gm-item" data-backup="1" title="${summary(backup)}"><span class="gm-name">${escapeHtml(backup.name)}</span></div>`
+      ? `<div class="gm-item" data-backup="1" title="${summary(backup)}"><i class="gm-i" data-i="undo-2"></i><div class="gm-item-text"><span class="gm-item-title">Previous desk</span></div><span class="gm-tail">Backup</span></div>`
       : "";
     const savedRows = getPresets().map(
       (p, i) =>
-        `<div class="gm-item" data-idx="${i}" title="${summary(p)}"><span class="gm-name">${escapeHtml(p.name)}</span><span class="gm-actions">${hub ? `<span class="gm-pub" data-pub="${i}" title="Publish to the community hub">⇪</span>` : ""}<span class="gm-del" data-del="${i}">✕</span></span></div>`,
+        `<div class="gm-item" data-idx="${i}" title="${summary(p)}"><i class="gm-i" data-i="lamp-desk"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(p.name)}</span></div><div class="gm-actions">${hub ? `<button class="gm-iconbtn gm-pub" data-pub="${i}" title="Publish to the community hub"><i class="gm-i" data-i="upload"></i></button>` : ""}<button class="gm-iconbtn gm-danger gm-desk-del" data-del="${i}" title="Delete"><i class="gm-i" data-i="trash-2"></i></button></div></div>`,
     );
     previews.hidePopover();
     list.innerHTML = backupRow + savedRows.join("") || '<div class="gm-empty">No saved desks</div>';
@@ -4851,7 +5170,7 @@ window.__gatherMods.define("desks", (ctx) => {
         if (preset) applyPreset(preset);
       };
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll(".gm-desk-del").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const l = getPresets();
@@ -4884,19 +5203,24 @@ window.__gatherMods.define("desks", (ctx) => {
   ctx.onTick(renderStatus);
   ctx.section({
     title: "Desks",
+    status: () => (pick.current() === "desk" ? "Picking" : null),
     html: `
-      <button class="gm-btn" id="gm-desk-pick" title="Click objects, or drag a box around them, to add or remove them from your desk. Esc to stop.">Pick desk objects: OFF</button>
-      <div class="gm-status"><span id="gm-desk-status"></span><span class="gm-link" id="gm-desk-reset" title="Track the objects inside the desk area again">Reset</span></div>
-      <div class="gm-row">
-        <input class="gm-input" id="gm-desk-name" placeholder="Name this desk..." />
-        <button class="gm-btn" id="gm-desk-save">Save</button>
+      <label class="gm-toggle" title="Click objects, or drag a box around them, to add or remove them from your desk. Esc to stop.">
+        <span class="gm-toggle-text"><span class="gm-toggle-title">Pick desk objects</span><span class="gm-hint"><span id="gm-desk-count"></span> · <span class="gm-link" id="gm-desk-reset" title="Track the objects inside the desk area again">Reset</span></span></span>
+        <input type="checkbox" class="gm-switch" id="gm-desk-pick" />
+      </label>
+      <div class="gm-field">
+        <input class="gm-input" id="gm-desk-name" placeholder="Name this desk" />
+        <button class="gm-btn gm-primary gm-sm" id="gm-desk-save">Save</button>
       </div>
+      <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-desk-status"></span></div>
       <div class="gm-list" id="gm-desks"></div>`,
     mount(el) {
       root = el;
-      el.querySelector("#gm-desk-pick").onclick = () =>
-        pick.current() === "desk" ? pick.stop("desk") : pick.start(deskSession);
-      el.querySelector("#gm-desk-reset").onclick = () => {
+      el.querySelector("#gm-desk-pick").onchange = (e) =>
+        e.target.checked ? pick.start(deskSession) : pick.stop("desk");
+      el.querySelector("#gm-desk-reset").onclick = (e) => {
+        e.preventDefault();
         localStorage.removeItem(trackedKey());
         pick.redraw();
         renderStatus();
@@ -5090,30 +5414,33 @@ window.__gatherMods.define("constructions", (ctx) => {
     if (!root?.isConnected) return;
     const $ = (sel) => root.querySelector(sel);
     const selecting = pick.current() === "construct";
-    $("#gm-construct-new").textContent = selecting ? "Cancel new construction" : "New construction";
-    $("#gm-construct-new").classList.toggle("active", selecting);
+    const newBtn = $("#gm-construct-new");
+    newBtn.innerHTML = selecting
+      ? '<i class="gm-i" data-i="x"></i>Cancel'
+      : '<i class="gm-i" data-i="plus"></i>New';
+    newBtn.classList.toggle("is-on", selecting);
     $("#gm-construct-save-row").style.display = selecting ? "" : "none";
     const current = pick.current() === "stamp" && stamped();
-    $("#gm-construct-status").textContent = selecting
+    const status = $("#gm-construct-status");
+    status.textContent = selecting
       ? `${state.selected.length} selected, click or drag on the map`
       : current
         ? `Click on the map to place "${current.name}" (Esc to cancel)${jobs.queuedSuffix("constructions")}`
         : jobs.busy("constructions")
           ? state.status + jobs.queuedSuffix("constructions")
           : state.status;
+    status.parentElement.classList.toggle("gm-err", /failed/i.test(status.textContent));
     root.querySelectorAll("#gm-constructions .gm-item").forEach((row) => {
       row.classList.toggle(
-        "active",
+        "is-on",
         pick.current() === "stamp" && +row.dataset.idx === state.stampIndex,
       );
     });
     const undo = $("#gm-construct-undo");
     const [last] = placements.list("construction");
     undo.style.display = last ? "" : "none";
-    if (last) {
-      undo.textContent = `↶ Delete last: "${last.name}"`;
-      undo.title = "Delete the objects of the last construction you placed on this map";
-    }
+    if (last)
+      undo.title = `Delete the objects of "${last.name}", the last construction you placed on this map`;
   }
 
   function renderList() {
@@ -5126,7 +5453,7 @@ window.__gatherMods.define("constructions", (ctx) => {
       getConstructions()
         .map(
           (p, i) =>
-            `<div class="gm-item" data-idx="${i}" title="${summary(p)}"><span class="gm-name">${escapeHtml(p.name)}</span><span class="gm-actions">${hub ? `<span class="gm-pub" data-pub="${i}" title="Publish to the community hub">⇪</span>` : ""}<span class="gm-del" data-del="${i}">✕</span></span></div>`,
+            `<div class="gm-item" data-idx="${i}" title="${summary(p)}"><i class="gm-i" data-i="boxes"></i><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(p.name)}</span></div><span class="gm-tail hide-on-hover">${p.items.length} objects</span><div class="gm-actions">${hub ? `<button class="gm-iconbtn gm-pub" data-pub="${i}" title="Publish to the community hub"><i class="gm-i" data-i="upload"></i></button>` : ""}<button class="gm-iconbtn gm-danger gm-construct-del" data-del="${i}" title="Delete"><i class="gm-i" data-i="trash-2"></i></button></div></div>`,
         )
         .join("") || '<div class="gm-empty">No saved constructions</div>';
     list.querySelectorAll(".gm-item").forEach((row) => {
@@ -5140,7 +5467,7 @@ window.__gatherMods.define("constructions", (ctx) => {
       );
       row.onclick = () => startStamp(+row.dataset.idx);
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll(".gm-construct-del").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         pick.stop("stamp");
@@ -5176,14 +5503,24 @@ window.__gatherMods.define("constructions", (ctx) => {
   placements.onChange(render);
   ctx.section({
     title: "Constructions",
+    status: () =>
+      pick.current() === "stamp"
+        ? "Placing"
+        : pick.current() === "construct"
+          ? "Selecting"
+          : jobs.busy("constructions")
+            ? "Working"
+            : null,
     html: `
-      <button class="gm-btn" id="gm-construct-new" title="Click objects, or drag a box around them, to select them (objects on them come along), then name and save. Esc to cancel.">New construction</button>
-      <div class="gm-row" id="gm-construct-save-row">
-        <input class="gm-input" id="gm-construct-name" placeholder="Name this construction..." />
-        <button class="gm-btn" id="gm-construct-save">Save</button>
+      <div class="gm-btn-row">
+        <button class="gm-btn" id="gm-construct-new" title="Click objects, or drag a box around them, to select them (objects on them come along), then name and save. Esc to cancel."><i class="gm-i" data-i="plus"></i>New</button>
+        <button class="gm-btn" id="gm-construct-undo"><i class="gm-i" data-i="undo-2"></i>Remove last</button>
       </div>
-      <div class="gm-status"><span id="gm-construct-status"></span></div>
-      <button class="gm-btn" id="gm-construct-undo"></button>
+      <div class="gm-field" id="gm-construct-save-row">
+        <input class="gm-input" id="gm-construct-name" placeholder="Name this construction" />
+        <button class="gm-btn gm-primary gm-sm" id="gm-construct-save">Save</button>
+      </div>
+      <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-construct-status"></span></div>
       <div class="gm-list" id="gm-constructions"></div>`,
     mount(el) {
       root = el;
@@ -5229,9 +5566,15 @@ window.__gatherMods.define("placed", (ctx) => {
   const describe = (e) => {
     const count = placements.liveIds(e).length;
     const time = e.at
-      ? new Date(e.at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })
+      ? new Date(e.at).toLocaleString([], {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
       : "";
-    return `${e.source} · ${count} object${count > 1 ? "s" : ""}${time ? " · " + time : ""}`;
+    const kind = e.source.charAt(0).toUpperCase() + e.source.slice(1);
+    return `${kind} · ${count} object${count > 1 ? "s" : ""}${time ? " · " + time : ""}`;
   };
 
   function drawHighlight(entries) {
@@ -5297,17 +5640,19 @@ window.__gatherMods.define("placed", (ctx) => {
     const entries = placements.list();
     const last = root.querySelector("#gm-placed-last");
     last.style.display = entries.length ? "" : "none";
-    if (entries.length) last.textContent = `↶ Delete last: "${entries[0].name}"`;
+    if (entries.length)
+      last.innerHTML = `<i class="gm-i" data-i="undo-2"></i><span>Remove last: ${escapeHtml(entries[0].name)}</span>`;
     root.querySelector("#gm-placed-status").textContent =
       state.status + (jobs.busy("placed") ? jobs.queuedSuffix("placed") : "");
-    const all = root.querySelector("#gm-placed-all");
-    all.style.display = entries.length > 1 && !state.confirmAll ? "" : "none";
+    root.querySelector("#gm-placed-head").style.display = entries.length ? "" : "none";
+    root.querySelector("#gm-placed-all").style.display =
+      entries.length > 1 && !state.confirmAll ? "" : "none";
     const confirmBox = root.querySelector("#gm-placed-confirm");
     if (state.confirmAll && !entries.length) state.confirmAll = false;
     confirmBox.style.display = state.confirmAll ? "" : "none";
     if (state.confirmAll) {
       const count = entries.reduce((n, e) => n + placements.liveIds(e).length, 0);
-      confirmBox.querySelector("span").textContent =
+      confirmBox.querySelector(".gm-confirm-text").textContent =
         `Delete the ${count} objects outlined in red (${entries.length} placements, listed below)?`;
       confirmBox.querySelector("#gm-placed-confirm-yes").textContent = `Delete ${count}`;
     }
@@ -5316,7 +5661,7 @@ window.__gatherMods.define("placed", (ctx) => {
       ? entries
           .map(
             (e, i) =>
-              `<div class="gm-item" data-idx="${i}" title="Hover to see the objects on the map"><span class="gm-placed-text"><span class="gm-name">${escapeHtml(e.name)}</span><span class="gm-placed-meta">${escapeHtml(describe(e))}</span></span><span class="gm-del" data-del="${i}" title="Delete these objects">✕</span></div>`,
+              `<div class="gm-item" data-idx="${i}" title="Hover to see the objects on the map"><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(e.name)}</span><span class="gm-item-meta">${escapeHtml(describe(e))}</span></div><div class="gm-actions"><button class="gm-iconbtn gm-danger" data-del="${i}" title="Delete these objects"><i class="gm-i" data-i="trash-2"></i></button></div></div>`,
           )
           .join("")
       : '<div class="gm-empty">Nothing placed with the mod on this map</div>';
@@ -5325,7 +5670,7 @@ window.__gatherMods.define("placed", (ctx) => {
       row.addEventListener("mouseenter", () => hover(keyOf(entry)));
       row.addEventListener("mouseleave", () => hover(null));
     });
-    list.querySelectorAll(".gm-del").forEach((d) => {
+    list.querySelectorAll("[data-del]").forEach((d) => {
       d.onclick = (e) => {
         e.stopPropagation();
         const entry = entries[+d.dataset.del];
@@ -5343,11 +5688,12 @@ window.__gatherMods.define("placed", (ctx) => {
   ctx.section({
     title: "Placed objects",
     html: `
-      <button class="gm-btn" id="gm-placed-last" title="Delete the objects of the last placement made with the mod on this map"></button>
-      <div class="gm-status"><span id="gm-placed-status"></span><span class="gm-link" id="gm-placed-all" title="Outline everything that would be deleted, then confirm">Delete all…</span></div>
-      <div class="gm-placed-confirm" id="gm-placed-confirm"><span></span>
-        <div class="gm-row"><button class="gm-btn" id="gm-placed-confirm-no">Cancel</button><button class="gm-btn gm-danger" id="gm-placed-confirm-yes"></button></div>
+      <button class="gm-btn gm-block" id="gm-placed-last" title="Delete the objects of the last placement made with the mod on this map"></button>
+      <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-placed-status"></span></div>
+      <div class="gm-card gm-confirm" id="gm-placed-confirm"><span class="gm-confirm-text"></span>
+        <div class="gm-btn-row"><button class="gm-btn gm-sm" id="gm-placed-confirm-no">Cancel</button><button class="gm-btn gm-sm gm-danger gm-solid" id="gm-placed-confirm-yes"></button></div>
       </div>
+      <div class="gm-sub" id="gm-placed-head">On this map<span class="gm-spacer"></span><span class="gm-link gm-danger" id="gm-placed-all" title="Outline everything that would be deleted, then confirm">Delete all…</span></div>
       <div class="gm-list" id="gm-placed-list"></div>`,
     mount(el) {
       root = el;
@@ -5378,13 +5724,6 @@ window.__gatherMods.define("placed", (ctx) => {
       render();
     },
   });
-  ctx.style(`
-    #gather-mods-panel .gm-placed-text { display:flex; flex-direction:column; min-width:0; }
-    #gather-mods-panel .gm-placed-meta { font-size:11px; color:var(--gm-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #gather-mods-panel .gm-placed-confirm { font-size:12px; color:var(--gm-fg); padding:6px 8px; margin:3px 0; border-radius:8px; background:rgba(255,59,48,.12); }
-    #gather-mods-panel .gm-placed-confirm .gm-row button.gm-btn { flex:1; text-align:center; }
-    #gather-mods-panel button.gm-btn.gm-danger { background:#ff3b30; color:#fff; }
-  `);
 });
 
 // Share: export and import the presets of the installed modules as JSON.
@@ -5423,20 +5762,26 @@ window.__gatherMods.define("share", (ctx) => {
   ctx.section({
     title: "Share presets",
     html: `
-      <div class="gm-row gm-share">
-        <button class="gm-btn" id="gm-export" title="Copy the presets of your installed modules to the clipboard and download them as a file">Export</button>
-        <button class="gm-btn" id="gm-import-file" title="Import presets from an exported file">Import file</button>
-        <button class="gm-btn" id="gm-import-paste" title="Import presets from pasted text">Paste</button>
+      <div class="gm-btn-row">
+        <button class="gm-btn" id="gm-export" title="Copy the presets of your installed modules to the clipboard and download them as a file"><i class="gm-i" data-i="download"></i>Export</button>
+        <button class="gm-btn" id="gm-import-file" title="Import presets from an exported file"><i class="gm-i" data-i="file-up"></i>Import</button>
+        <button class="gm-btn" id="gm-import-paste" title="Import presets from pasted text"><i class="gm-i" data-i="clipboard-paste"></i>Paste</button>
       </div>
       <input type="file" id="gm-import-input" accept=".json,application/json" hidden />
-      <div class="gm-status"><span id="gm-share-status"></span></div>`,
+      <div class="gm-note" id="gm-share-note"><i class="gm-i sm" data-i="circle-check"></i><span id="gm-share-status"></span></div>`,
     mount(el) {
-      const setStatus = (text) => (el.querySelector("#gm-share-status").textContent = text);
+      const note = el.querySelector("#gm-share-note");
+      const setStatus = (text, ok = true) => {
+        note.classList.toggle("gm-ok", ok);
+        note.classList.toggle("gm-err", !ok);
+        note.querySelector(".gm-i").dataset.i = ok ? "circle-check" : "circle-alert";
+        el.querySelector("#gm-share-status").textContent = text;
+      };
       const runImport = (text) => {
         try {
           setStatus("Imported " + describe(importPresets(JSON.parse(text))));
         } catch (e) {
-          setStatus("Import failed: " + (e?.message || e));
+          setStatus("Import failed: " + (e?.message || e), false);
         }
       };
       el.querySelector("#gm-export").onclick = async () => {
@@ -5462,9 +5807,6 @@ window.__gatherMods.define("share", (ctx) => {
       };
     },
   });
-  ctx.style(
-    `#gather-mods-panel .gm-share button.gm-btn { flex:1; text-align:center; padding:7px 4px; }`,
-  );
 });
 
 // Community hub: browse, preview, add and publish presets shared by others
@@ -5480,10 +5822,16 @@ window.__gatherMods.define("hub", (ctx) => {
 
   const isModalOpen = () => !!document.getElementById("gm-hub-grid");
   const presetType = () => ctx.presetType(hub.type);
-  function setStatus(text) {
+  const STATUS_ICONS = { ok: "circle-check", err: "circle-alert" };
+  function setStatus(text, tone) {
     for (const id of ["gm-hub-status", "gm-modal-status"]) {
       const el = document.getElementById(id);
-      if (el) el.textContent = text;
+      if (!el) continue;
+      el.textContent = text;
+      const note = el.parentElement;
+      note.classList.toggle("gm-ok", tone === "ok");
+      note.classList.toggle("gm-err", tone === "err");
+      note.querySelector(".gm-i").dataset.i = STATUS_ICONS[tone] ?? "info";
     }
   }
 
@@ -5510,7 +5858,7 @@ window.__gatherMods.define("hub", (ctx) => {
       setStatus(hub.items.length ? "" : "Nothing here yet");
     } catch (e) {
       hub.items = [];
-      setStatus("Hub error: " + e.message);
+      setStatus("Hub error: " + e.message, "err");
     }
     renderGrid();
   }
@@ -5519,11 +5867,9 @@ window.__gatherMods.define("hub", (ctx) => {
   function addFromHub(id) {
     const item = hub.items.find((i) => i.id === id);
     if (!item) return;
-    setStatus(
-      ctx.addPresets(item.type, [item.data])
-        ? `Added "${item.name}" to my ${item.type}s`
-        : `"${item.name}" is already in my ${item.type}s`,
-    );
+    if (ctx.addPresets(item.type, [item.data]))
+      setStatus(`Added "${item.name}" to my ${item.type}s`, "ok");
+    else setStatus(`"${item.name}" is already in my ${item.type}s`);
   }
   async function publish(type, preset) {
     setStatus("Publishing…");
@@ -5534,19 +5880,19 @@ window.__gatherMods.define("hub", (ctx) => {
         body: JSON.stringify({ author: me().name, data: preset }),
       });
       if (hub.type === type) await refresh();
-      setStatus(`Published "${preset.name}"`);
+      setStatus(`Published "${preset.name}"`, "ok");
     } catch (e) {
-      setStatus("Publish failed: " + e.message);
+      setStatus("Publish failed: " + e.message, "err");
     }
   }
   async function remove(type, id) {
     try {
       await api.request(`/presets/${type}/${id}`, { method: "DELETE" });
       hub.items = hub.items.filter((i) => i.id !== id);
-      setStatus("Deleted from the hub");
+      setStatus("Deleted from the hub", "ok");
       renderGrid();
     } catch (e) {
-      setStatus("Delete failed: " + e.message);
+      setStatus("Delete failed: " + e.message, "err");
     }
   }
 
@@ -5557,12 +5903,16 @@ window.__gatherMods.define("hub", (ctx) => {
     grid.innerHTML = hub.items
       .map((p) => {
         const id = escapeHtml(p.id);
-        const del = p.mine ? `<button class="gm-btn" data-hdel="${id}">Delete</button>` : "";
-        return `<div class="gm-card" title="${escapeHtml(p.summary)}">
+        const del = p.mine
+          ? `<button class="gm-btn gm-sm gm-ghost gm-danger" data-hdel="${id}"><i class="gm-i sm" data-i="trash-2"></i>Delete</button>`
+          : "";
+        return `<div class="gm-hub-card" title="${escapeHtml(p.summary)}">
           <div class="gm-preview">${type.preview(p.data)}</div>
-          <div class="gm-card-name">${escapeHtml(p.name)}</div>
-          <div class="gm-card-author">by ${escapeHtml(p.author)}</div>
-          <div class="gm-card-actions"><button class="gm-btn" data-add="${id}">Add</button>${del}</div>
+          <div class="gm-hub-card-text">
+            <div class="gm-hub-card-name">${escapeHtml(p.name)}</div>
+            <div class="gm-hub-card-meta">by ${escapeHtml(p.author)}</div>
+          </div>
+          <div class="gm-hub-card-actions"><button class="gm-btn gm-sm gm-primary" data-add="${id}"><i class="gm-i sm" data-i="plus"></i>Add</button>${del}</div>
         </div>`;
       })
       .join("");
@@ -5586,17 +5936,21 @@ window.__gatherMods.define("hub", (ctx) => {
     const modal = ctx.openModal(
       "Community hub",
       `
-      <div class="gm-toolbar">
-        ${types.map((t) => `<button class="gm-btn" data-hub-type="${t.type}">${escapeHtml(t.label)}</button>`).join("")}
-        <input class="gm-input" id="gm-hub-search" placeholder="Search by name, author or item..." />
-      </div>
-      <div class="gm-grid" id="gm-hub-grid"></div>
-      <div class="gm-status"><span id="gm-modal-status"></span><span class="gm-link" id="gm-hub-refresh">Refresh</span></div>`,
+      <div class="gm-window-body">
+        <div class="gm-hub-toolbar">
+          <div class="gm-field gm-hub-search"><i class="gm-i" data-i="search"></i><input class="gm-input" id="gm-hub-search" placeholder="Search by name, author or item" /></div>
+          ${types.length > 1 ? `<div class="gm-seg">${types.map((t) => `<button data-hub-type="${t.type}">${escapeHtml(t.label)}</button>`).join("")}</div>` : ""}
+          <button class="gm-iconbtn" id="gm-hub-refresh" title="Refresh"><i class="gm-i" data-i="refresh-cw"></i></button>
+        </div>
+        <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-modal-status"></span></div>
+        <div class="gm-hub-grid" id="gm-hub-grid"></div>
+      </div>`,
+      "gm-modal-hub",
     );
     const syncTabs = () =>
       modal
         .querySelectorAll("[data-hub-type]")
-        .forEach((b) => b.classList.toggle("active", b.dataset.hubType === hub.type));
+        .forEach((b) => b.classList.toggle("on", b.dataset.hubType === hub.type));
     modal.querySelectorAll("[data-hub-type]").forEach((b) => {
       b.onclick = () => {
         hub.type = b.dataset.hubType;
@@ -5622,22 +5976,28 @@ window.__gatherMods.define("hub", (ctx) => {
   ctx.section({
     title: "Community hub",
     html: `
-      <button class="gm-btn" id="gm-hub-open">Browse community presets</button>
-      <div class="gm-status"><span id="gm-hub-status"></span></div>`,
+      <button class="gm-btn gm-block" id="gm-hub-open"><i class="gm-i" data-i="globe"></i>Browse community presets</button>
+      <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-hub-status"></span></div>`,
     mount(el) {
       el.querySelector("#gm-hub-open").onclick = openHubModal;
     },
   });
   ctx.style(`
-    #gather-mods-modal .gm-toolbar { display:flex; gap:6px; align-items:center; }
-    #gather-mods-modal .gm-toolbar button.gm-btn { width:auto; text-align:center; padding:7px 14px; margin:0; }
-    #gather-mods-modal .gm-toolbar .gm-input { flex:1; margin:0; }
-    #gather-mods-modal .gm-grid { flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:10px; align-content:start; }
-    #gather-mods-modal .gm-card { display:flex; flex-direction:column; gap:4px; padding:8px; background:var(--gm-surface); border-radius:10px; }
-    #gather-mods-modal .gm-card-name { font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
-    #gather-mods-modal .gm-card-author { font-size:11px; color:var(--gm-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #gather-mods-modal .gm-card-actions { display:flex; gap:6px; margin-top:4px; }
-    #gather-mods-modal .gm-card-actions button.gm-btn { flex:1; text-align:center; padding:5px; margin:0; }
+    #gather-mods-modal .gm-modal-hub { width:min(900px, 92vw); height:min(680px, 86vh); }
+    #gather-mods-modal .gm-modal-hub .gm-window-body { flex:1; min-height:0; overflow:hidden; }
+    #gather-mods-modal .gm-hub-toolbar { display:flex; gap:8px; align-items:center; }
+    #gather-mods-modal .gm-hub-search { flex:1; min-width:0; }
+    #gather-mods-modal .gm-hub-search .gm-input { width:100%; }
+    #gather-mods-modal .gm-hub-toolbar .gm-seg { flex-shrink:0; }
+    #gather-mods-modal .gm-hub-grid { flex:1; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(168px, 1fr));
+      gap:12px; align-content:start; }
+    #gather-mods-modal .gm-hub-card { display:flex; flex-direction:column; gap:8px; padding:8px; border:1px solid var(--gm-line); border-radius:12px;
+      background:var(--gm-surface); }
+    #gather-mods-modal .gm-hub-card-text { display:flex; flex-direction:column; gap:1px; min-width:0; padding:0 2px; }
+    #gather-mods-modal .gm-hub-card-name { font-size:13px; font-weight:600; color:var(--gm-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #gather-mods-modal .gm-hub-card-meta { font-size:11.5px; color:var(--gm-text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #gather-mods-modal .gm-hub-card-actions { display:flex; gap:6px; }
+    #gather-mods-modal .gm-hub-card-actions .gm-btn { flex:1; }
   `);
 
   return { publish };
@@ -6419,21 +6779,20 @@ window.__gatherMods.define("custom", (ctx) => {
     if (!root?.isConnected) return;
     const $ = (sel) => root.querySelector(sel);
     const editing = draft?.editId;
-    $("#gm-co-new").textContent =
-      draft?.mode === "free" ? (editing ? "Cancel editing" : "Cancel new image") : "New image…";
-    $("#gm-co-new").classList.toggle("active", draft?.mode === "free");
-    $("#gm-co-skin").textContent =
+    $("#gm-co-new").innerHTML =
+      draft?.mode === "free"
+        ? `<i class="gm-i" data-i="x"></i>${editing ? "Cancel editing" : "Cancel"}`
+        : '<i class="gm-i" data-i="image-plus"></i>New image';
+    $("#gm-co-skin").innerHTML =
       draft?.mode === "skin"
-        ? editing
-          ? "Cancel editing"
-          : "Cancel restyle"
-        : "Restyle an object…";
-    $("#gm-co-skin").classList.toggle("active", draft?.mode === "skin");
+        ? `<i class="gm-i" data-i="x"></i>${editing ? "Cancel editing" : "Cancel"}`
+        : '<i class="gm-i" data-i="paintbrush"></i>Restyle';
     $("#gm-co-editor").style.display = draft ? "" : "none";
     if (!draft) return;
     const mode = pick.current();
     const loading = draft.imageUrl && textures.get(draft.imageUrl) === "loading";
     const broken = draft.imageUrl && textures.get(draft.imageUrl) === "error";
+    $("#gm-co-status").closest(".gm-note").classList.toggle("gm-err", !!broken);
     $("#gm-co-status").textContent = broken
       ? "This image could not be loaded"
       : !draft.imageUrl
@@ -6454,13 +6813,15 @@ window.__gatherMods.define("custom", (ctx) => {
     });
     $("#gm-co-base-row").style.display =
       draft.mode === "free" && draft.free.layer === "sorted" ? "" : "none";
-    $("#gm-co-place").textContent =
-      draft.free.x === undefined ? "Place on the map" : "Move on the map";
-    $("#gm-co-place").classList.toggle("active", mode === "custom-place");
-    $("#gm-co-pick").textContent = draft.skin ? "Pick another object" : "Pick the object";
-    $("#gm-co-pick").classList.toggle("active", mode === "custom-skin");
+    $("#gm-co-place").innerHTML =
+      draft.free.x === undefined
+        ? '<i class="gm-i" data-i="map-pin"></i>Place it on the map'
+        : '<i class="gm-i" data-i="move"></i>Move it on the map';
+    $("#gm-co-place").classList.toggle("is-on", mode === "custom-place");
+    $("#gm-co-pick").innerHTML =
+      `<i class="gm-i" data-i="mouse-pointer-click"></i>${draft.skin ? "Pick another object" : "Pick the object"}`;
+    $("#gm-co-pick").classList.toggle("is-on", mode === "custom-skin");
     $("#gm-co-save").disabled = !isReady() || broken;
-    $("#gm-co-save").textContent = editing ? "Save changes" : "Save";
     renderPlane();
   }
   function renderPlane() {
@@ -6469,6 +6830,8 @@ window.__gatherMods.define("custom", (ctx) => {
     const ready = !!placementOf(draft);
     $("#gm-co-back").disabled = !ready;
     $("#gm-co-front").disabled = !ready;
+    $("#gm-co-back").classList.toggle("on", draft.plane?.relation === "behind");
+    $("#gm-co-front").classList.toggle("on", draft.plane?.relation === "front");
     $("#gm-co-plane-reset").style.display = draft.plane ? "" : "none";
     $("#gm-co-plane-status").textContent =
       draft.planeMessage ||
@@ -6491,7 +6854,7 @@ window.__gatherMods.define("custom", (ctx) => {
       ? own
           .map(
             (o) =>
-              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id ? " gm-editing" : ""}" data-id="${escapeHtml(o.id)}" title="Hover to see it on the map, outlined in red"><span class="gm-name">${escapeHtml(o.name)}</span><span class="gm-actions"><span class="gm-co-mode">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><span class="gm-edit gm-copy" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}">＋</span><span class="gm-edit" data-edit="${escapeHtml(o.id)}" title="Edit this object">✎</span><span class="gm-del" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone">✕</span></span></div>`,
+              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id ? " is-on" : ""}" data-id="${escapeHtml(o.id)}" title="Hover to see it on the map, outlined in red"><span class="gm-thumb" style="background-image:url(&quot;${escapeHtml(imageSrc(o.imageUrl))}&quot;)"></span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(o.name)}</span></div><span class="gm-tail hide-on-hover">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><div class="gm-actions"><button class="gm-iconbtn${o.id === stamp?.id ? " on" : ""}" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}"><i class="gm-i sm" data-i="copy"></i></button><button class="gm-iconbtn" data-edit="${escapeHtml(o.id)}" title="Edit this object"><i class="gm-i sm" data-i="pencil"></i></button><button class="gm-iconbtn gm-danger" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone"><i class="gm-i sm" data-i="trash-2"></i></button></div></div>`,
           )
           .join("")
       : '<div class="gm-empty">You have no custom objects on this map</div>';
@@ -6515,7 +6878,7 @@ window.__gatherMods.define("custom", (ctx) => {
         else startStamp(o);
       };
     });
-    list.querySelectorAll(".gm-del").forEach((el) => {
+    list.querySelectorAll("[data-del]").forEach((el) => {
       el.onclick = () => {
         const o = find(el.dataset.del);
         if (o) deleteObject(o);
@@ -6583,52 +6946,57 @@ window.__gatherMods.define("custom", (ctx) => {
     .join("");
   ctx.section({
     title: "Custom objects",
+    status: () =>
+      draft
+        ? draft.editId
+          ? "Editing"
+          : draft.mode === "skin"
+            ? "Restyling"
+            : "New image"
+        : stamp
+          ? "Placing copies"
+          : null,
     html: `
-      <div class="gm-sublabel">Your images on the map, seen by everyone with this module</div>
-      <div class="gm-row">
-        <button class="gm-btn" id="gm-co-new" title="Draw an image anywhere: size, layer, base line and collision like a real object.">New image…</button>
-        <button class="gm-btn" id="gm-co-skin" title="Replace the look of a real object with an image: it keeps its collision and seats.">Restyle an object…</button>
+      <div class="gm-btn-row">
+        <button class="gm-btn" id="gm-co-new" title="Draw an image anywhere: size, layer, base line and collision like a real object."><i class="gm-i" data-i="image-plus"></i>New image</button>
+        <button class="gm-btn" id="gm-co-skin" title="Replace the look of a real object with an image: it keeps its collision and seats."><i class="gm-i" data-i="paintbrush"></i>Restyle</button>
       </div>
-      <div id="gm-co-editor" style="display:none">
-        <div class="gm-status"><span id="gm-co-status"></span></div>
-        <div class="gm-row">
-          <input class="gm-input" id="gm-co-url" placeholder="Image URL (https)..." />
-          <button class="gm-btn" id="gm-co-upload" title="png, jpeg, gif or webp, 512 KB max">Upload</button>
-          <input type="file" id="gm-co-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden />
+      <div class="gm-card" id="gm-co-editor" style="display:none">
+        <div class="gm-field">
+          <input class="gm-input" id="gm-co-url" placeholder="Image URL (https)" />
+          <button class="gm-btn gm-sm" id="gm-co-upload" title="png, jpeg, gif or webp, 512 KB max">Upload</button>
         </div>
-        <div data-co-for="free">
-          <button class="gm-btn" id="gm-co-place"></button>
-          <label class="gm-co-param">Width (tiles)<input class="gm-input" id="gm-co-width" type="number" min="0.25" max="30" step="0.25" /></label>
-          <label class="gm-co-param">Height (tiles)<input class="gm-input" id="gm-co-height" type="number" min="0.25" max="30" step="0.25" /></label>
-          <label class="gm-co-param">Layer<select class="gm-input" id="gm-co-layer">${layerOptions}</select></label>
-          <label class="gm-co-param" id="gm-co-base-row" title="Avatars standing above this line are drawn behind the image, below it in front.">Base line (tiles from the top)<input class="gm-input" id="gm-co-base" type="number" min="0" max="30" step="0.25" /></label>
-          <label class="gm-co-param" title="The tiles from the base line down block avatars (for people who have this module).">Collision<input type="checkbox" id="gm-co-collision" /></label>
+        <input type="file" id="gm-co-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden />
+        <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-co-status"></span></div>
+        <div class="gm-co-group" data-co-for="free">
+          <button class="gm-btn gm-block" id="gm-co-place"></button>
+          <div class="gm-prop"><span>Size</span><div class="gm-co-size"><label class="gm-field"><input class="gm-input" id="gm-co-width" type="number" min="0.25" max="30" step="0.25" title="Width (tiles)" /><span class="gm-unit">w</span></label><label class="gm-field"><input class="gm-input" id="gm-co-height" type="number" min="0.25" max="30" step="0.25" title="Height (tiles)" /><span class="gm-unit">h</span></label></div></div>
+          <div class="gm-prop"><span>Layer</span><select class="gm-select" id="gm-co-layer">${layerOptions}</select></div>
+          <div class="gm-prop" id="gm-co-base-row" title="Avatars standing above this line are drawn behind the image, below it in front."><span>Base line</span><label class="gm-field"><input class="gm-input" id="gm-co-base" type="number" min="0" max="30" step="0.25" title="Tiles from the top" /><span class="gm-unit">tiles</span></label></div>
+          <label class="gm-prop" title="The tiles from the base line down block avatars (for people who have this module)."><span>Collision</span><input type="checkbox" class="gm-switch" id="gm-co-collision" /></label>
         </div>
-        <div data-co-for="skin">
-          <button class="gm-btn" id="gm-co-pick"></button>
+        <div class="gm-co-group" data-co-for="skin">
+          <button class="gm-btn gm-block" id="gm-co-pick"></button>
         </div>
-        <label class="gm-co-param">Opacity<input id="gm-co-opacity" type="range" min="0.1" max="1" step="0.05" /></label>
-        <div class="gm-co-param" title="Draw order: move the image behind or in front of the objects it overlaps, one at a time.">Plane<span class="gm-co-plane"><button class="gm-btn" id="gm-co-back" title="Behind the next object it overlaps">▼ Back</button><button class="gm-btn" id="gm-co-front" title="In front of the next object it overlaps">▲ Front</button></span></div>
-        <div class="gm-status"><span id="gm-co-plane-status"></span><span class="gm-link" id="gm-co-plane-reset">Reset</span></div>
-        <div class="gm-row">
-          <input class="gm-input" id="gm-co-name" placeholder="Name this object..." />
-          <button class="gm-btn" id="gm-co-save">Save</button>
+        <div class="gm-prop"><span>Opacity</span><input class="gm-co-range" id="gm-co-opacity" type="range" min="0.1" max="1" step="0.05" /></div>
+        <div class="gm-prop" title="Draw order: move the image behind or in front of the objects it overlaps, one at a time."><span>Plane</span><div class="gm-seg"><button id="gm-co-back" title="Behind the next object it overlaps"><i class="gm-i xs" data-i="arrow-down"></i> Back</button><button id="gm-co-front" title="In front of the next object it overlaps"><i class="gm-i xs" data-i="arrow-up"></i> Front</button></div></div>
+        <div class="gm-note"><i class="gm-i sm" data-i="layers"></i><span id="gm-co-plane-status"></span><span class="gm-link gm-co-reset" id="gm-co-plane-reset">Reset</span></div>
+        <div class="gm-field">
+          <input class="gm-input" id="gm-co-name" placeholder="Name this image" />
+          <button class="gm-btn gm-primary gm-sm" id="gm-co-save">Save</button>
         </div>
       </div>
       <div class="gm-list" id="gm-co-list"></div>
-      <div class="gm-status"><span id="gm-co-list-status"></span></div>`,
+      <div class="gm-note"><i class="gm-i sm" data-i="info"></i><span id="gm-co-list-status"></span></div>`,
     mount,
   });
   ctx.style(`
-    #gather-mods-panel .gm-co-param { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--gm-muted); }
-    #gather-mods-panel .gm-co-param .gm-input { width:110px; flex:none; }
-    #gather-mods-panel .gm-co-param input[type=range] { width:110px; }
-    #gather-mods-panel .gm-co-mode { font-size:11px; color:var(--gm-muted); }
-    #gather-mods-panel .gm-co-plane { display:flex; gap:4px; }
-    #gather-mods-panel .gm-co-plane button.gm-btn { width:auto; margin:0; padding:3px 8px; }
-    #gather-mods-panel .gm-edit { color:var(--gm-muted); font-size:13px; flex-shrink:0; }
-    #gather-mods-panel .gm-edit:hover { color:var(--gm-fg); }
-    #gather-mods-panel .gm-item.gm-editing { box-shadow:inset 0 0 0 1px var(--theme-color-accent,#6c5ce7); }
+    #gather-mods-panel .gm-co-group { display:flex; flex-direction:column; gap:8px; }
+    #gather-mods-panel .gm-co-size { display:flex; gap:4px; width:132px; flex:none; }
+    #gather-mods-panel .gm-co-size > .gm-field { flex:1; min-width:0; }
+    #gather-mods-panel .gm-co-size .gm-input { padding-left:8px; padding-right:3px; }
+    #gather-mods-panel .gm-co-range { width:132px; flex:none; margin:0; accent-color:var(--gm-accent); }
+    #gather-mods-panel .gm-co-reset { margin-left:auto; flex:none; }
   `);
 
   ctx.onTick(() => {
@@ -6716,9 +7084,11 @@ window.__gatherMods.define("auto-away", (ctx) => {
   function render() {
     if (!root?.isConnected) return;
     const toggle = root.querySelector("#gm-away-toggle");
-    toggle.textContent = "Auto away: " + (settings.enabled ? "ON" : "OFF");
-    toggle.classList.toggle("active", settings.enabled);
+    toggle.checked = settings.enabled;
     toggle.disabled = !isSupported();
+    root
+      .querySelectorAll("#gm-away-idle-status button")
+      .forEach((b) => b.classList.toggle("on", b.dataset.status === settings.idleStatus));
     root.querySelector("#gm-away-status").textContent = !isSupported()
       ? "Only in the Gather desktop app: a browser tab can't see activity in other apps"
       : status ||
@@ -6730,25 +7100,33 @@ window.__gatherMods.define("auto-away", (ctx) => {
 
   ctx.section({
     title: "Auto away",
+    status: () => {
+      const auto = readJson(RESTORE_KEY, {})[me()?.id];
+      return auto ? auto.set : settings.enabled && isSupported() ? "On" : null;
+    },
     html: `
-      <button class="gm-btn" id="gm-away-toggle">Auto away: OFF</button>
-      <label class="gm-away-param">Status when idle<select class="gm-input" id="gm-away-idle-status">${IDLE_STATUSES.map((s) => `<option value="${s}">${s}</option>`).join("")}</select></label>
-      <label class="gm-away-param">Minutes without activity<input class="gm-input" id="gm-away-minutes" type="number" min="${MINUTES.min}" max="${MINUTES.max}" step="1" /></label>
-      <div class="gm-status"><span id="gm-away-status"></span></div>`,
+      <label class="gm-toggle">
+        <span class="gm-toggle-text"><span class="gm-toggle-title">Auto away</span><span class="gm-hint">When you leave your computer, back on your next input</span></span>
+        <input type="checkbox" class="gm-switch" id="gm-away-toggle" />
+      </label>
+      <div class="gm-prop"><span>Status when idle</span><div class="gm-seg" id="gm-away-idle-status">${IDLE_STATUSES.map((s) => `<button data-status="${s}">${s}</button>`).join("")}</div></div>
+      <div class="gm-prop"><span>After</span><label class="gm-field"><input class="gm-input" id="gm-away-minutes" type="number" min="${MINUTES.min}" max="${MINUTES.max}" step="1" /><span class="gm-unit">min</span></label></div>
+      <div class="gm-note"><i class="gm-i sm" data-i="moon"></i><span id="gm-away-status"></span></div>`,
     mount(el) {
       root = el;
-      el.querySelector("#gm-away-toggle").onclick = () => {
-        settings.enabled = !settings.enabled;
+      const toggle = el.querySelector("#gm-away-toggle");
+      toggle.addEventListener("change", () => {
+        settings.enabled = toggle.checked;
         save();
         render();
-      };
-      const idleStatus = el.querySelector("#gm-away-idle-status");
-      idleStatus.value = settings.idleStatus;
-      idleStatus.onchange = () => {
-        settings.idleStatus = idleStatus.value;
-        save();
-        render();
-      };
+      });
+      el.querySelectorAll("#gm-away-idle-status button").forEach((b) => {
+        b.onclick = () => {
+          settings.idleStatus = b.dataset.status;
+          save();
+          render();
+        };
+      });
       const minutes = el.querySelector("#gm-away-minutes");
       minutes.value = settings.minutes;
       minutes.addEventListener("keydown", (e) => e.stopPropagation());
@@ -6762,8 +7140,4 @@ window.__gatherMods.define("auto-away", (ctx) => {
       render();
     },
   });
-  ctx.style(`
-    #gather-mods-panel .gm-away-param { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--gm-muted); }
-    #gather-mods-panel .gm-away-param .gm-input { width:80px; flex:none; }
-  `);
 });
