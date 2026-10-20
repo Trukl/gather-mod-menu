@@ -482,9 +482,8 @@ window.__gatherMods.define("custom", (ctx) => {
 
   // Gather only draws the map when it changes: redraw when a drawn animated
   // image reaches its next frame.
-  let playFrame = 0;
+  let stopPlaying = null;
   function play() {
-    playFrame = 0;
     let changed = false;
     let playing = false;
     for (const { key, sprite } of drawn.values()) {
@@ -496,11 +495,14 @@ window.__gatherMods.define("custom", (ctx) => {
         changed = true;
       }
     }
-    if (changed) map.requestRender();
-    if (playing) playFrame = requestAnimationFrame(play);
+    if (!playing) {
+      stopPlaying();
+      stopPlaying = null;
+    }
+    return changed;
   }
   const startPlaying = () => {
-    if (!playFrame) playFrame = requestAnimationFrame(play);
+    stopPlaying ??= map.animate(play);
   };
 
   // Collisions: pathfinding reads Gather's collision map; arrow keys are
@@ -559,7 +561,7 @@ window.__gatherMods.define("custom", (ctx) => {
   }
   ctx.onCleanup(() => {
     map.scene().events.off("prerender", beforeRender);
-    cancelAnimationFrame(playFrame);
+    stopPlaying?.();
     planeOutline?.destroy();
     hoverOutline?.destroy();
     for (const id of [...drawn.keys()]) undraw(id);

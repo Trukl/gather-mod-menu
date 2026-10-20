@@ -1,7 +1,7 @@
 // Fun: gimmicks. Flee mode keeps you away from a chosen player. Animations
 // move objects on the screens of everyone who has this module: they are
-// stored on the community hub, their sprites are displaced locally (nothing
-// is sent to Gather's server) and the map is redrawn at 30 fps at most.
+// stored on the community hub and their sprites are displaced locally
+// (nothing is sent to Gather's server), on the map library's frame loop.
 window.__gatherMods.define("fun", (ctx) => {
   const { MC, me, allUsers, tpTo, escapeHtml, readJson, writeJson, onEnter, applyTheme } = ctx;
   const map = ctx.use("map");
@@ -99,7 +99,6 @@ window.__gatherMods.define("fun", (ctx) => {
   const SYNC_MS = 60_000;
   // A sync started before a change can still return the old list.
   const LOCAL_EDIT_MS = 90_000;
-  const FRAME_MS = 1000 / 30;
   const DEPTH_PER_PX = 1 / 9999;
   const COLOR_SELECTED = 0x00e5ff;
   const COLOR_PATH = 0x00e5ff;
@@ -313,18 +312,15 @@ window.__gatherMods.define("fun", (ctx) => {
     map.requestRender();
   }
 
-  let frame = 0;
-  let lastFrame = 0;
-  function animate(now) {
-    frame = 0;
-    if (now - lastFrame < FRAME_MS - 1) {
-      frame = requestAnimationFrame(animate);
-      return;
-    }
-    lastFrame = now;
+  let stopAnimating = null;
+  function animate() {
     const animations = activeAnimations();
-    if (!animations.length) return releaseAll();
-    frame = requestAnimationFrame(animate);
+    if (!animations.length) {
+      stopAnimating();
+      stopAnimating = null;
+      releaseAll();
+      return false;
+    }
     const moved = new Set();
     for (const a of animations) {
       const roots = map.liveObjects(placementOf(a)?.ids ?? []);
@@ -337,13 +333,13 @@ window.__gatherMods.define("fun", (ctx) => {
     }
     for (const id of [...displaced.keys()]) if (!moved.has(id)) release(id);
     if (studio) updateStudioFrame();
-    map.requestRender();
+    return true;
   }
   const refreshAnimations = () => {
-    if (!frame) frame = requestAnimationFrame(animate);
+    stopAnimating ??= map.animate(animate);
   };
   ctx.onCleanup(() => {
-    cancelAnimationFrame(frame);
+    stopAnimating?.();
     releaseAll();
     closeStudio();
   });
