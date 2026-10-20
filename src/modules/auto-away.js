@@ -1,11 +1,12 @@
 // Auto away: sets you Away (or Busy, your choice) after some minutes without
 // any input on the computer (keyboard, mouse, in any app), and back to your
 // previous status as soon as you use it again. Only a status this module set
-// is given back: the same status chosen by hand stays. The Gather desktop app
-// gives the computer's idle time; a browser tab only sees its own page, so it
-// is not supported.
+// is given back: the same status chosen by hand stays. A conversation or
+// meeting in Gather counts as input. The Gather desktop app gives the
+// computer's idle time; a browser tab only sees its own page, so it is not
+// supported.
 window.__gatherMods.define("auto-away", (ctx) => {
-  const { me, readJson, writeJson } = ctx;
+  const { GD, me, readJson, writeJson } = ctx;
   const SETTINGS_KEY = "gathermodv2:autoAway";
   // By space user: the status this module set and the one to give back, kept
   // across reloads.
@@ -25,6 +26,9 @@ window.__gatherMods.define("auto-away", (ctx) => {
   };
   const interop = () => window._electron_interop ?? null;
   const isSupported = () => typeof interop()?.getSystemIdleTime === "function";
+  // Gather's own test for a conversation or meeting with someone.
+  const inConversation = () => GD().Repos.avConnections.hasStrongConnections;
+  let conversationAt = 0;
   let status = "";
   let checking = false;
 
@@ -36,6 +40,7 @@ window.__gatherMods.define("auto-away", (ctx) => {
     if (checking || !isSupported() || !user?.connected) return;
     checking = true;
     try {
+      if (inConversation()) conversationAt = Date.now();
       const idle = await interop().getSystemIdleTime();
       const restore = readJson(RESTORE_KEY, {});
       const current = user.userSetAvailability.value;
@@ -52,7 +57,7 @@ window.__gatherMods.define("auto-away", (ctx) => {
         }
       } else if (
         settings.enabled &&
-        idle >= settings.minutes * 60 &&
+        Math.min(idle, (Date.now() - conversationAt) / 1000) >= settings.minutes * 60 &&
         IN_OFFICE.includes(current) &&
         current !== settings.idleStatus
       ) {
@@ -83,9 +88,11 @@ window.__gatherMods.define("auto-away", (ctx) => {
     root.querySelector("#gm-away-status").textContent = !isSupported()
       ? "Only in the Gather desktop app: a browser tab can't see activity in other apps"
       : status ||
-        (settings.enabled
-          ? `${settings.idleStatus} after ${settings.minutes} min without keyboard or mouse, back on your next input. ${settings.idleStatus} set by hand stays.`
-          : "Off");
+        (!settings.enabled
+          ? "Off"
+          : inConversation()
+            ? `In a conversation: no ${settings.idleStatus} until it ends`
+            : `${settings.idleStatus} after ${settings.minutes} min without keyboard, mouse or conversation, back on your next input. ${settings.idleStatus} set by hand stays.`);
   }
   const save = () => writeJson(SETTINGS_KEY, settings);
 

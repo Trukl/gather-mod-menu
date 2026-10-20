@@ -767,12 +767,19 @@
       "id": "auto-away",
       "kind": "module",
       "name": "Auto away",
-      "description": "Sets you Away (or Busy, your choice) after a few minutes without keyboard or mouse on your computer, and back to your status on your next input. The same status set by hand stays. Gather desktop app only.",
+      "description": "Sets you Away (or Busy, your choice) after a few minutes without keyboard or mouse on your computer, and back to your status on your next input. A conversation or meeting in Gather counts as activity. The same status set by hand stays. Gather desktop app only.",
       "file": "src/modules/auto-away.js",
       "icon": "moon",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.2.0",
+          "date": "2026-10-20",
+          "changes": [
+            "Never sets you Away or Busy during a conversation or meeting in Gather, even without keyboard or mouse: the minutes start when it ends. The panel says so while you are in one."
+          ]
+        },
         {
           "version": "1.1.0",
           "date": "2026-10-17",
