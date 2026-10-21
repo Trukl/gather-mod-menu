@@ -87,6 +87,50 @@ window.__gatherMods.define("map", (ctx) => {
     });
     return found;
   }
+  // A new version of the map can shift every coordinate (Gather trims the map
+  // to its content). What the mod places on the map keeps references to
+  // objects spread over it; the map moved by what most of those still there
+  // agree on, so a deleted or individually moved object doesn't count.
+  const ANCHOR_SPOTS = [
+    [0.25, 0.25],
+    [0.75, 0.25],
+    [0.5, 0.5],
+    [0.25, 0.75],
+    [0.75, 0.75],
+  ];
+  function mapAnchors() {
+    const objects = mapObjects();
+    const xs = objects.map((o) => o.absolutePosition.x);
+    const ys = objects.map((o) => o.absolutePosition.y);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    const picked = new Set();
+    for (const [fx, fy] of ANCHOR_SPOTS) {
+      const x = x0 + fx * (x1 - x0);
+      const y = y0 + fy * (y1 - y0);
+      let nearest = null;
+      let best = Infinity;
+      for (const o of objects) {
+        const d = (o.absolutePosition.x - x) ** 2 + (o.absolutePosition.y - y) ** 2;
+        if (d < best && !picked.has(o)) [nearest, best] = [o, d];
+      }
+      if (nearest) picked.add(nearest);
+    }
+    return [...picked].map(objectRef);
+  }
+  // In tiles, on the 1/8 grid images are placed on; null when none is found.
+  function mapShift(anchors) {
+    const votes = new Map();
+    resolveRefs(anchors).forEach((o, i) => {
+      if (!o) return;
+      const x = Math.round((o.absolutePosition.x - anchors[i].x) * 8) / 8;
+      const y = Math.round((o.absolutePosition.y - anchors[i].y) * 8) / 8;
+      const key = `${x},${y}`;
+      votes.set(key, { x, y, n: (votes.get(key)?.n ?? 0) + 1 });
+    });
+    let shift = null;
+    for (const v of votes.values()) if (!shift || v.n > shift.n) shift = v;
+    return shift && { x: shift.x, y: shift.y };
+  }
 
   function topLevelObjects(objects) {
     const ids = new Set(objects.map((o) => o.id));
@@ -196,6 +240,8 @@ window.__gatherMods.define("map", (ctx) => {
     currentFloorId,
     objectRef,
     resolveRefs,
+    mapAnchors,
+    mapShift,
     isLiveObject,
     liveObjects,
     cleanItem,
