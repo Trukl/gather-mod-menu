@@ -93,9 +93,16 @@
       "name": "Map helpers",
       "description": "Shared map object helpers.",
       "file": "src/lib/map.js",
-      "version": "1.3.0",
+      "version": "1.3.1",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.3.1",
+          "date": "2026-10-21",
+          "changes": [
+            "Anchors for what the mod places on the map: references to objects spread over it, and the shift most of those still there agree on after a new version of the map."
+          ]
+        },
         {
           "version": "1.3.0",
           "date": "2026-10-15",
@@ -300,9 +307,16 @@
       "description": "Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects follow a path of steps (lines, waves, arcs, orbits, formulas) with easings, pauses and turns, seen by everyone with this module.",
       "file": "src/modules/fun.js",
       "icon": "sparkles",
-      "version": "1.9.0",
+      "version": "1.9.1",
       "requires": { "map": "1.3.0", "map-pick": "1.2.0", "hub-api": "1.1.0", "motion": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.9.1",
+          "date": "2026-10-21",
+          "changes": [
+            "Back and forth and wave animations follow the map when a new version of it shifts everything: their end point stayed where it was, so the objects went to the wrong place. Orbits and path animations already followed."
+          ]
+        },
         {
           "version": "1.9.0",
           "date": "2026-10-17",
@@ -659,9 +673,16 @@
       "description": "Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.",
       "file": "src/modules/custom.js",
       "icon": "image",
-      "version": "1.7.0",
-      "requires": { "map": "1.3.0", "map-pick": "1.2.0", "hub-api": "1.3.0" },
+      "version": "1.7.1",
+      "requires": { "map": "1.3.1", "map-pick": "1.2.0", "hub-api": "1.3.0" },
       "changelog": [
+        {
+          "version": "1.7.1",
+          "date": "2026-10-21",
+          "changes": [
+            "Images follow the map when an admin publishes a new version that shifts everything (Gather trims the map to its content): each keeps references to 5 objects spread over the map and moves by what most of them moved, so a deleted or moved object doesn't matter. They are set when you place, move or copy an image; images placed before get them the first time their owner opens their map with this version."
+          ]
+        },
         {
           "version": "1.7.0",
           "date": "2026-10-17",

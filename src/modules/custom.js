@@ -203,6 +203,26 @@ window.__gatherMods.define("custom", (ctx) => {
     const span = depthSpan(zone);
     return o.plane.relation === "front" ? span.max + PLANE_STEP : span.min - PLANE_STEP;
   }
+  // Free images follow the map (see map.mapShift), computed once per image and
+  // map version as soon as one of its anchors is found.
+  const shifts = new WeakMap();
+  function freeOf(o) {
+    const f = o.free;
+    if (!f.anchors) return f;
+    const mapId = map.currentMapId();
+    let cached = shifts.get(f);
+    if (cached?.mapId !== mapId) {
+      const shift = map.mapShift(f.anchors);
+      if (!shift) return f;
+      shifts.set(f, (cached = { mapId, shift }));
+    }
+    return { ...f, x: f.x + cached.shift.x, y: f.y + cached.shift.y };
+  }
+  const unanchored = ({ anchors, ...free }) => free;
+  function anchored(free) {
+    const anchors = map.mapAnchors();
+    return anchors.length ? { ...free, anchors } : free;
+  }
   // Where an object is drawn: the rectangle and depth, and for a skin the
   // zone of the real object it covers. A plane, when set, decides the depth.
   function placementOf(o) {
@@ -216,8 +236,8 @@ window.__gatherMods.define("custom", (ctx) => {
       if (!zone) return null;
       return { zone, depth: planeDepth(o) ?? zone.depth + SKIN_DEPTH_STEP };
     }
-    const f = o.free;
-    if (!f || f.x === undefined) return null;
+    if (!o.free || o.free.x === undefined) return null;
+    const f = freeOf(o);
     const layerDepth =
       f.layer === "floor"
         ? FLOOR_DEPTH
@@ -290,8 +310,8 @@ window.__gatherMods.define("custom", (ctx) => {
   function collisionTiles(objects) {
     const tiles = new Set();
     for (const o of objects) {
-      const f = o.free;
-      if (o.mode !== "free" || !f?.collision || f.x === undefined) continue;
+      if (o.mode !== "free" || !o.free?.collision || o.free.x === undefined) continue;
+      const f = freeOf(o);
       const bottom = Math.ceil(f.y + f.height) - 1;
       const top = f.base < f.height ? Math.floor(f.y + f.base) : bottom;
       for (let y = top; y <= bottom; y++)
@@ -377,7 +397,7 @@ window.__gatherMods.define("custom", (ctx) => {
         if (!scene.textures.exists(key)) return true;
         const frame = frameOf(key) ?? "__BASE";
         const { width, height } = scene.textures.getFrame(key, frame);
-        const f = v.o.free;
+        const f = freeOf(v.o);
         const x = Math.floor(((tileX - f.x) / f.width) * width);
         const y = Math.floor(((tileY - f.y) / f.height) * height);
         if (x < 0 || y < 0 || x >= width || y >= height) return false;
@@ -396,8 +416,9 @@ window.__gatherMods.define("custom", (ctx) => {
     };
     v.o = o;
     v.name = o.name;
-    v.topLeftAbsolutePosition = { x: o.free.x, y: o.free.y };
-    v.absolutePosition = { x: o.free.x + o.free.width / 2, y: o.free.y + o.free.base };
+    const f = freeOf(o);
+    v.topLeftAbsolutePosition = { x: f.x, y: f.y };
+    v.absolutePosition = { x: f.x + f.width / 2, y: f.y + f.base };
     v.ref = { custom: o.id, ...v.absolutePosition };
     virtuals.set(o.id, v);
     return v;
@@ -567,6 +588,28 @@ window.__gatherMods.define("custom", (ctx) => {
     }
     renderAll();
     renderList();
+    anchorMine(floorId);
+  }
+  // Images saved before anchors existed get one the first time their owner
+  // opens their map, where they are now.
+  async function anchorMine(floorId) {
+    for (const o of shared.items) {
+      if (!o.mine || o.mode !== "free" || o.free.anchors) continue;
+      const free = anchored(o.free);
+      if (!free.anchors || floorId !== shared.floorId) return;
+      try {
+        const { object } = await api.request(objectsPath(o.id), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            data: { ...copyData(o), free, ...(o.plane && { plane: o.plane }) },
+          }),
+        });
+        shared.items = shared.items.map((x) => (x.id === object.id ? object : x));
+      } catch (e) {
+        return showStatus("Hub unreachable: " + e.message);
+      }
+    }
   }
 
   const isReady = () =>
@@ -579,7 +622,7 @@ window.__gatherMods.define("custom", (ctx) => {
       imageUrl: draft.imageUrl,
       opacity: draft.opacity,
       mode: draft.mode,
-      ...(draft.mode === "skin" ? { skin: draft.skin } : { free: draft.free }),
+      ...(draft.mode === "skin" ? { skin: draft.skin } : { free: anchored(draft.free) }),
       ...(draft.plane && { plane: draft.plane }),
     };
     showStatus(`Saving "${name}"…`);
@@ -694,7 +737,7 @@ window.__gatherMods.define("custom", (ctx) => {
     },
     pointerDown(e) {
       stampSession.hover(e);
-      placeCopy({ ...copyData(stamp), free: { ...stamp.free } });
+      placeCopy({ ...copyData(stamp), free: anchored(stamp.free) });
     },
     onStop: () => stopStamp(),
   };
@@ -708,7 +751,7 @@ window.__gatherMods.define("custom", (ctx) => {
   function startStamp(o) {
     if (draft) closeDraft();
     if (pick.current()) pick.stop();
-    stamp = { ...o, free: o.free && { ...o.free }, placed: 0 };
+    stamp = { ...o, free: o.free && unanchored(freeOf(o)), placed: 0 };
     shared.status = stampStatus();
     pick.start(o.mode === "skin" ? stampSkinSession : stampSession);
     renderList();
@@ -724,7 +767,7 @@ window.__gatherMods.define("custom", (ctx) => {
   function startDraft(mode, from = null) {
     if (pick.current()?.startsWith("custom-")) pick.stop();
     stopStamp();
-    const free = from?.free ?? { ...DEFAULT_FREE };
+    const free = from?.free ? unanchored(freeOf(from)) : DEFAULT_FREE;
     draft = {
       editId: from?.id,
       mode,

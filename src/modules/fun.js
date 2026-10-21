@@ -197,8 +197,8 @@ window.__gatherMods.define("fun", (ctx) => {
       };
     }
     const s = (1 - Math.cos(phase * 2 * Math.PI)) / 2;
-    const dx = a.point.x - center.x;
-    const dy = a.point.y - center.y;
+    const dx = point.x - center.x;
+    const dy = point.y - center.y;
     if (a.type === "line") return { x: dx * s, y: dy * s };
     const len = Math.hypot(dx, dy) || 1;
     const wave = a.params.amplitude * TILE_PX * Math.sin(2 * Math.PI * a.params.waves * s);
