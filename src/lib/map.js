@@ -227,11 +227,65 @@ window.__gatherMods.define("map", (ctx) => {
   const isOnMap = (e) => scene().game.canvas.parentElement.contains(e.target);
   // Gather only renders when the scene changes; draw one frame after updating
   // overlays from outside the map (panel buttons, list hover).
+  let forcedFrame = false;
   function requestRender() {
+    forcedFrame = true;
     try {
       scene().game.loop.tick();
     } catch {}
+    forcedFrame = false;
   }
+  // Animations share one loop. While objects move, Gather draws on its own (30
+  // fps, 7 without the focus): animations update right after its frames, so
+  // nothing is drawn twice. Otherwise a timer draws them at the same rates, and
+  // not at all while hidden or minimized. A timer, unlike
+  // requestAnimationFrame, doesn't make Chrome redraw the whole page each time.
+  const animations = new Set();
+  let animationTimer = 0;
+  let lastAnimationFrame = 0;
+  let afterGatherFrame = 0;
+  let gatherDrew = false;
+  function runAnimations() {
+    let changed = false;
+    for (const step of animations) changed = step() || changed;
+    return changed;
+  }
+  function onGatherFrame() {
+    if (forcedFrame || !animations.size) return;
+    gatherDrew = true;
+    afterGatherFrame ||= setTimeout(() => {
+      afterGatherFrame = 0;
+      runAnimations();
+    });
+  }
+  function scheduleAnimationFrame() {
+    if (animationTimer || document.hidden || !animations.size) return;
+    const frameMs = document.hasFocus() ? 1000 / 30 : 1000 / 7;
+    animationTimer = setTimeout(animationFrame, lastAnimationFrame + frameMs - performance.now());
+  }
+  function animationFrame() {
+    animationTimer = 0;
+    if (document.hidden) return;
+    lastAnimationFrame = performance.now();
+    scheduleAnimationFrame();
+    if (gatherDrew) gatherDrew = false;
+    else if (runAnimations()) requestRender();
+  }
+  // step() runs on every frame and returns whether it changed the map; the
+  // returned function stops it.
+  function animate(step) {
+    animations.add(step);
+    scheduleAnimationFrame();
+    return () => animations.delete(step);
+  }
+  scene().game.events.on("postrender", onGatherFrame);
+  document.addEventListener("visibilitychange", scheduleAnimationFrame);
+  ctx.onCleanup(() => {
+    clearTimeout(animationTimer);
+    clearTimeout(afterGatherFrame);
+    scene().game.events.off("postrender", onGatherFrame);
+    document.removeEventListener("visibilitychange", scheduleAnimationFrame);
+  });
 
   return {
     TILE_PX,
@@ -259,5 +313,6 @@ window.__gatherMods.define("map", (ctx) => {
     tileToScreen,
     isOnMap,
     requestRender,
+    animate,
   };
 });

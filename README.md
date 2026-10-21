@@ -96,7 +96,7 @@ Shared code lives in internal libraries (map helpers, map picking, previews, pla
 - **Your animations**: click one to start or stop it for everyone; the pencil (on hover) edits it in the studio (the preview replaces it until you save).
 - **Others' animations** are listed with their author: the eye button hides one on your screen only.
 
-Animations are stored on the community hub and refreshed every minute. Nothing is sent to Gather's server: objects only move on screen, and the map is redrawn at 30 fps at most while one runs.
+Animations are stored on the community hub and refreshed every minute. Nothing is sent to Gather's server: objects only move on screen. While one runs, the map is redrawn at 30 fps when Gather's window has the focus, 7 fps when it shows without the focus (like Gather itself), and not at all when it is hidden or minimized; animated custom images follow the same rule.
 
 <details>
 <summary>Reorder and duplicate steps, hide others' animations</summary>
