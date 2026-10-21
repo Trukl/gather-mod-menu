@@ -192,6 +192,7 @@ Nothing is sent to Gather's server: people without the module see the map as it 
 ### Auto away
 
 - After 5 minutes (1 to 120) without keyboard or mouse anywhere on your computer, your status goes to **Away** or **Busy** (your choice), and back to what it was as soon as you use the computer again.
+- **A conversation or meeting in Gather counts as activity**: you are never set Away or Busy during one, and the minutes start when it ends.
 - The same status set by hand is never changed, and a status you pick meanwhile wins.
 - **Gather desktop app only**: it gives the computer's idle time, while a browser tab only sees its own page.
 
