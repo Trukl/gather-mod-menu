@@ -1,8 +1,9 @@
-// Seasonal themes: Halloween, Christmas and Easter looks, picked by hand or by
-// the calendar. Gather's interface colors and logo are recolored, every catalog
-// object is lightly decorated (autumn leaves and cobwebs, snow and ornaments,
-// pastels and Easter eggs) right in the atlases Gather packs them into, and
-// effects play over the map. Only this browser sees it.
+// Seasonal themes: Halloween, Christmas and Easter looks, on by themselves
+// during their season (the user can go back to Gather's usual look until the
+// next one), unavailable outside it. Gather's interface colors and logo are
+// recolored, every catalog object is lightly decorated (autumn leaves and
+// cobwebs, snow and ornaments, pastels and Easter eggs) right in the atlases
+// Gather packs them into, and effects play over the map. Only this browser sees it.
 window.__gatherMods.define("themes", (ctx) => {
   const { GD, readJson, writeJson } = ctx;
   const map = ctx.use("map");
@@ -11,7 +12,8 @@ window.__gatherMods.define("themes", (ctx) => {
   const LOGO_URL = "/images/fpo/logos/gather.svg";
   // Gather's color tokens come in blocks of about 200 custom properties.
   const TOKEN_BLOCK_MIN = 100;
-  const settings = { theme: "auto", ...readJson(SETTINGS_KEY, {}) };
+  // The season the user turned off, e.g. "halloween-2026": the next one is on again.
+  const settings = { offSeason: null, ...readJson(SETTINGS_KEY, {}) };
 
   const clamp = (v) => Math.min(1, Math.max(0, v));
   function hash(text) {
@@ -333,8 +335,9 @@ window.__gatherMods.define("themes", (ctx) => {
     #gm-theme-fx > * { position:absolute; }
     #gm-theme-fx .gm-veil { inset:0; }`;
 
-  const monthDay = (d) => (d.getMonth() + 1) * 100 + d.getDate();
-  // As a UTC day, to count days without daylight saving time shifts.
+  const today = () => new Date();
+  const addDays = (date, days) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
   function easterSunday(year) {
     const a = year % 19;
     const b = Math.floor(year / 100);
@@ -345,14 +348,14 @@ window.__gatherMods.define("themes", (ctx) => {
     const l = (32 + 2 * (b % 4) + 2 * Math.floor(c / 4) - h - (c % 4)) % 7;
     const m = Math.floor((a + 11 * h + 22 * l) / 451);
     const n = h + l - 7 * m + 114;
-    return Date.UTC(year, Math.floor(n / 31) - 1, (n % 31) + 1);
+    return new Date(year, Math.floor(n / 31) - 1, (n % 31) + 1);
   }
 
+  // dates(year): first and last day of the season starting that year.
   const THEMES = {
     halloween: {
       name: "Halloween",
-      until: "Nov 1",
-      season: (d) => monthDay(d) >= 1015 && monthDay(d) <= 1101,
+      dates: (y) => [new Date(y, 9, 1), new Date(y, 10, 15)],
       ui: (h, s, l) =>
         s < 0.08 ? [270, greyTint(0.05, l), l] : isGatherBlue(h, s) ? [26, s, l] : null,
       logo: {
@@ -379,8 +382,7 @@ window.__gatherMods.define("themes", (ctx) => {
     },
     christmas: {
       name: "Christmas",
-      until: "Jan 6",
-      season: (d) => monthDay(d) >= 1201 || monthDay(d) <= 106,
+      dates: (y) => [new Date(y, 11, 1), new Date(y + 1, 0, 15)],
       ui: (h, s, l) => (isGatherBlue(h, s) ? [354, s, l] : null),
       logo: {
         colors: ["#c8323b", "#ffffff"],
@@ -400,13 +402,8 @@ window.__gatherMods.define("themes", (ctx) => {
     },
     easter: {
       name: "Easter",
-      until: "Easter Monday",
-      season: (d) => {
-        const days =
-          (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - easterSunday(d.getFullYear())) /
-          864e5;
-        return days >= -7 && days <= 1;
-      },
+      // From three weeks before Easter Sunday to two weeks after.
+      dates: (y) => [addDays(easterSunday(y), -21), addDays(easterSunday(y), 14)],
       ui: (h, s, l) =>
         s < 0.08 ? [330, greyTint(0.03, l), l] : isGatherBlue(h, s) ? [278, s * 0.8, l] : null,
       logo: {
@@ -580,9 +577,29 @@ window.__gatherMods.define("themes", (ctx) => {
     const parent = map.scene().game.canvas.parentElement;
     if (parent.firstElementChild !== fx) parent.prepend(fx);
   }
-  const seasonal = () => Object.keys(THEMES).find((id) => THEMES[id].season(new Date())) ?? null;
-  const wanted = () =>
-    settings.theme === "auto" ? seasonal() : settings.theme === "off" ? null : settings.theme;
+  // The season `date` falls in: its theme, first and last day, and a key for
+  // this year's occurrence.
+  function seasonAt(date) {
+    for (const [id, theme] of Object.entries(THEMES))
+      for (const year of [date.getFullYear() - 1, date.getFullYear()]) {
+        const [from, to] = theme.dates(year);
+        if (date >= from && date < addDays(to, 1)) return { id, key: `${id}-${year}`, from, to };
+      }
+    return null;
+  }
+  function nextSeason(date) {
+    let next = null;
+    for (const [id, theme] of Object.entries(THEMES))
+      for (const year of [date.getFullYear(), date.getFullYear() + 1]) {
+        const [from, to] = theme.dates(year);
+        if (from > date && (!next || from < next.from)) next = { id, from, to };
+      }
+    return next;
+  }
+  const wanted = () => {
+    const season = seasonAt(today());
+    return season && season.key !== settings.offSeason ? season.id : null;
+  };
   let active = null;
   let applying = 0;
   function apply(id) {
@@ -611,6 +628,7 @@ window.__gatherMods.define("themes", (ctx) => {
   ctx.onTick(() => {
     apply(wanted());
     if (active) placeFx();
+    if ((seasonAt(today())?.key ?? null) !== shownSeason) render();
   });
   ctx.onCleanup(() => {
     textures().off("addtexture", onTextureAdded);
@@ -621,37 +639,44 @@ window.__gatherMods.define("themes", (ctx) => {
   // ===================
   // Panel
   // ===================
-  const CHOICES = {
-    auto: "Auto (calendar)",
-    halloween: "Halloween",
-    christmas: "Christmas",
-    easter: "Easter",
-    off: "Off",
-  };
-  const options = Object.entries(CHOICES)
-    .map(([id, label]) => `<option value="${id}">${label}</option>`)
-    .join("");
+  const shortDate = (date) => date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const span = ({ from, to }) => `${shortDate(from)} – ${shortDate(to)}`;
   let root = null;
+  let shownSeason;
   function render() {
     if (!root?.isConnected) return;
-    root.querySelector("#gm-theme-pick").value = settings.theme;
+    const season = seasonAt(today());
+    shownSeason = season?.key ?? null;
+    const toggle = root.querySelector("#gm-theme-toggle");
+    toggle.disabled = !season;
+    toggle.checked = !!active;
+    const next = season ? null : nextSeason(today());
+    root.querySelector("#gm-theme-title").textContent = season
+      ? `${THEMES[season.id].name} theme`
+      : "No seasonal theme now";
+    root.querySelector("#gm-theme-hint").textContent = season
+      ? span(season)
+      : `Next: ${THEMES[next.id].name}, ${span(next)}`;
     root.querySelector("#gm-theme-status").textContent = active
-      ? `${THEMES[active].name}${settings.theme === "auto" ? ` until ${THEMES[active].until}` : ""}: interface colors, logo, objects and map effects. Only on your screen.`
-      : settings.theme === "auto"
-        ? "No season right now. Auto: Halloween from Oct 15, Christmas from Dec 1, Easter the week before Easter Sunday."
-        : "Off";
+      ? "Interface colors, logo, objects and map effects, only on your screen. Turn it off for Gather's usual look."
+      : season
+        ? `Gather's usual look until ${shortDate(season.to)}. The next season turns on by itself.`
+        : "Halloween, Christmas and Easter turn on by themselves during their season.";
   }
   ctx.section({
     title: "Seasonal themes",
     status: () => active && THEMES[active].name,
     html: `
-      <div class="gm-prop"><span>Theme</span><select class="gm-select" id="gm-theme-pick">${options}</select></div>
+      <label class="gm-toggle">
+        <span class="gm-toggle-text"><span class="gm-toggle-title" id="gm-theme-title"></span><span class="gm-hint" id="gm-theme-hint"></span></span>
+        <input type="checkbox" class="gm-switch" id="gm-theme-toggle" />
+      </label>
       <div class="gm-note"><i class="gm-i sm" data-i="paintbrush"></i><span id="gm-theme-status"></span></div>`,
     mount(el) {
       root = el;
-      const pick = el.querySelector("#gm-theme-pick");
-      pick.addEventListener("change", () => {
-        settings.theme = pick.value;
+      const toggle = el.querySelector("#gm-theme-toggle");
+      toggle.addEventListener("change", () => {
+        settings.offSeason = toggle.checked ? null : seasonAt(today()).key;
         writeJson(SETTINGS_KEY, settings);
         apply(wanted());
         render();

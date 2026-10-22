@@ -203,14 +203,21 @@ Nothing is sent to Gather's server: people without the module see the map as it 
 
 ### Seasonal themes
 
-Halloween, Christmas and Easter looks, only on your screen:
+Halloween, Christmas and Easter looks, only on your screen, each on by itself during its season:
+
+| Theme     | Season                                                   |
+| --------- | -------------------------------------------------------- |
+| Halloween | Oct 1 – Nov 15                                           |
+| Christmas | Dec 1 – Jan 15                                           |
+| Easter    | From three weeks before Easter Sunday to two weeks after |
+
+What a theme changes:
 
 - **Interface**: Gather's colors and buttons take the season's accent (pumpkin orange, Christmas red, Easter lilac) and its logo becomes a pumpkin, a snowy logo or a bunny.
 - **Every catalog object**, decorated in your browser from Gather's own images, so new objects follow: autumn leaves, night windows and cobwebs for Halloween; snow on top, ornaments and frosted windows for Christmas; pastels, flowers and Easter eggs for Easter.
 - **Over the map**: purple dusk, fog and bats; falling snow; drifting petals.
-- **Auto** (the default) follows the calendar: Halloween from Oct 15 to Nov 1, Christmas from Dec 1 to Jan 6, Easter from the Sunday before Easter to Easter Monday. You can also pick a theme, or Off.
 
-Walls, floors, avatars and custom objects keep their look, under the map effects.
+The switch in the panel turns the season's theme off: Gather's usual look comes back until the next season, which turns on again. Outside these dates there is no theme to turn on. Walls, floors, avatars and custom objects keep their look, under the map effects.
 
 ![Seasonal themes](docs/media/seasonal-themes.gif)
 
