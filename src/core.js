@@ -31,11 +31,17 @@
   const HUB_URL_KEY = STORAGE_PREFIX + "hubUrl";
   const INSTALL_ID_KEY = STORAGE_PREFIX + "installId";
   const REPORTED_INSTALL_KEY = STORAGE_PREFIX + "reportedInstall";
+  const SHOW_PRESENCE_KEY = STORAGE_PREFIX + "showPresence";
   const DEFAULT_HUB_URL = "https://gather-mods-hub.minnecorentin.workers.dev";
   const VERSIONS_HEADER = "X-Gather-Mods";
   const BUNDLE_URL =
     "https://raw.githubusercontent.com/Trukl/gather-mod-menu/main/gather-mod-menu.js";
   const REPORT_RETRY_MS = 10 * 60_000;
+  // Presence pings, and sooner when a new player shows up.
+  const PRESENCE_MS = 2 * 60_000;
+  const PRESENCE_GAP_MS = 30_000;
+  const HALO_KEY = "gm-mod-halo";
+  const HALO_SIZE = [60, 24];
   const REOPEN_SETTINGS_KEY = "gathermods:reopenSettings";
   const STYLE_ID = "gather-mods-style";
   const TICK_MS = 2000;
@@ -405,6 +411,9 @@
       required: requiredUpdates(),
       announcements: [],
       announcementsPoll: null,
+      modUsers: new Set(),
+      presenceAt: 0,
+      presenceAsked: new Set(),
     };
     installed = state;
     const blocked = blockedModules(state.required);
@@ -434,6 +443,8 @@
       renderSectionStatus();
       for (const fn of state.tickers) runSafely(fn);
       showAnnouncements(false);
+      if (presenceDue(state)) syncPresence();
+      renderModUsers();
     }, TICK_MS);
     if (sessionStorage.getItem(REOPEN_SETTINGS_KEY)) {
       sessionStorage.removeItem(REOPEN_SETTINGS_KEY);
@@ -455,6 +466,7 @@
     clearInterval(state.announcementsPoll);
     clearTimeout(launcherPing);
     for (const fn of [...state.cleanups].reverse()) runSafely(fn);
+    clearModUsers();
     window.removeEventListener("gathermods:launcher-state", onLauncherState);
     window.removeEventListener("gathermods:launcher-diff", renderReviewDiff);
     document.getElementById("gather-mods-panel")?.remove();
@@ -901,6 +913,151 @@
   }
 
   // ===================
+  // Mod users — while it runs, the mod pings the hub every 2 minutes with the
+  // online players of the space; the hub answers which of them run the mod too.
+  // They get a halo in Gather's accent color under their avatar (so it follows
+  // Seasonal themes) and a puzzle piece after their name, on the map and in the
+  // people list.
+  // ===================
+  const showsPresence = () => readJson(SHOW_PRESENCE_KEY, true);
+  const onlineAccounts = () =>
+    GD()
+      .Repos.SpaceUser.filter((u) => u.connected && u.userAccountId)
+      .map((u) => u.userAccountId);
+  function presenceDue(state) {
+    const since = Date.now() - state.presenceAt;
+    return (
+      since >= PRESENCE_MS ||
+      (since >= PRESENCE_GAP_MS && onlineAccounts().some((a) => !state.presenceAsked.has(a)))
+    );
+  }
+  async function syncPresence() {
+    const state = installed;
+    const accounts = onlineAccounts();
+    state.presenceAt = Date.now();
+    state.presenceAsked = new Set(accounts);
+    try {
+      const gatherToken = await gatherIdToken();
+      if (!gatherToken) return;
+      const r = await hubFetch("/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gatherToken, hidden: !showsPresence(), accounts }),
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const { active } = await r.json();
+      if (installed !== state) return;
+      state.modUsers = new Set(active);
+      renderModUsers();
+    } catch (e) {
+      console.warn("[GatherMods] presence unavailable:", e.message);
+    }
+  }
+
+  const accentProbe = document
+    .createElement("canvas")
+    .getContext("2d", { willReadFrequently: true });
+  let haloAccent = "";
+  // Draws the halo texture again when Gather's accent changes; true if it did.
+  function paintHalo(scene) {
+    const accent = getComputedStyle(document.documentElement)
+      .getPropertyValue("--theme-color-accent")
+      .trim();
+    if (accent === haloAccent && scene.textures.exists(HALO_KEY)) return false;
+    haloAccent = accent;
+    accentProbe.clearRect(0, 0, 1, 1);
+    accentProbe.fillStyle = accent || "#4257da";
+    accentProbe.fillRect(0, 0, 1, 1);
+    const [r, g, b] = accentProbe.getImageData(0, 0, 1, 1).data;
+    const lighter = (v) => Math.round(v + (255 - v) * 0.35);
+    const [w, h] = HALO_SIZE;
+    const texture = scene.textures.exists(HALO_KEY)
+      ? scene.textures.get(HALO_KEY)
+      : scene.textures.createCanvas(HALO_KEY, w, h);
+    const c = texture.getContext();
+    c.clearRect(0, 0, w, h);
+    c.save();
+    c.translate(w / 2, h / 2);
+    c.scale(1, h / w);
+    const glow = c.createRadialGradient(0, 0, 0, 0, 0, w / 2);
+    glow.addColorStop(0, `rgba(${lighter(r)},${lighter(g)},${lighter(b)},.75)`);
+    glow.addColorStop(0.55, `rgba(${r},${g},${b},.4)`);
+    glow.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    c.fillStyle = glow;
+    c.beginPath();
+    c.arc(0, 0, w / 2, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+    texture.refresh();
+    return true;
+  }
+
+  // The account whose name `el` shows, "" for any other text: React keeps the
+  // player in the props of the label's component.
+  const nameOwners = new WeakMap();
+  function nameOwner(el) {
+    const text = el.textContent.trim();
+    let owner = nameOwners.get(el);
+    if (owner?.text !== text) {
+      owner = { text, account: "" };
+      const key = Object.keys(el).find((k) => k.startsWith("__reactFiber$"));
+      for (let f = key && el[key], depth = 0; f && depth < 12; f = f.return, depth++) {
+        const user = f.memoizedProps?.spaceUser;
+        if (!user) continue;
+        if (user.name === text) owner.account = user.userAccountId;
+        break;
+      }
+      nameOwners.set(el, owner);
+    }
+    return owner.account;
+  }
+  // Text leaves of the map labels and of the people list.
+  const nameCandidates = () =>
+    [
+      document.querySelector(".gather-ui-container"),
+      ...(findSidebar()?.querySelectorAll("ul") ?? []),
+    ]
+      .filter(Boolean)
+      .flatMap((root) => [...root.querySelectorAll("div:not(:has(*)), span:not(:has(*))")]);
+
+  function renderModUsers() {
+    const users = installed.modUsers;
+    const scene = GD().PhaserManager.scene;
+    let redraw = paintHalo(scene);
+    for (const player of Object.values(PM().users)) {
+      const halo = player.getByName(HALO_KEY);
+      if (users.has(player.spaceUser?.userAccountId) === !!halo) continue;
+      redraw = true;
+      if (halo) {
+        halo.destroy();
+        continue;
+      }
+      // Under the feet, behind the avatar sprite.
+      const avatar = player.list.find((c) => c.type === "Sprite");
+      const x = avatar.x + avatar.displayWidth / 2;
+      const y = avatar.y + avatar.displayHeight - 5;
+      player.addAt(scene.add.image(x, y, HALO_KEY).setName(HALO_KEY), 0);
+    }
+    // Gather only draws when something moves.
+    if (redraw) scene.game.loop.tick();
+    for (const el of document.querySelectorAll("[data-gm-mod]"))
+      if (!users.has(el.dataset.gmMod)) delete el.dataset.gmMod;
+    if (!users.size) return;
+    for (const el of nameCandidates()) {
+      const account = nameOwner(el);
+      if (users.has(account) && el.dataset.gmMod !== account) el.dataset.gmMod = account;
+    }
+  }
+  function clearModUsers() {
+    for (const el of document.querySelectorAll("[data-gm-mod]")) delete el.dataset.gmMod;
+    const scene = GD().PhaserManager.scene;
+    for (const player of Object.values(PM().users)) player.getByName(HALO_KEY)?.destroy();
+    if (scene.textures.exists(HALO_KEY)) scene.textures.remove(HALO_KEY);
+    haloAccent = "";
+    scene.game.loop.tick();
+  }
+
+  // ===================
   // Settings
   // ===================
   let settingsTab = "modules";
@@ -917,6 +1074,10 @@
       <div class="gm-tab-pane" data-pane="modules">
         <div class="gm-window-body gm-modules-body">
           <div class="gm-hint gm-modules-hint">Only the modules you turn on run in Gather. Turning one off keeps its data (presets, saved locations…).</div>
+          <label class="gm-toggle gm-presence-toggle">
+            <span class="gm-toggle-text"><span class="gm-toggle-title">Show that I use the mod</span><span class="gm-hint">Others with the mod see a halo under your avatar and a puzzle piece after your name. Off, you still see theirs.</span></span>
+            <input type="checkbox" class="gm-switch" id="gm-show-presence" />
+          </label>
           <div id="gm-settings-modules"></div>
         </div>
         <div class="gm-window-foot">
@@ -962,6 +1123,12 @@
     modal.querySelector("#gm-expand-all").onclick = () => setCollapsed([]);
     modal.querySelector("#gm-collapse-all").onclick = () =>
       setCollapsed(installed?.sections.map((s) => s.id) ?? []);
+    const showPresence = modal.querySelector("#gm-show-presence");
+    showPresence.checked = showsPresence();
+    showPresence.onchange = () => {
+      writeJson(SHOW_PRESENCE_KEY, showPresence.checked);
+      syncPresence();
+    };
     modal.querySelector("#gm-auto-update").onchange = (e) =>
       sendToLauncher({ type: "set-auto-update", value: e.target.checked });
     modal.querySelector("#gm-check-update").onclick = () => {
@@ -1514,6 +1681,7 @@
     .gm-tab-pane.on { display:flex; }
     .gm-modules-body, .gm-news-body { gap:0; padding:4px 8px 8px; }
     .gm-modules-hint { padding:10px 12px 2px; }
+    .gm-presence-toggle { margin:6px 4px 0; }
     .gm-history-toggle { padding:10px 12px; font-size:12px; }
     #gm-update-list .gm-item { cursor:default; }
     #gm-update-list .gm-item:hover { background:none; }
@@ -1623,10 +1791,14 @@
     x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     zap: '<path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/>',
   };
-  const ICON_CSS = Object.entries(ICONS)
-    .map(([name, body]) => {
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
-      return `.gm-i[data-i="${name}"] { --gm-i: url("data:image/svg+xml,${encodeURIComponent(svg)}"); }`;
-    })
-    .join("\n");
+  const iconUrl = (name, strokeWidth = 1.75) => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  };
+  const ICON_CSS = [
+    ...Object.keys(ICONS).map((name) => `.gm-i[data-i="${name}"] { --gm-i: ${iconUrl(name)}; }`),
+    // Players running the mod: a puzzle piece after their name, in its color.
+    `[data-gm-mod]::after { content:""; display:inline-block; width:1em; height:1em; margin-left:.3em; vertical-align:-.15em; background:currentColor;
+      -webkit-mask:${iconUrl("puzzle", 2.25)} center / contain no-repeat; mask:${iconUrl("puzzle", 2.25)} center / contain no-repeat; }`,
+  ].join("\n");
 })();
