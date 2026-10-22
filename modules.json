@@ -795,6 +795,28 @@
           ]
         }
       ]
+    },
+    {
+      "id": "themes",
+      "kind": "module",
+      "name": "Seasonal themes",
+      "description": "Halloween, Christmas and Easter looks for Gather, on by themselves during their season: interface colors and logo, every object lightly decorated (autumn leaves and cobwebs, snow and ornaments, pastels and Easter eggs) and effects over the map. A switch brings back Gather's usual look until the next season. Only on your screen.",
+      "file": "src/modules/themes.js",
+      "icon": "paintbrush",
+      "version": "1.0.0",
+      "requires": { "map": "1.4.0" },
+      "changelog": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-22",
+          "changes": [
+            "New module: Halloween, Christmas and Easter looks. Gather's interface colors and buttons follow the season, and so does its logo (a pumpkin, a snowy logo, bunny ears).",
+            "Every object of the catalog is lightly decorated, computed in your browser: autumn leaves, night windows and cobwebs for Halloween; snow, ornaments and frosted windows for Christmas; pastels, flowers and Easter eggs for Easter.",
+            "Effects over the map: purple dusk, fog and bats; falling snow; drifting petals.",
+            "Each theme turns on by itself during its season: Halloween from Oct 1 to Nov 15, Christmas from Dec 1 to Jan 15, Easter from three weeks before Easter Sunday to two weeks after. Its switch brings back Gather's usual look until the next season, which turns on again. Outside these dates, Gather keeps its usual look."
+          ]
+        }
+      ]
     }
   ]
 }
