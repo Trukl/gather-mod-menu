@@ -61,19 +61,20 @@ Paste the content of [`gather-mod-menu.js`](gather-mod-menu.js) (all modules in 
 
 ## Modules
 
-| Module                            | What you get                                                      |
-| --------------------------------- | ----------------------------------------------------------------- |
-| [Teleport](#teleport)             | Teleport instead of walking: to your desk, a player, a saved spot |
-| [Fun](#fun)                       | Flee a player; animate map objects, seen by everyone              |
-| [Build](#build)                   | Free placement, Place on…, linked objects, bulk delete            |
-| [Outfits](#outfits)               | Saved outfits, plus “No outfit” and “Invisible”                   |
-| [Desks](#desks)                   | Desk decoration presets, with an automatic backup                 |
-| [Constructions](#constructions)   | Reusable groups of objects, placed in one click                   |
-| [Placed objects](#placed-objects) | Journal of what the mod placed, to delete it again                |
-| [Share presets](#share-presets)   | Export and import your presets as JSON                            |
-| [Community hub](#community-hub)   | Outfits, desks and constructions shared by others                 |
-| [Custom objects](#custom-objects) | Your own images on the map, seen by everyone                      |
-| [Auto away](#auto-away)           | Away or Busy when you leave your computer, back when you return   |
+| Module                              | What you get                                                      |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| [Teleport](#teleport)               | Teleport instead of walking: to your desk, a player, a saved spot |
+| [Fun](#fun)                         | Flee a player; animate map objects, seen by everyone              |
+| [Build](#build)                     | Free placement, Place on…, linked objects, bulk delete            |
+| [Outfits](#outfits)                 | Saved outfits, plus “No outfit” and “Invisible”                   |
+| [Desks](#desks)                     | Desk decoration presets, with an automatic backup                 |
+| [Constructions](#constructions)     | Reusable groups of objects, placed in one click                   |
+| [Placed objects](#placed-objects)   | Journal of what the mod placed, to delete it again                |
+| [Share presets](#share-presets)     | Export and import your presets as JSON                            |
+| [Community hub](#community-hub)     | Outfits, desks and constructions shared by others                 |
+| [Custom objects](#custom-objects)   | Your own images on the map, seen by everyone                      |
+| [Auto away](#auto-away)             | Away or Busy when you leave your computer, back when you return   |
+| [Seasonal themes](#seasonal-themes) | Halloween, Christmas and Easter looks for Gather and its objects  |
 
 Shared code lives in internal libraries (map helpers, map picking, previews, placements journal, job queue, hub API, path animation math), installed automatically when a module needs them.
 
@@ -199,6 +200,19 @@ Nothing is sent to Gather's server: people without the module see the map as it 
 ![Auto away](docs/media/auto-away.gif)
 
 <sub>Recorded in a browser tab with the computer's idle time simulated.</sub>
+
+### Seasonal themes
+
+Halloween, Christmas and Easter looks, only on your screen:
+
+- **Interface**: Gather's colors and buttons take the season's accent (pumpkin orange, Christmas red, Easter lilac) and its logo becomes a pumpkin, a snowy logo or a bunny.
+- **Every catalog object**, decorated in your browser from Gather's own images, so new objects follow: autumn leaves, night windows and cobwebs for Halloween; snow on top, ornaments and frosted windows for Christmas; pastels, flowers and Easter eggs for Easter.
+- **Over the map**: purple dusk, fog and bats; falling snow; drifting petals.
+- **Auto** (the default) follows the calendar: Halloween from Oct 15 to Nov 1, Christmas from Dec 1 to Jan 6, Easter from the Sunday before Easter to Easter Monday. You can also pick a theme, or Off.
+
+Walls, floors, avatars and custom objects keep their look, under the map effects.
+
+![Seasonal themes](docs/media/seasonal-themes.gif)
 
 ## Using the panel
 
