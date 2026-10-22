@@ -7,9 +7,17 @@
       "description": "Mods panel, settings, module manager and launcher bridge. Always installed.",
       "file": "src/core.js",
       "icon": "puzzle",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.7.0",
+          "date": "2026-10-22",
+          "changes": [
+            "Players running the mod are marked: a halo under their avatar, in Gather's accent color (so it follows Seasonal themes), and a puzzle piece after their name, on the map and in the people list.",
+            "While it runs, the mod tells the community hub every 2 minutes, with your Gather account, and learns which online players run it too. Turn off “Show that I use the mod” at the top of ⚙ Settings → Modules to hide yours; you still see the others."
+          ]
+        },
         {
           "version": "1.6.0",
           "date": "2026-10-17",
