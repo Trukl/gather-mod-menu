@@ -13,6 +13,8 @@
         {
           "version": "1.8.0",
           "date": "2026-10-26",
+          "breaking": true,
+          "notice": "Security update: the mod now sends your Gather sign-in token to the community hub only once, to sign in. Older versions sent it every 2 minutes, so they are turned off until you update.",
           "changes": [
             "Your Gather sign-in token is only sent to the community hub once, to sign in: presence pings and install reports now use the hub session.",
             "Hub requests can no longer be redirected by a value left in the page's storage (only a local test hub can replace the community hub).",
