@@ -29,6 +29,11 @@
   const SEEN_ANNOUNCEMENTS_KEY = STORAGE_PREFIX + "seenAnnouncements";
   const ANNOUNCEMENTS_POLL_MS = 10 * 60_000;
   const HUB_URL_KEY = STORAGE_PREFIX + "hubUrl";
+  const HUB_SESSION_KEY = STORAGE_PREFIX + "hubSession";
+  const RENEW_SESSION_BEFORE_MS = 24 * 3_600_000;
+  // Only a local hub (wrangler dev) can replace the default one, so a script
+  // can't send the mod's hub requests elsewhere.
+  const LOCAL_HUB_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
   const INSTALL_ID_KEY = STORAGE_PREFIX + "installId";
   const REPORTED_INSTALL_KEY = STORAGE_PREFIX + "reportedInstall";
   const SHOW_PRESENCE_KEY = STORAGE_PREFIX + "showPresence";
@@ -269,9 +274,13 @@
   }
 
   // ===================
-  // Community hub access, shared by the core (install reports) and hub-api
+  // Community hub access, shared by the core (install reports, presence) and
+  // hub-api
   // ===================
-  const hubUrl = () => localStorage.getItem(HUB_URL_KEY) || DEFAULT_HUB_URL;
+  const hubUrl = () => {
+    const local = localStorage.getItem(HUB_URL_KEY);
+    return LOCAL_HUB_RE.test(local ?? "") ? local : DEFAULT_HUB_URL;
+  };
   // The hub checks the versions of the running modules and answers 426 with
   // the breaking changes they miss.
   async function hubFetch(path, init = {}) {
@@ -309,6 +318,48 @@
       db.close();
     }
   }
+  // Gather's ID token is only sent to /auth, for a hub session (30 days) that
+  // every other request carries. Without the versions header, so an outdated
+  // mod still signs in for its install report.
+  let signingIn = null;
+  async function signIn() {
+    const gatherToken = await gatherIdToken();
+    if (!gatherToken) throw new Error("hub sign-in: no Gather session found");
+    const r = await fetch(hubUrl() + "/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gatherToken }),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error("hub sign-in: " + (body.error || "HTTP " + r.status));
+    writeJson(HUB_SESSION_KEY, { ...body, accountId: me().userAccountId });
+    return body.session;
+  }
+  // A session belongs to one Gather account: switching accounts signs in again.
+  function hubSession() {
+    const saved = readJson(HUB_SESSION_KEY, null);
+    if (
+      saved?.accountId === me().userAccountId &&
+      saved.expiresAt - Date.now() > RENEW_SESSION_BEFORE_MS
+    )
+      return Promise.resolve(saved.session);
+    signingIn ??= signIn().finally(() => (signingIn = null));
+    return signingIn;
+  }
+  const dropHubSession = () => localStorage.removeItem(HUB_SESSION_KEY);
+  // A request with the hub session; a rejected session (expired, secret
+  // changed) is replaced once.
+  async function signedHubFetch(path, init = {}, send = hubFetch) {
+    const attempt = async () =>
+      send(path, {
+        ...init,
+        headers: { ...init.headers, Authorization: "Bearer " + (await hubSession()) },
+      });
+    const r = await attempt();
+    if (r.status !== 401) return r;
+    dropHubSession();
+    return attempt();
+  }
 
   // Tells the hub which versions this install runs, on first install and after
   // each update, so the author knows how many installs run which version.
@@ -324,19 +375,21 @@
     if (Date.now() < reportRetryAt) return;
     reportRetryAt = Date.now() + REPORT_RETRY_MS;
     try {
-      const gatherToken = await gatherIdToken();
-      if (!gatherToken) return;
       if (!localStorage.getItem(INSTALL_ID_KEY))
         localStorage.setItem(INSTALL_ID_KEY, crypto.randomUUID());
-      const r = await fetch(hubUrl() + "/installs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gatherToken,
-          installId: localStorage.getItem(INSTALL_ID_KEY),
-          ...JSON.parse(report),
-        }),
-      });
+      const send = (path, init) => fetch(hubUrl() + path, init);
+      const r = await signedHubFetch(
+        "/installs",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            installId: localStorage.getItem(INSTALL_ID_KEY),
+            ...JSON.parse(report),
+          }),
+        },
+        send,
+      );
       if (!r.ok) throw new Error("HTTP " + r.status);
       localStorage.setItem(REPORTED_INSTALL_KEY, report);
     } catch (e) {
@@ -501,6 +554,8 @@
       closeModal,
       hubUrl,
       hubFetch,
+      hubSession,
+      dropHubSession,
       gatherIdToken,
       panel: () => document.getElementById("gather-mods-panel"),
       use: (dep) => state.apis.get(dep),
@@ -736,14 +791,29 @@
         .map((m) => [m.id, m.version]),
     );
   }
+  // A breaking changelog entry sent by the hub, null when malformed.
+  const cleanHubEntry = (e) =>
+    e?.breaking === true && /^\d+\.\d+\.\d+$/.test(e.version)
+      ? {
+          version: e.version,
+          breaking: true,
+          ...(typeof e.date === "string" && { date: e.date }),
+          ...(typeof e.notice === "string" && { notice: e.notice }),
+          changes: Array.isArray(e.changes) ? e.changes.filter((c) => typeof c === "string") : [],
+        }
+      : null;
+  const hubEntries = (fromHub, id) =>
+    Object.hasOwn(fromHub, id) && Array.isArray(fromHub[id])
+      ? fromHub[id].map(cleanHubEntry).filter(Boolean)
+      : [];
   function requiredUpdates() {
     const owned = ownedVersions();
-    const fromHub = readJson(UPDATE_REQUIRED_KEY, {});
+    const fromHub = readJson(UPDATE_REQUIRED_KEY, {}) ?? {};
     return catalogModules().flatMap((module) => {
       const version = owned[module.id];
       if (!version) return [];
       const entries = new Map();
-      for (const entry of [...(module.changelog ?? []), ...(fromHub[module.id] ?? [])])
+      for (const entry of [...(module.changelog ?? []), ...hubEntries(fromHub, module.id)])
         if (entry.breaking && isNewerVersion(entry.version, version))
           entries.set(entry.version, entry);
       const sorted = [...entries.values()].sort((a, b) =>
@@ -769,9 +839,11 @@
     registry.reload();
     return true;
   }
-  function onHubUpdateRequired({ modules }) {
-    const fromHub = readJson(UPDATE_REQUIRED_KEY, {});
-    for (const { id, changelog } of modules) fromHub[id] = changelog;
+  function onHubUpdateRequired(body) {
+    const fromHub = readJson(UPDATE_REQUIRED_KEY, {}) ?? {};
+    for (const m of Array.isArray(body?.modules) ? body.modules : [])
+      if (typeof m?.id === "string" && Array.isArray(m.changelog))
+        fromHub[m.id] = m.changelog.map(cleanHubEntry).filter(Boolean);
     writeJson(UPDATE_REQUIRED_KEY, fromHub);
     reloadIfRequiredChanged();
   }
@@ -937,12 +1009,10 @@
     state.presenceAt = Date.now();
     state.presenceAsked = new Set(accounts);
     try {
-      const gatherToken = await gatherIdToken();
-      if (!gatherToken) return;
-      const r = await hubFetch("/presence", {
+      const r = await signedHubFetch("/presence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gatherToken, hidden: !showsPresence(), accounts }),
+        body: JSON.stringify({ hidden: !showsPresence(), accounts }),
       });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const { active } = await r.json();

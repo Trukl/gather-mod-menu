@@ -3,6 +3,12 @@
 window.__gatherMods.define("map", (ctx) => {
   const TILE_PX = 32;
   const { GD } = ctx;
+  // Imported and hub layouts get the hub's limits (see gather-mod-hub).
+  const MAX_LAYOUT_OBJECTS = 200;
+  const MAX_LAYOUT_DEPTH = 5;
+  const MAX_LAYOUT_OFFSET = 100;
+  const MAX_NAME = 40;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   const scene = () => GD().PhaserManager.scene;
   const currentMapId = () => GD().Repos.gameSpace.currentMap.baseArea.mapId;
@@ -152,25 +158,41 @@ window.__gatherMods.define("map", (ctx) => {
     };
   }
 
-  // Validates an imported/hub layout item (variant + position + children).
-  function cleanItem(i) {
+  // Validates an imported/hub layout item (variant + position + children):
+  // `counter` counts the objects of the whole layout.
+  function cleanLayoutItem(i, depth, counter) {
     if (
-      typeof i?.variant !== "string" ||
+      depth > MAX_LAYOUT_DEPTH ||
+      ++counter.n > MAX_LAYOUT_OBJECTS ||
+      !UUID_RE.test(typeof i?.variant === "string" ? i.variant : "") ||
       !Number.isFinite(i.x) ||
       !Number.isFinite(i.y) ||
+      Math.abs(i.x) > MAX_LAYOUT_OFFSET ||
+      Math.abs(i.y) > MAX_LAYOUT_OFFSET ||
       !Array.isArray(i.children)
     )
       return null;
-    const children = i.children.map(cleanItem);
+    const children = i.children.map((c) => cleanLayoutItem(c, depth + 1, counter));
     if (children.includes(null)) return null;
     return {
       variant: i.variant,
-      name: typeof i.name === "string" ? i.name : "?",
+      name: typeof i.name === "string" ? i.name.slice(0, MAX_NAME) : "?",
       x: i.x,
       y: i.y,
       children,
     };
   }
+  const cleanItem = (i) => cleanLayoutItem(i, 1, { n: 0 });
+  // A whole imported/hub layout: 1 to 200 objects, null when invalid.
+  function cleanLayout(items) {
+    if (!Array.isArray(items) || !items.length) return null;
+    const counter = { n: 0 };
+    const clean = items.map((i) => cleanLayoutItem(i, 1, counter));
+    return clean.includes(null) ? null : clean;
+  }
+  // An imported/hub preset name, null when missing.
+  const cleanName = (name) =>
+    typeof name === "string" && name.trim() ? name.trim().slice(0, MAX_NAME) : null;
 
   async function createObject(item, parent, createdIds = []) {
     const R = GD().Repos;
@@ -299,6 +321,8 @@ window.__gatherMods.define("map", (ctx) => {
     isLiveObject,
     liveObjects,
     cleanItem,
+    cleanLayout,
+    cleanName,
     objectName,
     mapObjects,
     registerVirtualObjects,

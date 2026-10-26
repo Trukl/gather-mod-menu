@@ -145,13 +145,13 @@ window.__gatherMods.define("desks", (ctx) => {
   }
 
   function cleanDesk(p) {
-    if (typeof p?.name !== "string" || !Array.isArray(p.items)) return null;
-    const items = p.items.map(map.cleanItem);
-    if (items.includes(null)) return null;
+    const name = map.cleanName(p?.name);
+    const items = map.cleanLayout(p?.items);
+    if (!name || !items) return null;
     const valid = (n) => Number.isFinite(n) && n > 0 && n <= 50;
     return valid(p.area?.width) && valid(p.area?.height)
-      ? { name: p.name, items, area: { width: p.area.width, height: p.area.height } }
-      : { name: p.name, items };
+      ? { name, items, area: { width: p.area.width, height: p.area.height } }
+      : { name, items };
   }
   const deskPreview = (p) => previews.layoutPreviewHtml(p.items, p.area ?? DEFAULT_AREA);
 

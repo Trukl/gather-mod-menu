@@ -97,7 +97,7 @@ Shared code lives in internal libraries (map helpers, map picking, previews, pla
 - **Your animations**: click one to start or stop it for everyone; the pencil (on hover) edits it in the studio (the preview replaces it until you save).
 - **Others' animations** are listed with their author: the eye button hides one on your screen only.
 
-Animations are stored on the community hub and refreshed every minute. Nothing is sent to Gather's server: objects only move on screen. While one runs, the map is redrawn at 30 fps when Gather's window has the focus, 7 fps when it shows without the focus (like Gather itself), and not at all when it is hidden or minimized; animated custom images follow the same rule.
+Animations are stored on the community hub (10 per account on a floor) and refreshed every minute. Nothing is sent to Gather's server: objects only move on screen. While one runs, the map is redrawn at 30 fps when Gather's window has the focus, 7 fps when it shows without the focus (like Gather itself), and not at all when it is hidden or minimized; animated custom images follow the same rule.
 
 <details>
 <summary>Reorder and duplicate steps, hide others' animations</summary>
@@ -163,7 +163,7 @@ Browse, preview, add and publish outfits, desks and constructions shared by othe
 
 Your own images on the map, since Gather V2 cannot add custom objects. Everyone on the map who has this module sees them.
 
-- **New image**: an https image URL or an upload (png/jpeg/gif/webp, 512 KB max, stored on the community hub), dropped where you click (it follows the pointer). Set its width and height in tiles, its layer (floor: under everyone; sorted: avatars standing above its base line pass behind it, below it in front; above everything), opacity and collision (the tiles from the base line down block avatars).
+- **New image**: an https image URL or an upload (png/jpeg/gif/webp, 512 KB max, stored on the community hub), dropped where you click (it follows the pointer). Set its width and height in tiles, its layer (floor: under everyone; sorted: avatars standing above its base line pass behind it, below it in front; above everything), opacity and collision (the tiles from the base line down block avatars). Each account places 30 images at most per floor. Images are loaded without cookies nor referrer, and those over 8 MB or 16 megapixels are not shown.
 - **Restyle**: an image drawn over a real object, which keeps its collision and seats, and follows it when it is animated.
 - **The copy button** places copies like a Gather object: the ghost follows the pointer and every click places one more (for a restyle, every clicked object gets the image). Esc to stop.
 - **Plane**: “Back” and “Front” move the image behind or in front of the objects it overlaps, one at a time (the object it is set against is outlined in green); “Reset” goes back to its layer, or to the restyled object's plane.
@@ -259,9 +259,9 @@ Open them with ⚙ in the panel header. A dot there means updates or new modules
 
 ## Your data
 
-- **Sign-in**: Fun (animations), Custom objects and Community hub sign in to the hub with your Gather account. The mod reads Gather's ID token from the page and sends it once to the hub, which verifies it with Google's public keys and keeps only your Gather account id (not the token, not your email). What you publish belongs to that account, so you can manage it from the Gather app and the browser alike.
-- **Install reports**: on first install and after each update, the core sends the hub a random install id (kept in `localStorage`, one per Gather app or browser), whether the launcher is used, the installed module versions and your Gather ID token, verified the same way; the hub keeps your Gather account id with the report. Nothing else is sent, and nothing in between.
-- **Presence**: while the mod runs, the core sends the hub, every 2 minutes, your Gather ID token (verified the same way; the hub keeps your account id and the time) and the account ids of the space's online players; the hub answers which of them ran the mod in the last 5 minutes. With “Show that I use the mod” off, the hub deletes your record instead, so nobody sees your halo.
+- **Sign-in**: the core signs in to the hub with your Gather account, for Fun (animations), Custom objects, Community hub, install reports and presence. The mod reads Gather's ID token from the page and sends it once to the hub (`/auth`, and nowhere else), which verifies it with Google's public keys, keeps only your Gather account id (not the token, not your email) and answers a hub session that every other request carries. The hub address can't be changed, except for a local test hub (`http://localhost`). What you publish belongs to that account, so you can manage it from the Gather app and the browser alike.
+- **Install reports**: on first install and after each update, the core sends the hub a random install id (kept in `localStorage`, one per Gather app or browser), whether the launcher is used and the installed module versions, with the hub session; the hub keeps your Gather account id with the report. Nothing else is sent, and nothing in between.
+- **Presence**: while the mod runs, the core sends the hub, every 2 minutes, with the hub session (the hub keeps your account id and the time), the account ids of the space's online players; the hub answers which of them ran the mod in the last 5 minutes. With “Show that I use the mod” off, the hub deletes your record instead, so nobody sees your halo.
 - **New map versions**: what the mod tracks on the map (animations, placed objects, your desk objects, saved locations, custom images) survives a new version of the map published by a space admin. Gather then recreates every object with a new id but keeps its `hashIdentifier`, so the mod finds objects by that, or by type and position, and follows the map if it moved. Saved locations keep the nearest object as an anchor; custom images keep objects spread over the map and move by what most of them moved. Animations belong to the floor, not to a map version.
 
 ## Development

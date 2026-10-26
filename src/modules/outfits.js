@@ -5,6 +5,7 @@ window.__gatherMods.define("outfits", (ctx) => {
   const { OUTFIT_SLOTS } = previews;
   const OUTFITS_KEY = "gathermodv2:outfits";
   const BOWTIE_ID = "9bdd32b6-afa0-4325-ad5b-8702c9ac2eb3";
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const BUILTIN_OUTFITS = [
     { name: "No outfit", summary: "Empty, shows after reload", outfit: {}, icon: "ban" },
     { name: "Invisible", summary: "Bowtie", outfit: { other: BOWTIE_ID }, icon: "ghost" },
@@ -30,15 +31,17 @@ window.__gatherMods.define("outfits", (ctx) => {
   const applyOutfit = (preset) =>
     me().saveSpaceOutfit(Object.fromEntries(OUTFIT_SLOTS.map((s) => [s, preset.outfit[s]])));
 
+  // Imported and hub outfits get the hub's limits: wearable ids, a name of 40
+  // characters and a summary of 300.
   function cleanOutfit(p) {
-    if (typeof p?.name !== "string" || typeof p.outfit !== "object" || p.outfit === null)
-      return null;
+    const name = typeof p?.name === "string" ? p.name.trim().slice(0, 40) : "";
+    if (!name || typeof p.outfit !== "object" || p.outfit === null) return null;
     return {
-      name: p.name,
+      name,
       outfit: Object.fromEntries(
-        OUTFIT_SLOTS.filter((s) => typeof p.outfit[s] === "string").map((s) => [s, p.outfit[s]]),
+        OUTFIT_SLOTS.filter((s) => UUID_RE.test(p.outfit[s] ?? "")).map((s) => [s, p.outfit[s]]),
       ),
-      summary: typeof p.summary === "string" ? p.summary : "",
+      summary: typeof p.summary === "string" ? p.summary.slice(0, 300) : "",
     };
   }
 

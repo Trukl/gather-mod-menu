@@ -42,6 +42,9 @@ window.__gatherMods.define("custom", (ctx) => {
   let stamp = null;
   const objectsPath = (id = "") => `/objects/${shared.floorId}${id ? "/" + id : ""}`;
   const imageSrc = (url) => (url.startsWith("/images/") ? hubUrl() + url : url);
+  // A CSS url(), with the characters that could end it escaped.
+  const cssUrl = (url) =>
+    `url("${url.replace(/["\\\n\r]/g, (c) => `\\${c.charCodeAt(0).toString(16)} `)}")`;
 
   // ===================
   // Textures: one per image URL, loaded once. Animated GIF, WebP and PNG
@@ -53,6 +56,10 @@ window.__gatherMods.define("custom", (ctx) => {
   const MAX_FRAMES = 300;
   const MAX_ANIMATION_PIXELS = 16_000_000;
   const MAX_CANVAS_SIDE = 4096;
+  // Any https image can be shown: capped before it is decoded, so one can't
+  // freeze the tab of everyone on the floor.
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+  const MAX_IMAGE_PIXELS = 16_000_000;
   const MIN_FRAME_MS = 20;
   const textureKey = (url) => "gather-mods-custom:" + url;
   // The type from the first bytes: servers often send a generic one.
@@ -108,14 +115,17 @@ window.__gatherMods.define("custom", (ctx) => {
     durations.reduce((t, d) => (ends.push(t + d), t + d), 0);
     animations.set(key, { ends, total: ends[ends.length - 1] });
   }
-  function addStillTexture(key, blob) {
+  // The image element, once loaded: its size is known before it is decoded
+  // (only when drawn), so an oversized one is refused without decoding it.
+  function loadImage(blob) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const src = URL.createObjectURL(blob);
       img.onload = () => {
         URL.revokeObjectURL(src);
-        map.scene().textures.addImage(key, img);
-        resolve();
+        if (img.naturalWidth * img.naturalHeight > MAX_IMAGE_PIXELS)
+          reject(new Error("image too large"));
+        else resolve(img);
       };
       img.onerror = () => {
         URL.revokeObjectURL(src);
@@ -124,16 +134,34 @@ window.__gatherMods.define("custom", (ctx) => {
       img.src = src;
     });
   }
+  // Without cookies nor referrer, and read up to MAX_IMAGE_BYTES only.
+  async function fetchImage(url) {
+    const r = await fetch(imageSrc(url), { credentials: "omit", referrerPolicy: "no-referrer" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    if (Number(r.headers.get("Content-Length")) > MAX_IMAGE_BYTES)
+      throw new Error("image too large");
+    const reader = r.body.getReader();
+    const chunks = [];
+    let size = 0;
+    for (let chunk; !(chunk = await reader.read()).done; ) {
+      size += chunk.value.length;
+      if (size > MAX_IMAGE_BYTES) {
+        reader.cancel();
+        throw new Error("image too large");
+      }
+      chunks.push(chunk.value);
+    }
+    return new Blob(chunks, { type: r.headers.get("Content-Type") || "" });
+  }
   async function loadTexture(url) {
     const key = textureKey(url);
     try {
-      const r = await fetch(imageSrc(url));
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      const blob = await r.blob();
+      const blob = await fetchImage(url);
+      const img = await loadImage(blob);
       const animation = await decodeAnimation(blob).catch(() => null);
       if (!map.scene().textures.exists(key)) {
         if (animation) addAnimatedTexture(key, animation);
-        else await addStillTexture(key, blob);
+        else map.scene().textures.addImage(key, img);
       }
       textures.set(url, "ready");
       renderAll();
@@ -894,7 +922,7 @@ window.__gatherMods.define("custom", (ctx) => {
       ? own
           .map(
             (o) =>
-              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id ? " is-on" : ""}" data-id="${escapeHtml(o.id)}" title="Hover to see it on the map, outlined in red"><span class="gm-thumb" style="background-image:url(&quot;${escapeHtml(imageSrc(o.imageUrl))}&quot;)"></span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(o.name)}</span></div><span class="gm-tail hide-on-hover">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><div class="gm-actions"><button class="gm-iconbtn${o.id === stamp?.id ? " on" : ""}" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}"><i class="gm-i sm" data-i="copy"></i></button><button class="gm-iconbtn" data-edit="${escapeHtml(o.id)}" title="Edit this object"><i class="gm-i sm" data-i="pencil"></i></button><button class="gm-iconbtn gm-danger" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone"><i class="gm-i sm" data-i="trash-2"></i></button></div></div>`,
+              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id ? " is-on" : ""}" data-id="${escapeHtml(o.id)}" title="Hover to see it on the map, outlined in red"><span class="gm-thumb" style="background-image:${escapeHtml(cssUrl(imageSrc(o.imageUrl)))}"></span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(o.name)}</span></div><span class="gm-tail hide-on-hover">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><div class="gm-actions"><button class="gm-iconbtn${o.id === stamp?.id ? " on" : ""}" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}"><i class="gm-i sm" data-i="copy"></i></button><button class="gm-iconbtn" data-edit="${escapeHtml(o.id)}" title="Edit this object"><i class="gm-i sm" data-i="pencil"></i></button><button class="gm-iconbtn gm-danger" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone"><i class="gm-i sm" data-i="trash-2"></i></button></div></div>`,
           )
           .join("")
       : '<div class="gm-empty">You have no custom objects on this map</div>';

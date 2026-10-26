@@ -156,9 +156,9 @@ window.__gatherMods.define("constructions", (ctx) => {
   }
 
   function cleanItems(p) {
-    if (typeof p?.name !== "string" || !Array.isArray(p.items)) return null;
-    const items = p.items.map(map.cleanItem);
-    return items.includes(null) ? null : { name: p.name, items };
+    const name = map.cleanName(p?.name);
+    const items = map.cleanLayout(p?.items);
+    return name && items ? { name, items } : null;
   }
 
   let root = null;

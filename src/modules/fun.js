@@ -514,11 +514,16 @@ window.__gatherMods.define("fun", (ctx) => {
     return items.map((a) => (claimed.includes(a.id) ? { ...a, mine: true } : a));
   }
   // Animations saved per map version with object ids are moved to the floor,
-  // with stable references, while that version is the current one.
+  // with stable references, while that version is the current one. The hub
+  // only moves ours (or nobody's, `movable`), or those we have the token of.
   async function migrateLegacyAnimations(mapId, legacy) {
-    const items = legacy.map((a) => ({
+    const tokens = readJson(LEGACY_TOKENS_KEY, {});
+    const ours = legacy.filter((a) => a.movable || tokens[a.id]);
+    if (!ours.length) return null;
+    const items = ours.map((a) => ({
       id: a.id,
       objects: map.liveObjects(a.ids).map(map.objectRef),
+      ...(tokens[a.id] && { token: tokens[a.id] }),
     }));
     return api.request(animationsPath("migrate"), {
       method: "POST",
@@ -540,9 +545,8 @@ window.__gatherMods.define("fun", (ctx) => {
       const listed = await api.request(`${animationsPath()}?map=${mapId}`);
       if (floorId !== shared.floorId) return;
       shared.clockOffset = listed.now - (sentAt + Date.now()) / 2;
-      const { items } = listed.legacy
-        ? await migrateLegacyAnimations(mapId, listed.legacy)
-        : listed;
+      const migrated = listed.legacy && (await migrateLegacyAnimations(mapId, listed.legacy));
+      const { items } = migrated || listed;
       shared.fetched = await claimLegacyAnimations(floorId, items);
       if (shared.status.startsWith("Hub")) shared.status = "";
     } catch (e) {
