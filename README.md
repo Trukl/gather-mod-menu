@@ -93,7 +93,7 @@ Shared code lives in internal libraries (map helpers, map picking, previews, pla
 - **Animation studio**: a floating window. Select objects, then click points on the map: each point is a step, drawn as a dashed path with numbered points you can drag.
 - **Each step** has a shape (line, wave, arc, orbit around a point, or your own `x(t)` and `y(t)` formulas), an easing (smooth, overshoot, bounce, elastic, or your own `f(t)`), a duration, a pause and a turn. The arrow buttons reorder steps, the copy button duplicates one.
 - **Block or each**: the selection moves as one block, turning as one piece around its center, or each object on its own, one after the other with a stagger.
-- **At the end** the path loops, plays back (ping-pong) or stops. Preview with play, pause and a timeline, then save.
+- **At the end** the path loops, plays back (ping-pong) or stops. **Close the loop** adds a last step from the last point back to the start, so a U of three points loops as a square. Preview with play, pause and a timeline, then save.
 - **Your animations**: click one to start or stop it for everyone; the pencil (on hover) edits it in the studio (the preview replaces it until you save).
 - **Others' animations** are listed with their author: the eye button hides one on your screen only.
 
