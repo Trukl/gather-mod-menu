@@ -572,10 +572,11 @@ window.__gatherMods.define("themes", (ctx) => {
   const style = document.createElement("style");
   const fx = document.createElement("div");
   fx.id = "gm-theme-fx";
-  // First in the map's container, under Gather's labels and bubbles.
+  // First in the map's container, under Gather's labels and bubbles. The map
+  // has no container while another tab of Gather (chat, calendar…) is shown.
   function placeFx() {
     const parent = map.scene().game.canvas.parentElement;
-    if (parent.firstElementChild !== fx) parent.prepend(fx);
+    if (parent && parent.firstElementChild !== fx) parent.prepend(fx);
   }
   // The season `date` falls in: its theme, first and last day, and a key for
   // this year's occurrence.

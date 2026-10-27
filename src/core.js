@@ -467,6 +467,9 @@
       modUsers: new Set(),
       presenceAt: 0,
       presenceAsked: new Set(),
+      panel: null,
+      panelObserver: null,
+      panelFrame: 0,
     };
     installed = state;
     const blocked = blockedModules(state.required);
@@ -489,13 +492,23 @@
     trackInstalledVersions();
     window.addEventListener("gathermods:launcher-state", onLauncherState);
     window.addEventListener("gathermods:launcher-diff", renderReviewDiff);
+    // Gather rebuilds the sidebar when the map tab comes back: the panel is
+    // put back before the next paint instead of on the next tick.
+    state.panelObserver = new MutationObserver(() => {
+      if (state.panel?.isConnected || state.panelFrame) return;
+      state.panelFrame = requestAnimationFrame(() => {
+        state.panelFrame = 0;
+        ensurePanel();
+      });
+    });
+    state.panelObserver.observe(document.body, { childList: true, subtree: true });
     state.tick = setInterval(() => {
       ensurePanel();
-      const panel = document.getElementById("gather-mods-panel");
-      if (panel) applyTheme(panel);
+      if (state.panel?.isConnected) applyTheme(state.panel);
       renderSectionStatus();
       for (const fn of state.tickers) runSafely(fn);
       showAnnouncements(false);
+      showNewModules();
       if (presenceDue(state)) syncPresence();
       renderModUsers();
     }, TICK_MS);
@@ -505,6 +518,7 @@
     }
     showUpdateRequired();
     showNews();
+    showNewModules();
     fetchAnnouncements();
     state.announcementsPoll = setInterval(fetchAnnouncements, ANNOUNCEMENTS_POLL_MS);
     console.log(`[GatherMods] installed: ${[...state.apis.keys()].join(", ") || "core only"}`);
@@ -522,7 +536,9 @@
     clearModUsers();
     window.removeEventListener("gathermods:launcher-state", onLauncherState);
     window.removeEventListener("gathermods:launcher-diff", renderReviewDiff);
-    document.getElementById("gather-mods-panel")?.remove();
+    state.panelObserver.disconnect();
+    cancelAnimationFrame(state.panelFrame);
+    state.panel?.remove();
     document.getElementById(STYLE_ID)?.remove();
     closeModal();
   }
@@ -557,7 +573,7 @@
       hubSession,
       dropHubSession,
       gatherIdToken,
-      panel: () => document.getElementById("gather-mods-panel"),
+      panel: () => state.panel,
       use: (dep) => state.apis.get(dep),
       has: (dep) => state.apis.has(dep),
       style: (css) => state.styles.push(css),
@@ -589,18 +605,30 @@
   const getCollapsed = () => readJson(SECTIONS_KEY, {}).collapsed ?? [];
   function setCollapsed(collapsed) {
     writeJson(SECTIONS_KEY, { ...readJson(SECTIONS_KEY, {}), collapsed });
-    document.querySelectorAll("#gather-mods-panel .gm-sec").forEach((el) => {
+    installed?.panel?.querySelectorAll(".gm-sec").forEach((el) => {
       el.classList.toggle("open", !collapsed.includes(el.dataset.section));
     });
     renderSectionStatus();
   }
   const moduleIcon = (id) => catalogModules().find((m) => m.id === id)?.icon ?? "puzzle";
 
+  // Built once, then moved back into the sidebar whenever Gather rebuilds it,
+  // with its sections as they were. Only on the map tab: the other tabs have a
+  // sidebar with the same search field, but no map.
   function ensurePanel() {
-    if (!installed || document.getElementById("gather-mods-panel")) return;
+    if (!installed || installed.panel?.isConnected) return;
+    if (!GD().PhaserManager.scene.game.canvas.isConnected) return;
     const sidebar = findSidebar();
     if (!sidebar) return;
-    const panel = document.createElement("div");
+    if (installed.panel) {
+      sidebar.insertBefore(installed.panel, sidebar.lastElementChild);
+      applyTheme(installed.panel);
+      renderSectionStatus();
+      renderUpdateDot();
+      renderAnnouncements();
+      return;
+    }
+    const panel = (installed.panel = document.createElement("div"));
     panel.id = "gather-mods-panel";
     if (localStorage.getItem(PANEL_COLLAPSED_KEY) === "true") panel.classList.add("collapsed");
     const collapsed = getCollapsed();
@@ -690,6 +718,7 @@
     if (requiredUpdateStep) return continueRequiredUpdate();
     if (reloadIfRequiredChanged()) return;
     showNews();
+    showNewModules();
   }
 
   // ===================
@@ -769,6 +798,48 @@
     modal.querySelector("#gm-news-ok").onclick = closeModal;
     const review = modal.querySelector("#gm-news-review");
     if (review) review.onclick = openReviewModal;
+  }
+
+  // ===================
+  // New modules — a module published since the user last looked, and not
+  // installed, offers itself once in a window.
+  // ===================
+  function showNewModules() {
+    if (document.getElementById("gather-mods-modal") || launcherLost) return;
+    const fresh = unseenModules().filter((m) => !selectedModules().includes(m.id));
+    if (!fresh.length) return;
+    writeJson(SEEN_MODULES_KEY, [...new Set([...seenModules(), ...fresh.map((m) => m.id)])]);
+    renderUpdateDot();
+    const nameOf = (id) => catalogModules().find((m) => m.id === id)?.name ?? id;
+    const one = fresh.length === 1;
+    const rowHtml = (m) => {
+      const libs = [...requiredClosure([m.id])].filter(
+        (dep) => dep !== m.id && dep !== "core" && !installedVersion(dep),
+      );
+      return `
+      <div class="gm-mod gm-entry">
+        <span class="gm-mod-icon"><i class="gm-i" data-i="${escapeHtml(m.icon ?? "puzzle")}"></i></span>
+        <div class="gm-mod-main">
+          <div class="gm-mod-name">${escapeHtml(m.name)}<span class="gm-mod-version">${escapeHtml(m.version)}</span><span class="gm-spacer"></span>${one ? "" : `<button class="gm-btn gm-sm gm-primary" data-install="${escapeHtml(m.id)}">Install</button>`}</div>
+          <div class="gm-mod-desc">${escapeHtml(m.description)}</div>
+          ${libs.length ? `<span class="gm-hint">Also installs: ${escapeHtml(libs.map(nameOf).join(", "))}.</span>` : ""}
+        </div>
+      </div>`;
+    };
+    const modal = openMessage({
+      icon: "sparkles",
+      title: one ? `New module: ${fresh[0].name}` : `${fresh.length} new modules`,
+      html: `<div class="gm-entries">${fresh.map(rowHtml).join("")}</div>`,
+      actions: `<button class="gm-btn gm-ghost" id="gm-new-later">Not now</button>${one ? `<button class="gm-btn gm-primary" data-install="${escapeHtml(fresh[0].id)}">Install</button>` : ""}`,
+    });
+    modal.querySelector("#gm-new-later").onclick = closeModal;
+    modal.querySelectorAll("[data-install]").forEach((button) => {
+      button.onclick = () => {
+        button.disabled = true;
+        button.textContent = "Installing…";
+        setSelectedModules([...selectedModules(), button.dataset.install]);
+      };
+    });
   }
 
   // ===================

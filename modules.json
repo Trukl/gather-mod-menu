@@ -7,9 +7,17 @@
       "description": "Mods panel, settings, module manager and launcher bridge. Always installed.",
       "file": "src/core.js",
       "icon": "puzzle",
-      "version": "1.8.0",
+      "version": "1.9.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.9.0",
+          "date": "2026-10-27",
+          "changes": [
+            "The Mods panel no longer reloads when you come back to the map from another tab of Gather (chat, calendar…): it is back right away, as you left it. It no longer shows up in those other tabs.",
+            "A new module offers itself once in a window, with its description and an Install button, instead of only a “New” badge in the settings."
+          ]
+        },
         {
           "version": "1.8.0",
           "date": "2026-10-26",
@@ -872,9 +880,16 @@
       "description": "Halloween, Christmas and Easter looks for Gather, on by themselves during their season: interface colors and logo, every object lightly decorated (autumn leaves and cobwebs, snow and ornaments, pastels and Easter eggs) and effects over the map. A switch brings back Gather's usual look until the next season. Only on your screen.",
       "file": "src/modules/themes.js",
       "icon": "paintbrush",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "requires": { "map": "1.4.0" },
       "changelog": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-27",
+          "changes": [
+            "No more errors in the console while another tab of Gather (chat, calendar…) hides the map."
+          ]
+        },
         {
           "version": "1.0.0",
           "date": "2026-10-22",
