@@ -1,8 +1,14 @@
 name: Release mod
 
-# Manual only (`npm run release` or “Run workflow”), so several merged pull
-# requests go out as one release.
+# Runs once the Bundle workflow has updated gather-mod-menu.js on main, so
+# every merged pull request that changes a module is released. Bundle only
+# runs on pushes to main: a pull request can't start this. Also by hand
+# (`npm run release`, “Run workflow”), with a dry run.
 on:
+  workflow_run:
+    workflows: [Bundle]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -19,7 +25,7 @@ concurrency:
 
 jobs:
   release:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: read

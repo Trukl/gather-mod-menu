@@ -277,7 +277,7 @@ scripts/release.mjs       catalog checks, signing and upload (run by the CI)
 scripts/check.mjs         pull request check (`npm run check`)
 scripts/build-launcher-app.mjs   builds “Gather Mods.app”
 updates/                  Cloudflare worker: GET /catalog, GET /modules/:hash, POST /release (CI only)
-.github/workflows/        check.yml (pull requests), bundle.yml (main), release.yml (manual)
+.github/workflows/        check.yml (pull requests), bundle.yml (main), release.yml (after each bundle, or by hand)
 docs/media/               README recordings
 ```
 
@@ -296,7 +296,7 @@ The repo is public but only maintainers can push to it: contribute through a for
 3. Test it: `npm run bundle`, then paste `gather-mod-menu.js` into the DevTools console of an `app.v2.gather.town` tab (see [Browser](#browser-without-the-launcher)). Before committing, `git checkout gather-mod-menu.js` drops the generated file.
 4. Push the branch to your fork and open a pull request against `main`, with a GIF or video of the change when it shows on screen.
 
-The `Check` workflow runs on every pull request (`npm run check` runs it locally): `modules.json` is valid, every module whose code changed has a higher version with its changelog entry, the code parses, and the bundle is left out. A maintainer reviews and merges it; releases are published separately.
+The `Check` workflow runs on every pull request (`npm run check` runs it locally): `modules.json` is valid, every module whose code changed has a higher version with its changelog entry, the code parses, and the bundle is left out. A maintainer reviews and merges it, which releases it.
 
 Changes to the community hub (shared presets, animations, custom objects API) go to [gather-mod-hub](https://github.com/Trukl/gather-mod-hub), the same way.
 
@@ -306,12 +306,12 @@ Changes to the community hub (shared presets, animations, custom objects API) go
    - Start a change with `Removed:` when it takes something away, so it shows in red.
    - For news every user must read (breaking change, action needed), add a short `"notice"` (300 characters max) to that changelog entry: it opens the “Mod news” window once.
    - When older versions of the module no longer work (new data format, changed hub API), also add `"breaking": true` to that entry: every install below that version must update or disable the module. Keep it for real breakages: it stops every outdated install at once.
-2. Commit on a branch and open a pull request: `main` only accepts pull requests, once the `Check` workflow passes. After the merge, the `Bundle` workflow regenerates `gather-mod-menu.js` on `main`. Merging does not publish anything.
-3. Release when you want, everything merged since the last release at once: `npm run release` (or “Run workflow” on the `Release mod` workflow in GitHub Actions). It signs and publishes the modules that changed, then creates a [GitHub release](https://github.com/Trukl/gather-mod-menu/releases) listing them with their changelog. Retry a failed run with `gh run rerun <id>`.
+2. Commit on a branch and open a pull request: `main` only accepts pull requests, once the `Check` workflow passes.
+3. Merge it. The `Bundle` workflow regenerates `gather-mod-menu.js` on `main`, then the `Release mod` workflow signs and publishes the modules that changed and creates a [GitHub release](https://github.com/Trukl/gather-mod-menu/releases) listing them with their changelog. Merges in a row are released one after the other. `npm run release` (or “Run workflow” on `Release mod`) runs it by hand; retry a failed run with `gh run rerun <id>`.
 
 `npm run release:dry-run` runs the same workflow on `main` without publishing; the signed release is available as a workflow artifact.
 
-The release is refused (red run, nothing published) when the bundle is out of date (the `Bundle` workflow hasn't finished yet), a module's code changed without a higher version, a version changed without code change, a version goes backwards, a changelog entry is missing, or no module changed. No signing key exists locally: only the CI publishes.
+The release is refused (red run, nothing published) when the bundle is out of date (the `Bundle` workflow hasn't finished yet), a module's code changed without a higher version, a version changed without code change, a version goes backwards, or a changelog entry is missing. When no module changed, it publishes nothing and stops without error. No signing key exists locally: only the CI publishes.
 
 ## Update security
 

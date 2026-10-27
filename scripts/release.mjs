@@ -23,7 +23,12 @@ const published = await fetch(`${UPDATES_URL}/catalog`).then((r) => (r.ok ? r.js
 const publishedModules = published ? JSON.parse(published.manifest).modules : null;
 const { errors, changed } = releaseChanges(modules, publishedModules);
 if (errors.length) throw new Error("Release refused:\n- " + errors.join("\n- "));
-if (!changed.length) throw new Error("Nothing to release: no module changed");
+// The release runs after every bundle of main: a merge that changes no module
+// is not an error.
+if (!changed.length) {
+  console.log("Nothing to release: no module changed");
+  process.exit(0);
+}
 console.log("Changes:\n- " + changed.join("\n- "));
 
 const manifest = JSON.stringify({
