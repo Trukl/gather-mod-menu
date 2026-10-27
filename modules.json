@@ -347,9 +347,16 @@
       "description": "Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects follow a path of steps (lines, waves, arcs, orbits, formulas) with easings, pauses and turns, seen by everyone with this module.",
       "file": "src/modules/fun.js",
       "icon": "sparkles",
-      "version": "1.11.0",
+      "version": "1.12.0",
       "requires": { "map": "1.4.0", "map-pick": "1.2.0", "hub-api": "1.1.0", "motion": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.12.0",
+          "date": "2026-10-27",
+          "changes": [
+            "“Close the loop” in the animation studio: a last step goes from the last point back to where the path starts, as if you put a last point on the start. With Loop, the objects go round: three points in a U make a square. Points you add afterwards go before it, and older versions play it the same."
+          ]
+        },
         {
           "version": "1.11.0",
           "date": "2026-10-26",

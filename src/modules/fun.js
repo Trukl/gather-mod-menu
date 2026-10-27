@@ -111,6 +111,10 @@ window.__gatherMods.define("fun", (ctx) => {
   const MAX_STEPS = 20;
   const LEGACY_LABELS = { orbit: "Orbit", line: "Back and forth", wave: "Wave" };
   const SHAPE_LABELS = { line: "Line", wave: "Wave", arc: "Arc", orbit: "Orbit", custom: "Custom" };
+  // A last line back to where the path starts closes the loop. Saved as a plain
+  // step, so older versions play it the same.
+  const isReturn = (s) => s.shape === "line" && s.to?.x === 0 && s.to?.y === 0;
+  const isClosed = (steps) => steps.length > 1 && isReturn(steps[steps.length - 1]);
   // What a step saves besides shape, easing, duration, pause and rotate.
   const SHAPE_FIELDS = {
     line: ["to"],
@@ -369,8 +373,10 @@ window.__gatherMods.define("fun", (ctx) => {
       const origin = draftOrigin();
       if (origin && draft.steps.length < MAX_STEPS) {
         const p = map.pointerWorldPoint(e);
-        draft.steps.push(newStep({ x: p.x - origin.x, y: p.y - origin.y }));
-        selectStep(draft.steps.length - 1);
+        // A closed loop keeps its way back to the start last.
+        const at = isClosed(draft.steps) ? draft.steps.length - 1 : draft.steps.length;
+        draft.steps.splice(at, 0, newStep({ x: p.x - origin.x, y: p.y - origin.y }));
+        selectStep(at);
         changed();
       }
       if (!origin || draft.steps.length >= MAX_STEPS) pick.stop("anim-point");
@@ -637,6 +643,7 @@ window.__gatherMods.define("fun", (ctx) => {
         ${prop("Order", `<select class="gm-select" data-k="order">${options(Object.entries(ORDERS))}</select>`)}
       </div>
       ${prop("At the end", '<div class="gm-seg" data-k="end"><button data-v="loop" title="Start again from the beginning">Loop</button><button data-v="pingpong" title="Go back along the path, then again">Ping-pong</button><button data-v="once" title="Stay at the last point">Once</button></div>')}
+      <label class="gm-prop" title="A last step goes from the last point back to where the path starts, as if you put a last point on the start: with Loop, the objects go round"><span>Close the loop</span><input type="checkbox" class="gm-switch" data-k="closed" /></label>
       <div class="gm-sub">Steps<span class="gm-spacer"></span><button class="gm-btn gm-ghost gm-sm" data-k="add"></button></div>
       <div class="gm-list gm-st-steps" data-k="steps"></div>
       <div class="gm-card gm-st-card" data-k="step">
@@ -766,8 +773,14 @@ window.__gatherMods.define("fun", (ctx) => {
       const value = Number(el.value);
       if (el.value === "" || !Number.isFinite(value)) return;
       draft.stagger.delay = Math.min(Math.max(value, 0), 60);
-    }
-    if (key === "order" || key === "delay" || (el.dataset.f && setStepField(el))) changed();
+    } else if (key === "closed") setClosed(el.checked);
+    if (
+      key === "order" ||
+      key === "delay" ||
+      key === "closed" ||
+      (el.dataset.f && setStepField(el))
+    )
+      changed();
   }
   function setStepField(el) {
     const step = draft.steps[draft.selected];
@@ -822,6 +835,20 @@ window.__gatherMods.define("fun", (ctx) => {
     const kept = draft.selected > i ? draft.selected - 1 : draft.selected;
     selectStep(Math.max(0, Math.min(kept, draft.steps.length - 1)));
   }
+  // The way back to the start goes at the pace of the step before it.
+  function setClosed(on) {
+    const { steps } = draft;
+    if (on === isClosed(steps)) return;
+    if (!on) return deleteStep(steps.length - 1);
+    const last = steps[steps.length - 1];
+    steps.push({
+      ...newStep({ x: 0, y: 0 }),
+      duration: last.duration,
+      easing: last.easing,
+      easingExpr: last.easingExpr,
+    });
+    selectStep(steps.length - 1);
+  }
   // Steps are points on the map: moving one changes the order they are reached in.
   function moveStep(i, by) {
     const j = i + by;
@@ -845,13 +872,13 @@ window.__gatherMods.define("fun", (ctx) => {
   const stepAction = (action, title, icon) =>
     `<button class="gm-iconbtn${action === "del" ? " gm-danger" : ""}" data-act="${action}" title="${title}">${icon}</button>`;
   const stepRow = (s, i, steps) =>
-    `<div class="gm-item${i === draft.selected ? " is-on show-actions" : ""}" data-step="${i}"><span class="gm-avatar gm-st-num">${i + 1}</span><div class="gm-item-text"><span class="gm-item-title">${SHAPE_LABELS[s.shape]} · ${seconds(s.duration)}${s.pause ? ` + ${seconds(s.pause)} pause` : ""}${s.rotate ? ` · ${+s.rotate.toFixed(1)}°` : ""}</span></div><div class="gm-actions">${i > 0 ? stepAction("up", "Move up: reached earlier", '<i class="gm-i sm" data-i="arrow-up"></i>') : ""}${i < steps.length - 1 ? stepAction("down", "Move down: reached later", '<i class="gm-i sm" data-i="arrow-down"></i>') : ""}${steps.length < MAX_STEPS ? stepAction("copy", "Duplicate: the same move again from where this step ends", '<i class="gm-i sm" data-i="copy"></i>') : ""}${stepAction("del", "Delete this step", '<i class="gm-i sm" data-i="trash-2"></i>')}</div></div>`;
+    `<div class="gm-item${i === draft.selected ? " is-on show-actions" : ""}" data-step="${i}"><span class="gm-avatar gm-st-num">${i + 1}</span><div class="gm-item-text"><span class="gm-item-title">${i === steps.length - 1 && isClosed(steps) ? "Back to start" : SHAPE_LABELS[s.shape]} · ${seconds(s.duration)}${s.pause ? ` + ${seconds(s.pause)} pause` : ""}${s.rotate ? ` · ${+s.rotate.toFixed(1)}°` : ""}</span></div><div class="gm-actions">${i > 0 ? stepAction("up", "Move up: reached earlier", '<i class="gm-i sm" data-i="arrow-up"></i>') : ""}${i < steps.length - 1 ? stepAction("down", "Move down: reached later", '<i class="gm-i sm" data-i="arrow-down"></i>') : ""}${steps.length < MAX_STEPS ? stepAction("copy", "Duplicate: the same move again from where this step ends", '<i class="gm-i sm" data-i="copy"></i>') : ""}${stepAction("del", "Delete this step", '<i class="gm-i sm" data-i="trash-2"></i>')}</div></div>`;
   function studioStatus(session) {
     if (draft.status) return draft.status;
     if (session === "anim-select")
       return "Click objects on the map or drag a box around them, then Done.";
     if (session === "anim-point")
-      return `Click the map to add point ${draft.steps.length + 1}. Esc or Done to stop.`;
+      return `Click the map to add point ${draft.steps.length + (isClosed(draft.steps) ? 0 : 1)}. Esc or Done to stop.`;
     if (!draft.ids.length) return "Select the objects to animate.";
     if (!draft.steps.length) return "Add points on the map: the objects go from one to the next.";
     const bad = draft.steps.findIndex((s) => !isValidStep(s));
@@ -870,6 +897,8 @@ window.__gatherMods.define("fun", (ctx) => {
     $("select").classList.toggle("gm-primary", session === "anim-select");
     for (const k of ["mode", "end"])
       for (const b of $(k).children) b.classList.toggle("on", b.dataset.v === draft[k]);
+    $("closed").checked = isClosed(steps);
+    $("closed").disabled = !steps.length || (!isClosed(steps) && steps.length >= MAX_STEPS);
     $("stagger").style.display = draft.mode === "each" ? "" : "none";
     $("steps").innerHTML = steps.length
       ? steps.map(stepRow).join("")
