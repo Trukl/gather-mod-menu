@@ -7,9 +7,20 @@
       "description": "Mods panel, settings, module manager and launcher bridge. Always installed.",
       "file": "src/core.js",
       "icon": "puzzle",
-      "version": "1.7.0",
+      "version": "1.8.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.8.0",
+          "date": "2026-10-26",
+          "breaking": true,
+          "notice": "Security update: the mod now sends your Gather sign-in token to the community hub only once, to sign in. Older versions sent it every 2 minutes, so they are turned off until you update.",
+          "changes": [
+            "Your Gather sign-in token is only sent to the community hub once, to sign in: presence pings and install reports now use the hub session.",
+            "Hub requests can no longer be redirected by a value left in the page's storage (only a local test hub can replace the community hub).",
+            "A malformed answer of the hub can no longer keep the mod from starting."
+          ]
+        },
         {
           "version": "1.7.0",
           "date": "2026-10-22",
@@ -101,9 +112,16 @@
       "name": "Map helpers",
       "description": "Shared map object helpers.",
       "file": "src/lib/map.js",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.5.0",
+          "date": "2026-10-26",
+          "changes": [
+            "Imported and community hub desks and constructions get the hub's limits: 200 objects, 5 nesting levels, positions within 100 tiles, names of 40 characters."
+          ]
+        },
         {
           "version": "1.4.0",
           "date": "2026-10-21",
@@ -248,9 +266,16 @@
       "name": "Hub API",
       "description": "Shared requests to the community hub, signed in with your Gather account.",
       "file": "src/lib/hub-api.js",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "requires": {},
       "changelog": [
+        {
+          "version": "1.4.0",
+          "date": "2026-10-26",
+          "changes": [
+            "Uses the core's hub session, shared with presence pings and install reports."
+          ]
+        },
         {
           "version": "1.3.0",
           "date": "2026-10-13",
@@ -322,9 +347,16 @@
       "description": "Gimmicks. Flee mode: keep your distance from a chosen player. Animations: make objects follow a path of steps (lines, waves, arcs, orbits, formulas) with easings, pauses and turns, seen by everyone with this module.",
       "file": "src/modules/fun.js",
       "icon": "sparkles",
-      "version": "1.10.0",
+      "version": "1.11.0",
       "requires": { "map": "1.4.0", "map-pick": "1.2.0", "hub-api": "1.1.0", "motion": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.11.0",
+          "date": "2026-10-26",
+          "changes": [
+            "Only your own animations saved before stable references (or those you have the key of) are moved to the floor; the others wait for their author."
+          ]
+        },
         {
           "version": "1.10.0",
           "date": "2026-10-21",
@@ -490,9 +522,16 @@
       "description": "Save and apply outfits, including “No outfit” and “Invisible”.",
       "file": "src/modules/outfits.js",
       "icon": "shirt",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "requires": { "previews": "1.0.0" },
       "changelog": [
+        {
+          "version": "1.2.0",
+          "date": "2026-10-26",
+          "changes": [
+            "Imported and community hub outfits get the hub's limits: wearable ids only, names of 40 characters."
+          ]
+        },
         {
           "version": "1.1.0",
           "date": "2026-10-17",
@@ -510,15 +549,22 @@
       "description": "Save and swap your desk decoration, and pick which objects belong to your desk.",
       "file": "src/modules/desks.js",
       "icon": "lamp-desk",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "requires": {
-        "map": "1.2.0",
+        "map": "1.5.0",
         "map-pick": "1.0.0",
         "previews": "1.0.0",
         "placements": "1.1.0",
         "jobs": "1.0.0"
       },
       "changelog": [
+        {
+          "version": "1.5.0",
+          "date": "2026-10-26",
+          "changes": [
+            "Imported and community hub desks get the hub's limits (200 objects, positions within 100 tiles); an empty desk is refused."
+          ]
+        },
         {
           "version": "1.4.0",
           "date": "2026-10-17",
@@ -556,15 +602,22 @@
       "description": "Save a group of objects and place it anywhere on the map in one click.",
       "file": "src/modules/constructions.js",
       "icon": "boxes",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "requires": {
-        "map": "1.1.0",
+        "map": "1.5.0",
         "map-pick": "1.0.0",
         "previews": "1.0.0",
         "placements": "1.0.0",
         "jobs": "1.0.0"
       },
       "changelog": [
+        {
+          "version": "1.4.0",
+          "date": "2026-10-26",
+          "changes": [
+            "Imported and community hub constructions get the hub's limits (200 objects, positions within 100 tiles); an empty one is refused."
+          ]
+        },
         {
           "version": "1.3.0",
           "date": "2026-10-17",
@@ -695,9 +748,17 @@
       "description": "Your own images on the map, seen by everyone with this module: anywhere (size, layer, base line, collision) or over a real object to restyle it.",
       "file": "src/modules/custom.js",
       "icon": "image",
-      "version": "1.8.0",
+      "version": "1.9.0",
       "requires": { "map": "1.4.0", "map-pick": "1.2.0", "hub-api": "1.3.0" },
       "changelog": [
+        {
+          "version": "1.9.0",
+          "date": "2026-10-26",
+          "changes": [
+            "Images are loaded without cookies nor referrer, and those over 8 MB or 16 megapixels are refused before they are decoded, so one image can't freeze Gather.",
+            "Image URLs can no longer change the look of the list of your custom objects."
+          ]
+        },
         {
           "version": "1.8.0",
           "date": "2026-10-21",
