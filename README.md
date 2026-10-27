@@ -170,6 +170,7 @@ Your own images on the map, since Gather V2 cannot add custom objects. Everyone 
 - **Animated GIFs** (and animated WebP or PNG) play on the map, in sync for everyone, for images and restyles alike.
 - Placed images behave like map objects: Fun animates them and Bulk delete deletes them. They are hidden in Gather's simplified view, like the map's own objects.
 - **Your images** are listed: hover one to see it outlined in red on the map; the pencil and trash buttons (on hover) edit or delete it.
+- **Moving an image**: hold Alt and drag it on the map, or click its move button (on hover) then click where it goes. It is saved as soon as it lands; Esc cancels.
 
 Nothing is sent to Gather's server: people without the module see the map as it is, and collisions only stop the avatars of people who have it.
 

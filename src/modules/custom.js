@@ -143,7 +143,7 @@ window.__gatherMods.define("custom", (ctx) => {
     const reader = r.body.getReader();
     const chunks = [];
     let size = 0;
-    for (let chunk; !(chunk = await reader.read()).done; ) {
+    for (let chunk; !(chunk = await reader.read()).done;) {
       size += chunk.value.length;
       if (size > MAX_IMAGE_BYTES) {
         reader.cancel();
@@ -794,6 +794,128 @@ window.__gatherMods.define("custom", (ctx) => {
     renderList();
   }
 
+  // ===================
+  // Moving: drag one of your images on the map with Alt held, or click its
+  // Move button then the map. Saved as soon as it lands.
+  // ===================
+  let moving = null;
+  const replaceItem = (id, o) => (shared.items = shared.items.map((x) => (x.id === id ? o : x)));
+  // `grab`: where the pointer holds the image, in tiles from its top-left corner.
+  function startMove(o, grab) {
+    if (draft) closeDraft();
+    stopStamp();
+    moving = { id: o.id, before: o, grab, drop: false };
+  }
+  function moveTo(e) {
+    const p = map.pointerWorldPoint(e);
+    const o = shared.items.find((x) => x.id === moving.id);
+    if (!o) return;
+    const snap = (v) => Math.round(v * 8) / 8;
+    const free = {
+      ...unanchored(freeOf(o)),
+      x: snap(p.x / TILE_PX - moving.grab.x),
+      y: snap(p.y / TILE_PX - moving.grab.y),
+    };
+    replaceItem(o.id, { ...o, free });
+    renderAll();
+  }
+  async function endMove() {
+    const { id, before, drop } = moving;
+    moving = null;
+    const o = shared.items.find((x) => x.id === id);
+    const from = freeOf(before);
+    if (!o || !drop || (o.free.x === from.x && o.free.y === from.y)) {
+      if (o) replaceItem(id, before);
+      shared.status = "";
+      renderAll();
+      return renderList();
+    }
+    showStatus(`Moving "${o.name}"…`);
+    try {
+      const data = {
+        name: o.name,
+        imageUrl: o.imageUrl,
+        opacity: o.opacity,
+        mode: "free",
+        free: anchored(o.free),
+        ...(o.plane && { plane: o.plane }),
+      };
+      const { object } = await api.request(objectsPath(id), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data }),
+      });
+      replaceItem(id, object);
+      showStatus("");
+    } catch (e) {
+      replaceItem(id, before);
+      showStatus(`Could not move "${o.name}": ${e.message}`);
+    }
+    renderAll();
+  }
+  const moveSession = {
+    id: "custom-move",
+    hover(e) {
+      if (e && moving) moveTo(e);
+    },
+    pointerDown(e) {
+      moveTo(e);
+      moving.drop = true;
+      pick.stop("custom-move");
+    },
+    onStop: () => moving && endMove(),
+  };
+  function startMoveButton(o) {
+    if (pick.current()) pick.stop();
+    const f = freeOf(o);
+    startMove(o, { x: f.width / 2, y: f.height / 2 });
+    shared.status = `Click on the map to drop "${o.name}", Esc to cancel`;
+    pick.start(moveSession);
+    renderList();
+  }
+  // Your free image under the pointer, the front one first.
+  function ownImageAt(e) {
+    const p = map.pointerWorldPoint(e);
+    const [x, y] = [p.x / TILE_PX, p.y / TILE_PX];
+    let found = null;
+    for (const o of placedFree()) {
+      const f = freeOf(o);
+      if (!o.mine || x < f.x || y < f.y || x >= f.x + f.width || y >= f.y + f.height) continue;
+      const v = virtualOf(o);
+      if (v.isOpaqueAt(x, y) && (!found || v.drawY() > found.drawY())) found = v;
+    }
+    return found;
+  }
+  // Alt + drag takes the whole gesture from Gather.
+  const DRAG_EVENTS = ["pointerdown", "pointermove", "pointerup", "mousedown", "mouseup", "click"];
+  let dragging = null;
+  function onDragPointer(e) {
+    if (!dragging) {
+      if (e.type !== "pointerdown" || e.button !== 0 || !e.altKey) return;
+      if (moving || draft || stamp || pick.current() || !map.isOnMap(e)) return;
+      const v = ownImageAt(e);
+      if (!v) return;
+      const p = map.pointerWorldPoint(e);
+      const f = freeOf(v.o);
+      startMove(v.o, { x: p.x / TILE_PX - f.x, y: p.y / TILE_PX - f.y });
+      dragging = { active: true };
+    }
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    if (!dragging.active) return;
+    if (e.type === "pointermove") moveTo(e);
+    if (e.type === "pointerup") {
+      dragging.active = false;
+      moving.drop = true;
+      endMove();
+      setTimeout(() => (dragging = null));
+    }
+  }
+  for (const type of DRAG_EVENTS) addEventListener(type, onDragPointer, true);
+  ctx.onCleanup(() => {
+    for (const type of DRAG_EVENTS) removeEventListener(type, onDragPointer, true);
+  });
+
   function startDraft(mode, from = null) {
     if (pick.current()?.startsWith("custom-")) pick.stop();
     stopStamp();
@@ -922,7 +1044,7 @@ window.__gatherMods.define("custom", (ctx) => {
       ? own
           .map(
             (o) =>
-              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id ? " is-on" : ""}" data-id="${escapeHtml(o.id)}" title="Hover to see it on the map, outlined in red"><span class="gm-thumb" style="background-image:${escapeHtml(cssUrl(imageSrc(o.imageUrl)))}"></span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(o.name)}</span></div><span class="gm-tail hide-on-hover">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><div class="gm-actions"><button class="gm-iconbtn${o.id === stamp?.id ? " on" : ""}" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}"><i class="gm-i sm" data-i="copy"></i></button><button class="gm-iconbtn" data-edit="${escapeHtml(o.id)}" title="Edit this object"><i class="gm-i sm" data-i="pencil"></i></button><button class="gm-iconbtn gm-danger" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone"><i class="gm-i sm" data-i="trash-2"></i></button></div></div>`,
+              `<div class="gm-item${o.id === draft?.editId || o.id === stamp?.id || o.id === moving?.id ? " is-on" : ""}" data-id="${escapeHtml(o.id)}" title="Hover to see it on the map, outlined in red${o.mode === "free" ? ". Alt + drag it on the map to move it" : ""}"><span class="gm-thumb" style="background-image:${escapeHtml(cssUrl(imageSrc(o.imageUrl)))}"></span><div class="gm-item-text"><span class="gm-item-title">${escapeHtml(o.name)}</span></div><span class="gm-tail hide-on-hover">${o.mode === "skin" ? "Restyle" : LAYERS[o.free.layer].split(" (")[0]}</span><div class="gm-actions">${o.mode === "free" ? `<button class="gm-iconbtn${o.id === moving?.id ? " on" : ""}" data-move="${escapeHtml(o.id)}" title="Move: click on the map to drop it (or Alt + drag it on the map)"><i class="gm-i sm" data-i="move"></i></button>` : ""}<button class="gm-iconbtn${o.id === stamp?.id ? " on" : ""}" data-copy="${escapeHtml(o.id)}" title="${o.mode === "skin" ? "Restyle other objects with this image: click them, Esc to stop" : "Place copies: click on the map, Esc to stop"}"><i class="gm-i sm" data-i="copy"></i></button><button class="gm-iconbtn" data-edit="${escapeHtml(o.id)}" title="Edit this object"><i class="gm-i sm" data-i="pencil"></i></button><button class="gm-iconbtn gm-danger" data-del="${escapeHtml(o.id)}" title="Delete this object for everyone"><i class="gm-i sm" data-i="trash-2"></i></button></div></div>`,
           )
           .join("")
       : '<div class="gm-empty">You have no custom objects on this map</div>';
@@ -936,6 +1058,14 @@ window.__gatherMods.define("custom", (ctx) => {
       el.onclick = () => {
         const o = find(el.dataset.edit);
         if (o) startDraft(o.mode, o);
+      };
+    });
+    list.querySelectorAll("[data-move]").forEach((el) => {
+      el.onclick = () => {
+        const o = find(el.dataset.move);
+        if (!o) return;
+        if (moving?.id === o.id) pick.stop("custom-move");
+        else startMoveButton(o);
       };
     });
     list.querySelectorAll("[data-copy]").forEach((el) => {
@@ -1023,7 +1153,9 @@ window.__gatherMods.define("custom", (ctx) => {
             : "New image"
         : stamp
           ? "Placing copies"
-          : null,
+          : moving
+            ? "Moving"
+            : null,
     html: `
       <div class="gm-btn-row">
         <button class="gm-btn" id="gm-co-new" title="Draw an image anywhere: size, layer, base line and collision like a real object."><i class="gm-i" data-i="image-plus"></i>New image</button>
@@ -1068,6 +1200,8 @@ window.__gatherMods.define("custom", (ctx) => {
   `);
 
   ctx.onTick(() => {
+    // A sync would put the image being moved back where it was saved.
+    if (moving) return;
     const due = Date.now() - shared.syncedAt > SYNC_MS;
     if (map.currentFloorId() !== shared.floorId || (due && !document.hidden)) sync();
     else renderAll();
