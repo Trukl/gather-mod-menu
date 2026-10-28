@@ -894,9 +894,19 @@
       "description": "Halloween, Christmas and Easter looks for Gather, on by themselves during their season: interface colors and logo, every object lightly decorated (autumn leaves and cobwebs, snow and ornaments, pastels and Easter eggs) and effects over the map. A switch brings back Gather's usual look until the next season. Only on your screen.",
       "file": "src/modules/themes.js",
       "icon": "paintbrush",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "requires": { "map": "1.4.0" },
       "changelog": [
+        {
+          "version": "1.0.2",
+          "date": "2026-10-28",
+          "breaking": true,
+          "notice": "Gather is rolling out a new way of loading its images. With it, older versions of this module could turn every object of the map into a “?” and hide avatars, so they are turned off until you update.",
+          "changes": [
+            "With Gather's new way of loading images, the map no longer ends up with “?” instead of objects and no avatars.",
+            "With this new loading, objects keep Gather's look: the interface colors, the logo and the effects over the map still follow the season."
+          ]
+        },
         {
           "version": "1.0.1",
           "date": "2026-10-27",
