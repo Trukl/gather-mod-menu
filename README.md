@@ -215,7 +215,7 @@ Halloween, Christmas and Easter looks, only on your screen, each on by itself du
 What a theme changes:
 
 - **Interface**: Gather's colors and buttons take the season's accent (pumpkin orange, Christmas red, Easter lilac) and its logo becomes a pumpkin, a snowy logo or a bunny.
-- **Every catalog object**, decorated in your browser from Gather's own images, so new objects follow: autumn leaves, night windows and cobwebs for Halloween; snow on top, ornaments and frosted windows for Christmas; pastels, flowers and Easter eggs for Easter.
+- **Every catalog object**, decorated in your browser from Gather's own images, so new objects follow: autumn leaves, night windows and cobwebs for Halloween; snow on top, ornaments and frosted windows for Christmas; pastels, flowers and Easter eggs for Easter. Gather is rolling out a new way of loading its images that the mod cannot redraw: with it, objects keep their usual look and the rest of the theme stays.
 - **Over the map**: purple dusk, fog and bats; falling snow; drifting petals.
 
 The switch in the panel turns the season's theme off: Gather's usual look comes back until the next season, which turns on again. Outside these dates there is no theme to turn on. Walls, floors, avatars and custom objects keep their look, under the map effects.

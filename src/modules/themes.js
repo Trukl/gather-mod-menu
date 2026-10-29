@@ -528,9 +528,11 @@ window.__gatherMods.define("themes", (ctx) => {
     }
     return pixels;
   }
-  // Frames are named after the image URL Gather packed.
+  // Frames are named after the image URL Gather packed. Atlases Gather uploads
+  // straight to the GPU have no image to draw from: they keep their look.
   function paintTexture(texture) {
     texture.source.forEach((source, index) => {
+      if (source.isGLTexture) return;
       const frames = Object.entries(texture.frames)
         .filter(
           ([name, f]) => name.startsWith(CATALOG_URL) && f.sourceIndex === index && !f.rotated,
