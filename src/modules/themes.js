@@ -495,7 +495,9 @@ window.__gatherMods.define("themes", (ctx) => {
   // Objects: Gather's atlases
   // ===================
   const textures = () => map.scene().textures;
-  // Atlas pages this module repainted, with Gather's image to put back.
+  const renderer = () => map.scene().game.renderer;
+  // Atlas pages this module repainted: their texture's key and what puts
+  // Gather's pixels back.
   const painted = new Map();
   // Themed pixels by frame name, for the active theme: Gather repacks its
   // atlases as objects come and go.
@@ -519,51 +521,144 @@ window.__gatherMods.define("themes", (ctx) => {
     if (!variantInfo.has(path)) indexVariants();
     return variantInfo.get(path) ?? { seed: hash(path), kind: "thing", main: true };
   }
-  function themedFrame(c2d, frame) {
+  // `read` gives the frame's own pixels; it only runs for frames not themed yet.
+  function themedFrame(frame, read) {
     let pixels = themedFrames.get(frame.name);
     if (!pixels) {
-      pixels = c2d.getImageData(frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight);
+      pixels = read();
       THEMES[active].objects(new Pixels(pixels), frameInfo(frame.name));
       themedFrames.set(frame.name, pixels);
     }
     return pixels;
   }
-  // Frames are named after the image URL Gather packed. Atlases Gather uploads
-  // straight to the GPU have no image to draw from: they keep their look.
+  function paintCanvas(source, frames) {
+    const image = source.image;
+    const canvas = document.createElement("canvas");
+    canvas.width = source.width;
+    canvas.height = source.height;
+    const c2d = canvas.getContext("2d", { willReadFrequently: true });
+    c2d.drawImage(image, 0, 0);
+    for (const f of frames)
+      c2d.putImageData(
+        themedFrame(f, () => c2d.getImageData(f.cutX, f.cutY, f.cutWidth, f.cutHeight)),
+        f.cutX,
+        f.cutY,
+      );
+    source.image = canvas;
+    source.isCanvas = true;
+    source.update();
+    return () => {
+      source.image = image;
+      source.isCanvas = false;
+      renderer().updateCanvasTexture(image, source.glTexture, source.flipY);
+    };
+  }
+
+  // Atlases Gather uploads straight to the GPU have no image behind them: their
+  // pixels are read back from the texture and rewritten in place, premultiplied
+  // like Gather uploads them. The GL state touched is put back for Phaser.
+  function readTexture(gl, source) {
+    const bound = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    const framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      source.glTexture.webGLTexture,
+      0,
+    );
+    const data = new Uint8Array(source.width * source.height * 4);
+    gl.readPixels(0, 0, source.width, source.height, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bound);
+    gl.deleteFramebuffer(framebuffer);
+    return data;
+  }
+  function writeFrame(gl, source, f, pixels, premultiply) {
+    const unit = gl.getParameter(gl.ACTIVE_TEXTURE);
+    gl.activeTexture(gl.TEXTURE0);
+    const bound = gl.getParameter(gl.TEXTURE_BINDING_2D);
+    const wasPremultiplying = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+    const wasFlipping = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+    gl.bindTexture(gl.TEXTURE_2D, source.glTexture.webGLTexture);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultiply);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texSubImage2D(
+      gl.TEXTURE_2D,
+      0,
+      f.cutX,
+      f.cutY,
+      f.cutWidth,
+      f.cutHeight,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      pixels,
+    );
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, wasPremultiplying);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, wasFlipping);
+    gl.bindTexture(gl.TEXTURE_2D, bound);
+    gl.activeTexture(unit);
+  }
+  function frameBytes(data, width, f) {
+    const row = f.cutWidth * 4;
+    const bytes = new Uint8Array(row * f.cutHeight);
+    for (let y = 0; y < f.cutHeight; y++) {
+      const start = ((f.cutY + y) * width + f.cutX) * 4;
+      bytes.set(data.subarray(start, start + row), y * row);
+    }
+    return bytes;
+  }
+  function unpremultiplied(bytes, f) {
+    const image = new ImageData(f.cutWidth, f.cutHeight);
+    for (let i = 0; i < bytes.length; i += 4) {
+      const a = bytes[i + 3];
+      if (!a) continue;
+      for (let c = 0; c < 3; c++) image.data[i + c] = (bytes[i + c] * 255) / a;
+      image.data[i + 3] = a;
+    }
+    return image;
+  }
+  function paintGpu(source, frames) {
+    const gl = renderer().gl;
+    const data = readTexture(gl, source);
+    const originals = frames.map((f) => [f, frameBytes(data, source.width, f)]);
+    for (const [f, bytes] of originals)
+      writeFrame(gl, source, f, themedFrame(f, () => unpremultiplied(bytes, f)).data, true);
+    return () => {
+      for (const [f, bytes] of originals) writeFrame(gl, source, f, bytes, false);
+    };
+  }
+
+  // Frames are named after the image URL Gather packed.
   function paintTexture(texture) {
     texture.source.forEach((source, index) => {
-      if (source.isGLTexture) return;
+      if (painted.has(source)) return;
       const frames = Object.entries(texture.frames)
         .filter(
           ([name, f]) => name.startsWith(CATALOG_URL) && f.sourceIndex === index && !f.rotated,
         )
         .map(([, f]) => f);
       if (!frames.length) return;
-      const image = painted.get(source) ?? source.image;
-      const canvas = document.createElement("canvas");
-      canvas.width = source.width;
-      canvas.height = source.height;
-      const c2d = canvas.getContext("2d", { willReadFrequently: true });
-      c2d.drawImage(image, 0, 0);
-      for (const f of frames) c2d.putImageData(themedFrame(c2d, f), f.cutX, f.cutY);
-      painted.set(source, image);
-      source.image = canvas;
-      source.isCanvas = true;
-      source.update();
+      const restore = source.isGLTexture ? paintGpu(source, frames) : paintCanvas(source, frames);
+      painted.set(source, { key: texture.key, restore });
     });
   }
   function unpaint() {
-    const renderer = map.scene().game.renderer;
-    for (const [source, image] of painted) {
-      source.image = image;
-      source.isCanvas = false;
-      renderer.updateCanvasTexture(image, source.glTexture, source.flipY);
-    }
+    for (const { restore } of painted.values()) restore();
     painted.clear();
   }
-  const onTextureAdded = (key, texture) => active && paintTexture(texture);
+  // Painted once Gather is done with the new atlas: an error here must not stop
+  // Gather from importing the next ones.
+  const onTextureAdded = (key, texture) =>
+    setTimeout(() => {
+      if (!active || textures().get(key) !== texture) return;
+      paintTexture(texture);
+      map.requestRender();
+    });
+  // Runs inside Phaser's removal, after it cleared the pages' texture: an error
+  // here would cut Gather's own code short, such as an avatar's new look.
   const onTextureRemoved = (key) => {
-    for (const source of painted.keys()) if (source.texture.key === key) painted.delete(source);
+    for (const [source, page] of painted) if (page.key === key) painted.delete(source);
   };
   textures().on("addtexture", onTextureAdded);
   textures().on("removetexture", onTextureRemoved);

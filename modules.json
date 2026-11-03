@@ -894,9 +894,17 @@
       "description": "Halloween, Christmas and Easter looks for Gather, on by themselves during their season: interface colors and logo, every object lightly decorated (autumn leaves and cobwebs, snow and ornaments, pastels and Easter eggs) and effects over the map. A switch brings back Gather's usual look until the next season. Only on your screen.",
       "file": "src/modules/themes.js",
       "icon": "paintbrush",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "requires": { "map": "1.4.0" },
       "changelog": [
+        {
+          "version": "1.0.3",
+          "date": "2026-11-03",
+          "changes": [
+            "Objects are decorated again with Gather's new way of loading images (cobwebs and autumn leaves, snow and ornaments, pastels and Easter eggs): 1.0.2 left them with their usual look.",
+            "Your avatar no longer disappears when you come back from Away or Do not disturb while a theme is on. Gather had redone its object images in the meantime, and the theme then cut short the redrawing of your avatar; going Away and back again was the only way to see it."
+          ]
+        },
         {
           "version": "1.0.2",
           "date": "2026-10-28",
